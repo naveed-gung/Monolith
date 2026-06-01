@@ -1,8 +1,16 @@
 # Monolith
 
+![Monolith app icon](branding/app_icon_source.png)
+
+![Monolith hero graphic](docs/assets/readme-hero.svg)
+
 Monolith is a Flutter music player built around an offline-first mobile listening experience. The app combines device-library import, managed downloads, playlists, immersive playback UI, and shared Android/iOS presentation in a single codebase.
 
 The project is structured to keep platform UI parity high while still allowing each platform to expose the native behaviors users expect, including media-library access, background playback metadata, lock-screen controls, and Android notification transport controls.
+
+Today the product direction is centered on local-first playback, YouTube-source music acquisition, and a yt-dlp-style download workflow for building an offline library. In the current codebase, the embedded downloader implementation is powered by `youtube_explode_dart` rather than shipping `yt-dlp` binaries directly.
+
+For iOS right now, the project focus is jailbroken iOS 16 while the broader public-safe Windows-to-iPhone workflow remains on standby.
 
 ![Monolith product overview](docs/assets/product-overview.svg)
 
@@ -20,6 +28,7 @@ Playback is powered by `just_audio`, with `just_audio_background` handling syste
 
 - Shared Flutter UI for Android and iOS.
 - Local device-library import using `on_audio_query`.
+- YouTube-source music downloads aligned with a yt-dlp-style offline acquisition workflow.
 - Offline track persistence and manifest-backed download storage.
 - Download workflow with progress, pause, cancel, retry, and fatal-error handling.
 - Playlist creation and playlist membership management inside the Library surface.
@@ -121,6 +130,7 @@ Notes:
 
 - `flutter build ios` must be executed on macOS.
 - The downloader is not intended for web builds.
+- The current downloader flow targets YouTube-source audio acquisition and is described in yt-dlp terms for product direction, while the in-app implementation currently uses `youtube_explode_dart`.
 - The repository keeps local plugin overrides in `third_party/` to avoid AGP and Kotlin drift.
 
 ## Windows To iPhone Standby
@@ -178,8 +188,10 @@ The current widget suite is used as the primary fast validation path for shell n
 ### iOS
 
 - Uses the shared Flutter UI.
+- The current device-side focus is jailbroken iOS 16.
 - Prompts at startup for Apple Music and media-library import when supported.
 - Requires macOS tooling for build and signing.
+- The public-safe GitHub standby flow is prepared, but real-world iOS iteration is currently centered on jailbroken iOS 16 hardware.
 
 ## Documentation Map
 

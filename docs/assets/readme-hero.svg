@@ -1,0 +1,50 @@
+<svg width="1440" height="820" viewBox="0 0 1440 820" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="132" y1="58" x2="1289" y2="742" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#041E20"/>
+      <stop offset="0.52" stop-color="#0C3B3B"/>
+      <stop offset="1" stop-color="#112A44"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="188" y1="126" x2="1226" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#103338" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#0B182A" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="224" y1="225" x2="963" y2="587" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3BE0C1"/>
+      <stop offset="1" stop-color="#7FD6FF"/>
+    </linearGradient>
+    <filter id="shadow" x="114" y="62" width="1212" height="696" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="24"/>
+      <feGaussianBlur stdDeviation="28"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0117647 0 0 0 0 0.105882 0 0 0 0 0.137255 0 0 0 0.34 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+  <rect width="1440" height="820" rx="40" fill="url(#bg)"/>
+  <circle cx="1231" cy="148" r="150" fill="#52E0C7" fill-opacity="0.08"/>
+  <circle cx="240" cy="696" r="198" fill="#69B9FF" fill-opacity="0.08"/>
+  <g filter="url(#shadow)">
+    <rect x="170" y="118" width="1100" height="584" rx="34" fill="url(#panel)"/>
+    <rect x="170.75" y="118.75" width="1098.5" height="582.5" rx="33.25" stroke="white" stroke-opacity="0.12" stroke-width="1.5"/>
+  </g>
+  <rect x="224" y="174" width="128" height="128" rx="28" fill="#081A1F" stroke="#3BE0C1" stroke-opacity="0.45" stroke-width="2"/>
+  <path d="M257 266V208H290.5C315.629 208 332 218.65 332 237.75C332 256.932 315.629 266 290.5 266H257ZM280 246H290C302.15 246 308 242.084 308 237.75C308 233.331 302.15 228 290 228H280V246Z" fill="url(#accent)"/>
+  <path d="M231 336H1209" stroke="white" stroke-opacity="0.1" stroke-width="2"/>
+  <text x="394" y="220" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700" letter-spacing="0.8">Monolith</text>
+  <text x="394" y="273" fill="#C4F5EB" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="500">Offline-first music player with system-grade playback surfaces</text>
+  <text x="231" y="405" fill="#E9FFFB" font-family="Segoe UI, Arial, sans-serif" font-size="23" font-weight="700">What It Focuses On</text>
+  <text x="231" y="449" fill="#D7E8EE" font-family="Segoe UI, Arial, sans-serif" font-size="22">Library import, immersive playback, playlist control, and local music ownership.</text>
+  <text x="231" y="498" fill="#D7E8EE" font-family="Segoe UI, Arial, sans-serif" font-size="22">YouTube-source downloads aligned with a yt-dlp-style offline workflow.</text>
+  <text x="231" y="547" fill="#D7E8EE" font-family="Segoe UI, Arial, sans-serif" font-size="22">Background media metadata for Android notifications and iOS now-playing surfaces.</text>
+  <rect x="855" y="388" width="308" height="208" rx="24" fill="#081823" stroke="#8EDDFC" stroke-opacity="0.25" stroke-width="1.5"/>
+  <text x="889" y="439" fill="#88F0D8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="1.1">CURRENT IOS FOCUS</text>
+  <text x="889" y="487" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">Jailbroken</text>
+  <text x="889" y="530" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">iOS 16</text>
+  <text x="889" y="571" fill="#C9D7E0" font-family="Segoe UI, Arial, sans-serif" font-size="18">Public-safe builder standby remains in the repo,</text>
+  <text x="889" y="598" fill="#C9D7E0" font-family="Segoe UI, Arial, sans-serif" font-size="18">but near-term device work is centered here.</text>
+  <rect x="231" y="616" width="238" height="40" rx="20" fill="#0F2B31"/>
+  <text x="259" y="642" fill="#90F6DE" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">Flutter • just_audio • offline media</text>
+</svg>

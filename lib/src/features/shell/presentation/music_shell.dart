@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -7,11 +8,9 @@ import '../../../app/state/app_controller.dart';
 import '../../../app/state/app_scope.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
-import '../../../core/widgets/app_header.dart';
 import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/atmosphere.dart';
 import '../../../core/widgets/glass_panel.dart';
-import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
 import '../../downloads/presentation/downloads_page.dart';
 import '../../library/presentation/library_page.dart';
@@ -19,8 +18,8 @@ import '../../player/presentation/player_page.dart';
 import '../../search/presentation/search_page.dart';
 import '../../settings/presentation/settings_page.dart';
 
-const _kBottomNavigationFootprint = 104.0;
-const _kMiniPlayerBottomGap = AppSpacing.md;
+const _kNavBarHeight = 84.0;
+const _kMiniPlayerGap = AppSpacing.sm;
 
 class MusicShell extends StatefulWidget {
   const MusicShell({super.key});
@@ -29,7 +28,8 @@ class MusicShell extends StatefulWidget {
   State<MusicShell> createState() => _MusicShellState();
 }
 
-class _MusicShellState extends State<MusicShell> with TickerProviderStateMixin {
+class _MusicShellState extends State<MusicShell>
+    with TickerProviderStateMixin {
   late final AnimationController _visualizerController;
   late final AnimationController _artworkController;
   MonolithController? _controller;
@@ -43,7 +43,7 @@ class _MusicShellState extends State<MusicShell> with TickerProviderStateMixin {
     );
     _artworkController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 18),
+      duration: const Duration(seconds: 20),
     );
   }
 
@@ -70,7 +70,6 @@ class _MusicShellState extends State<MusicShell> with TickerProviderStateMixin {
   void _handleControllerChanged() {
     final controller = _controller;
     if (controller == null || !mounted) return;
-
     if (controller.isPlaying) {
       if (!_visualizerController.isAnimating) _visualizerController.repeat();
       if (!_artworkController.isAnimating) _artworkController.repeat();
@@ -87,63 +86,39 @@ class _MusicShellState extends State<MusicShell> with TickerProviderStateMixin {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wideLayout = constraints.maxWidth > 880;
-        final currentPage = _buildCurrentPage(controller);
+        final currentPage = _buildPage(controller);
 
         return Scaffold(
-          extendBody: !wideLayout,
+          extendBody: true,
           body: Stack(
             children: [
               const Positioned.fill(child: Atmosphere()),
-              SafeArea(
-                bottom: false,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: wideLayout ? 1280 : 480,
-                    ),
-                    child: wideLayout
-                        ? _WideShell(
-                            currentPage: currentPage,
-                            controller: controller,
-                            header: _buildHeader(controller),
-                            artworkAnimation: _artworkController,
-                          )
-                        : _NarrowShell(
-                            currentPage: currentPage,
-                            controller: controller,
-                            header: _buildHeader(controller),
-                            artworkAnimation: _artworkController,
-                          ),
-                  ),
-                ),
-              ),
+              currentPage,
+              // Player overlay
               Positioned.fill(
                 child: IgnorePointer(
                   ignoring: !controller.isPlayerOpen,
                   child: AnimatedSwitcher(
-                    duration: AppMotion.durMedium,
-                    switchInCurve: AppMotion.standard,
+                    duration: AppMotion.durSlow,
+                    switchInCurve: AppMotion.emphasized,
                     switchOutCurve: AppMotion.exit,
-                    transitionBuilder: (child, animation) {
-                      final curve = CurvedAnimation(
-                        parent: animation,
-                        curve: AppMotion.standard,
-                        reverseCurve: AppMotion.exit,
-                      );
+                    transitionBuilder: (child, anim) {
                       return FadeTransition(
-                        opacity: curve,
+                        opacity: CurvedAnimation(
+                          parent: anim,
+                          curve: AppMotion.standard,
+                        ),
                         child: SlideTransition(
                           position: Tween<Offset>(
-                            begin: const Offset(0, 0.08),
+                            begin: const Offset(0, 1),
                             end: Offset.zero,
-                          ).animate(curve),
-                          child: ScaleTransition(
-                            scale: Tween<double>(
-                              begin: 0.985,
-                              end: 1,
-                            ).animate(curve),
-                            child: child,
+                          ).animate(
+                            CurvedAnimation(
+                              parent: anim,
+                              curve: AppMotion.emphasized,
+                            ),
                           ),
+                          child: child,
                         ),
                       );
                     },
@@ -153,7 +128,6 @@ class _MusicShellState extends State<MusicShell> with TickerProviderStateMixin {
                             controller: controller,
                             animation: _visualizerController,
                             artworkAnimation: _artworkController,
-                            wideLayout: wideLayout,
                           )
                         : const SizedBox.shrink(
                             key: ValueKey('player-overlay-hidden'),
@@ -165,33 +139,34 @@ class _MusicShellState extends State<MusicShell> with TickerProviderStateMixin {
           ),
           bottomNavigationBar: wideLayout
               ? null
-              : _BottomNavigation(controller: controller),
+              : _BottomNav(controller: controller),
         );
       },
     );
   }
 
-  Widget _buildCurrentPage(MonolithController controller) {
-    switch (controller.currentTab) {
-      case AppTab.library:
-        return const LibraryPage();
-      case AppTab.downloads:
-        return const DownloadsPage(embedded: true);
-      case AppTab.search:
-        return const SearchPage();
-    }
-  }
+  Widget _buildPage(MonolithController controller) {
+    return SafeArea(
+      bottom: false,
+      child: switch (controller.currentTab) {
+        AppTab.library => _PageWithMiniPlayer(
+            key: const ValueKey('library'),
+            controller: controller,
+            child: LibraryPage(onOpenSettings: _openSettings),
+          ),
 
-  Widget _buildHeader(MonolithController controller) {
-    return AppHeader(
-      onMenuPressed: _openDownloads,
-      onProfilePressed: _openSettings,
-      statusLabel: 'Settings',
+        AppTab.downloads => _PageWithMiniPlayer(
+            key: const ValueKey('downloads'),
+            controller: controller,
+            child: const DownloadsPage(embedded: true),
+          ),
+        AppTab.search => _PageWithMiniPlayer(
+            key: const ValueKey('search'),
+            controller: controller,
+            child: const SearchPage(),
+          ),
+      },
     );
-  }
-
-  Future<void> _openDownloads() async {
-    _controller?.selectTab(AppTab.downloads);
   }
 
   Future<void> _openSettings() async {
@@ -201,305 +176,264 @@ class _MusicShellState extends State<MusicShell> with TickerProviderStateMixin {
   }
 }
 
-class _NarrowShell extends StatelessWidget {
-  const _NarrowShell({
-    required this.currentPage,
+class _PageWithMiniPlayer extends StatelessWidget {
+  const _PageWithMiniPlayer({
+    super.key,
     required this.controller,
-    required this.header,
-    required this.artworkAnimation,
+    required this.child,
   });
 
-  final Widget currentPage;
   final MonolithController controller;
-  final Widget header;
-  final Animation<double> artworkAnimation;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final showMiniPlayer = !controller.isPlayerOpen;
-
     return Stack(
       children: [
-        Column(
-          children: [
-            header,
-            Expanded(
-              child: KeyedSubtree(
-                key: ValueKey(controller.currentTab),
-                child: currentPage,
-              ),
-            ),
-          ],
-        ),
-        if (showMiniPlayer)
+        child,
+        if (!controller.isPlayerOpen)
           Positioned(
             left: AppSpacing.lg,
             right: AppSpacing.lg,
-            bottom: _kBottomNavigationFootprint + _kMiniPlayerBottomGap,
-            child: AnimatedSlide(
-              duration: AppMotion.durMedium,
-              curve: AppMotion.standard,
-              offset: showMiniPlayer ? Offset.zero : const Offset(0, 0.18),
-              child: AnimatedOpacity(
-                duration: AppMotion.durFast,
-                opacity: showMiniPlayer ? 1 : 0,
-                child: _MiniPlayer(controller: controller),
-              ),
-            ),
+            bottom: _kNavBarHeight + _kMiniPlayerGap,
+            child: _MiniPlayer(controller: controller),
           ),
       ],
     );
   }
 }
 
-class _WideShell extends StatelessWidget {
-  const _WideShell({
-    required this.currentPage,
-    required this.controller,
-    required this.header,
-    required this.artworkAnimation,
-  });
+// ── Bottom navigation bar ──────────────────────────────────────────────────
 
-  final Widget currentPage;
+class _BottomNav extends StatelessWidget {
+  const _BottomNav({required this.controller});
   final MonolithController controller;
-  final Widget header;
-  final Animation<double> artworkAnimation;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.md,
-        AppSpacing.lg,
-        AppSpacing.xl,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _RailNavigation(controller: controller),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            flex: 2,
-            child: GlassPanel(
-              child: Column(
+    final scheme = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final selected = AppTab.values.indexOf(controller.currentTab);
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: (brightness == Brightness.dark ? Colors.black : Colors.white)
+                .withValues(alpha: 0.82),
+            border: Border(
+              top: BorderSide(
+                color: scheme.outlineVariant.withValues(alpha: 0.4),
+                width: 0.5,
+              ),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: _kNavBarHeight,
+              child: Row(
                 children: [
-                  header,
-                  Expanded(
-                    child: KeyedSubtree(
-                      key: ValueKey(controller.currentTab),
-                      child: currentPage,
+                  for (final tab in AppTab.values)
+                    Expanded(
+                      child: _NavItem(
+                        tab: tab,
+                        isSelected: AppTab.values.indexOf(tab) == selected,
+                        onTap: () => controller.selectTab(tab),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
           ),
-          const SizedBox(width: AppSpacing.lg),
-          SizedBox(
-            width: 320,
-            child: Column(
-              children: [
-                AnimatedOpacity(
-                  duration: AppMotion.durFast,
-                  opacity: controller.isPlayerOpen ? 0.25 : 1,
-                  child: IgnorePointer(
-                    ignoring: controller.isPlayerOpen,
-                    child: _MiniPlayer(controller: controller),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                GlassPanel(
-                  padding: const EdgeInsets.all(AppSpacing.xl),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SectionHeader(title: 'Operations'),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        'Theme: ${controller.themePreference.name}',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Queue: ${controller.queueLabel}',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      if (controller.upNextTracks.isNotEmpty)
-                        for (final track in controller.upNextTracks.take(2)) ...[
-                          _QueuePreview(track: track),
-                          const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
-                        ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _RailNavigation extends StatelessWidget {
-  const _RailNavigation({required this.controller});
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.tab,
+    required this.isSelected,
+    required this.onTap,
+  });
 
-  final MonolithController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = AppTab.values.indexOf(controller.currentTab);
-    return GlassPanel(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
-      child: NavigationRail(
-        selectedIndex: selected,
-        onDestinationSelected: (index) =>
-            controller.selectTab(AppTab.values[index]),
-        labelType: NavigationRailLabelType.all,
-        destinations: [
-          NavigationRailDestination(
-            icon: PhosphorIcon(AppIcons.navLibrary(false), size: 26),
-            selectedIcon: PhosphorIcon(AppIcons.navLibrary(true), size: 26),
-            label: const Text('Library'),
-          ),
-          NavigationRailDestination(
-            icon: PhosphorIcon(AppIcons.navDownloads(false), size: 26),
-            selectedIcon: PhosphorIcon(AppIcons.navDownloads(true), size: 26),
-            label: const Text('Downloads'),
-          ),
-          NavigationRailDestination(
-            icon: PhosphorIcon(AppIcons.navSearch(false), size: 26),
-            selectedIcon: PhosphorIcon(AppIcons.navSearch(true), size: 26),
-            label: const Text('Search'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BottomNavigation extends StatelessWidget {
-  const _BottomNavigation({required this.controller});
-
-  final MonolithController controller;
+  final AppTab tab;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final selected = AppTab.values.indexOf(controller.currentTab);
-    return SafeArea(
-      top: false,
+    final scheme = Theme.of(context).colorScheme;
+    final label = switch (tab) {
+      AppTab.library => 'Library',
+      AppTab.downloads => 'Downloads',
+      AppTab.search => 'Search',
+    };
+    final icon = switch (tab) {
+      AppTab.library => AppIcons.navLibrary(isSelected),
+      AppTab.downloads => AppIcons.navDownloads(isSelected),
+      AppTab.search => AppIcons.navSearch(isSelected),
+    };
+
+    return InkResponse(
+      onTap: onTap,
+      radius: 32,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          0,
-          AppSpacing.md,
-          AppSpacing.sm + AppSpacing.xs,
-        ),
-        child: GlassPanel(
-          child: NavigationBar(
-            selectedIndex: selected,
-            height: 72,
-            onDestinationSelected: (index) =>
-                controller.selectTab(AppTab.values[index]),
-            destinations: [
-              NavigationDestination(
-                icon: PhosphorIcon(
-                  AppIcons.navLibrary(false),
-                  key: const Key('nav-library-icon'),
-                  size: 26,
-                ),
-                selectedIcon: PhosphorIcon(AppIcons.navLibrary(true), size: 26),
-                label: 'Library',
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedScale(
+              scale: isSelected ? 1.12 : 1.0,
+              duration: AppMotion.durFast,
+              curve: AppMotion.standard,
+              child: PhosphorIcon(
+                icon,
+                size: 26,
+                color: isSelected
+                    ? scheme.primary
+                    : scheme.onSurfaceVariant,
               ),
-              NavigationDestination(
-                icon: PhosphorIcon(
-                  AppIcons.navDownloads(false),
-                  key: const Key('nav-downloads-icon'),
-                  size: 26,
-                ),
-                selectedIcon:
-                    PhosphorIcon(AppIcons.navDownloads(true), size: 26),
-                label: 'Downloads',
-              ),
-              NavigationDestination(
-                icon: PhosphorIcon(
-                  AppIcons.navSearch(false),
-                  key: const Key('nav-search-icon'),
-                  size: 26,
-                ),
-                selectedIcon: PhosphorIcon(AppIcons.navSearch(true), size: 26),
-                label: 'Search',
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 3),
+            AnimatedDefaultTextStyle(
+              duration: AppMotion.durFast,
+              style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                    color: isSelected
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
+                    fontWeight: isSelected ? AppType.label : AppType.body,
+                  ),
+              child: Text(label),
+            ),
+          ],
         ),
       ),
     );
   }
 }
+
+// ── Mini player ────────────────────────────────────────────────────────────
 
 class _MiniPlayer extends StatelessWidget {
   const _MiniPlayer({required this.controller});
-
   final MonolithController controller;
 
   @override
   Widget build(BuildContext context) {
     final track = controller.currentTrack;
     final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return GlassPanel(
       key: const Key('mini-player'),
-      padding: const EdgeInsets.all(AppSpacing.md),
+      borderRadius: AppRadii.all(AppRadii.xl),
+      padding: EdgeInsets.zero,
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          onTap: controller.openPlayer,
-          borderRadius: AppRadii.all(AppRadii.lg),
-          child: Row(
+        child: ClipRRect(
+          borderRadius: AppRadii.all(AppRadii.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                width: 56,
-                height: 56,
-                child: Hero(
-                  tag: 'player-artwork-${track.id}',
-                  child: TrackArtwork(
-                    track: track,
-                    borderRadius: AppRadii.all(AppRadii.md),
+              // Main row
+              InkWell(
+                onTap: controller.openPlayer,
+                borderRadius: AppRadii.all(AppRadii.xl),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.sm,
+                    AppSpacing.sm,
+                    AppSpacing.sm,
+                    AppSpacing.sm,
+                  ),
+                  child: Row(
+                    children: [
+                      // Artwork
+                      SizedBox(
+                        width: 52,
+                        height: 52,
+                        child: Hero(
+                          tag: 'player-artwork-${track.id}',
+                          child: TrackArtwork(
+                            track: track,
+                            borderRadius: AppRadii.all(AppRadii.md),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      // Title + artist
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              track.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.titleSmall?.copyWith(
+                                fontWeight: AppType.label,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              track.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Controls
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _MiniButton(
+                            icon: AppIcons.skipBack,
+                            onPressed: controller.previousTrack,
+                            size: 22,
+                          ),
+                          _MiniButton(
+                            icon: controller.isPlaying
+                                ? AppIcons.pauseCircle
+                                : AppIcons.playCircle,
+                            onPressed: track.canPlay
+                                ? controller.togglePlayback
+                                : null,
+                            size: 32,
+                            color: scheme.primary,
+                          ),
+                          _MiniButton(
+                            icon: AppIcons.skipForward,
+                            onPressed: () =>
+                                controller.nextTrack(openPlayer: false),
+                            size: 22,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      track.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                    Text(
-                      track.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: track.canPlay ? controller.togglePlayback : null,
-                icon: PhosphorIcon(
-                  controller.isPlaying ? AppIcons.pauseCircle : AppIcons.playCircle,
-                  color: scheme.primary,
-                  size: 36,
+              // Thin progress bar
+              SizedBox(
+                height: 3,
+                child: ClipRRect(
+                  borderRadius: AppRadii.all(AppRadii.pill),
+                  child: LinearProgressIndicator(
+                    value: controller.playbackProgress,
+                    backgroundColor: scheme.outlineVariant.withValues(alpha: 0.3),
+                    valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                    minHeight: 3,
+                  ),
                 ),
               ),
             ],
@@ -509,6 +443,37 @@ class _MiniPlayer extends StatelessWidget {
     );
   }
 }
+
+class _MiniButton extends StatelessWidget {
+  const _MiniButton({
+    required this.icon,
+    required this.onPressed,
+    required this.size,
+    this.color,
+  });
+
+  final PhosphorIconData icon;
+  final VoidCallback? onPressed;
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return IconButton(
+      onPressed: onPressed,
+      icon: PhosphorIcon(
+        icon,
+        size: size,
+        color: color ?? scheme.onSurface,
+      ),
+      padding: const EdgeInsets.all(AppSpacing.xs),
+      constraints: BoxConstraints(minWidth: size + 8, minHeight: size + 8),
+    );
+  }
+}
+
+// ── Player overlay (full sheet) ────────────────────────────────────────────
 
 class _PlayerOverlay extends StatelessWidget {
   const _PlayerOverlay({
@@ -516,161 +481,75 @@ class _PlayerOverlay extends StatelessWidget {
     required this.controller,
     required this.animation,
     required this.artworkAnimation,
-    required this.wideLayout,
   });
 
   final MonolithController controller;
   final Animation<double> animation;
   final Animation<double> artworkAnimation;
-  final bool wideLayout;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final height = MediaQuery.sizeOf(context).height;
-    final panelHeight = wideLayout
-        ? (height * 0.82).clamp(520.0, 760.0)
-        : (height * 0.9).clamp(480.0, 860.0);
+    final brightness = Theme.of(context).brightness;
 
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            onTap: controller.closePlayer,
-            child: ColoredBox(
-              color: Colors.black.withValues(alpha: 0.32),
-            ),
-          ),
-        ),
-        SafeArea(
-          child: Align(
-            alignment:
-                wideLayout ? Alignment.center : Alignment.bottomCenter,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                wideLayout ? AppSpacing.xxl : AppSpacing.sm + AppSpacing.xs,
-                wideLayout ? AppSpacing.xl : AppSpacing.sm + AppSpacing.xs,
-                wideLayout ? AppSpacing.xxl : AppSpacing.sm + AppSpacing.xs,
-                wideLayout ? AppSpacing.xl : 0,
+    return Container(
+      color: (brightness == Brightness.dark
+              ? AppSurfaces.dark.canvas
+              : AppSurfaces.light.canvas)
+          .withValues(alpha: 0.97),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Drag handle + close
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenInset,
+                AppSpacing.lg,
+                AppSpacing.md,
+                0,
               ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: wideLayout ? 520 : 480,
-                  maxHeight: panelHeight,
-                ),
-                child: Material(
-                  key: const Key('player-overlay-sheet'),
-                  color: scheme.surface.withValues(alpha: 0.96),
-                  elevation: 28,
-                  borderRadius: AppRadii.all(AppRadii.xl),
-                  clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.lg,
-                          AppSpacing.md,
-                          AppSpacing.md,
-                          AppSpacing.sm,
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 4,
-                                    margin: const EdgeInsets.only(
-                                      bottom: AppSpacing.md,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: scheme.outlineVariant,
-                                      borderRadius: AppRadii.all(AppRadii.pill),
-                                    ),
-                                  ),
-                                  Text(
-                                    'Now playing',
-                                    style: textTheme.titleLarge,
-                                  ),
-                                  Text(
-                                    'Opened from the mini deck',
-                                    style: textTheme.bodyMedium?.copyWith(
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              key: const Key('player-overlay-close'),
-                              onPressed: controller.closePlayer,
-                              icon: PhosphorIcon(AppIcons.close),
-                              tooltip: 'Close player',
-                            ),
-                          ],
-                        ),
+              child: Row(
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: scheme.outlineVariant,
+                        borderRadius: AppRadii.all(AppRadii.pill),
                       ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: PlayerPage(
-                          animation: animation,
-                          artworkAnimation: artworkAnimation,
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.screenInset,
-                            AppSpacing.sm,
-                            AppSpacing.screenInset,
-                            AppSpacing.xxl,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
+                  const Spacer(),
+                  IconButton(
+                    key: const Key('player-overlay-close'),
+                    onPressed: controller.closePlayer,
+                    icon: PhosphorIcon(
+                      AppIcons.close,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    tooltip: 'Close player',
+                  ),
+                ],
+              ),
+            ),
+            // Player content
+            Expanded(
+              child: PlayerPage(
+                animation: animation,
+                artworkAnimation: artworkAnimation,
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenInset,
+                  AppSpacing.sm,
+                  AppSpacing.screenInset,
+                  AppSpacing.xl,
                 ),
               ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
 
-class _QueuePreview extends StatelessWidget {
-  const _QueuePreview({required this.track});
-
-  final Track track;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 48,
-          height: 48,
-          child: TrackArtwork(
-            track: track,
-            borderRadius: AppRadii.all(AppRadii.sm),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm + AppSpacing.xs),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text(
-                track.artist,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}

@@ -8,8 +8,6 @@ import '../../../app/state/app_scope.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
 import '../../../core/widgets/app_icons.dart';
-import '../../../core/widgets/glass_panel.dart';
-import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
 
 class PlayerPage extends StatelessWidget {
@@ -32,479 +30,449 @@ class PlayerPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.watch(context);
-    final textTheme = Theme.of(context).textTheme;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final availableWidth = constraints.maxWidth.isFinite
-            ? constraints.maxWidth
-            : MediaQuery.sizeOf(context).width;
-        final deckWidth =
-            math.max(0.0, math.min(availableWidth - 40, 420.0));
-
-        return ListView(
-          padding: padding,
-          children: [
-            Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: deckWidth),
-                child: _PlaybackDeck(
-                  controller: controller,
-                  animation: animation,
-                  artworkAnimation: artworkAnimation,
-                  availableWidth: availableWidth,
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
-            SectionHeader(
-              title: 'Next songs',
-              actionLabel: 'Queue',
-              onAction: controller.openPlayer,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            if (controller.upNextTracks.isEmpty)
-              GlassPanel(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Text(
-                  'This is the only track in the active queue.',
-                  style: textTheme.bodyLarge,
-                ),
-              )
-            else
-              for (final queuedTrack in controller.upNextTracks) ...[
-                _QueueTile(track: queuedTrack),
-                const SizedBox(height: AppSpacing.md),
-              ],
-          ],
-        );
-      },
+    return ListView(
+      padding: padding,
+      children: [
+        _ArtworkSection(
+          controller: controller,
+          artworkAnimation: artworkAnimation,
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        _TrackInfo(controller: controller),
+        const SizedBox(height: AppSpacing.xl),
+        _ProgressSection(controller: controller),
+        const SizedBox(height: AppSpacing.xl),
+        _TransportControls(controller: controller),
+        const SizedBox(height: AppSpacing.xxxl),
+        _UpNextSection(controller: controller),
+      ],
     );
   }
 
-  static PhosphorIconData _repeatIcon(RepeatMode mode) {
-    switch (mode) {
-      case RepeatMode.off:
-        return AppIcons.repeat;
-      case RepeatMode.all:
-        return AppIcons.repeatFill;
-      case RepeatMode.one:
-        return AppIcons.repeatOne;
-    }
-  }
-
-  static String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds =
-        duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
+  static String formatDuration(Duration duration) {
+    final m = duration.inMinutes;
+    final s = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 }
 
-class _PlaybackDeck extends StatelessWidget {
-  const _PlaybackDeck({
+// ── Artwork ────────────────────────────────────────────────────────────────
+
+class _ArtworkSection extends StatelessWidget {
+  const _ArtworkSection({
     required this.controller,
-    required this.animation,
     required this.artworkAnimation,
-    required this.availableWidth,
   });
 
   final MonolithController controller;
-  final Animation<double> animation;
   final Animation<double> artworkAnimation;
-  final double availableWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final track = controller.currentTrack;
+    final maxSize = math.min(
+      MediaQuery.sizeOf(context).width - AppSpacing.screenInset * 2,
+      360.0,
+    );
+
+    return Center(
+      child: AnimatedBuilder(
+        animation: artworkAnimation,
+        builder: (context, child) {
+          final scale = controller.isPlaying
+              ? 1.0 + math.sin(artworkAnimation.value * math.pi * 2) * 0.012
+              : 0.94;
+          return AnimatedScale(
+            scale: scale,
+            duration: controller.isPlaying
+                ? const Duration(milliseconds: 600)
+                : AppMotion.durMedium,
+            curve: AppMotion.emphasized,
+            child: child,
+          );
+        },
+        child: Container(
+          width: maxSize,
+          height: maxSize,
+          decoration: BoxDecoration(
+            borderRadius: AppRadii.all(AppRadii.xl),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.primary.withValues(alpha: 0.28),
+                blurRadius: 48,
+                offset: const Offset(0, 24),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.20),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Hero(
+            tag: 'player-artwork-${track.id}',
+            child: TrackArtwork(
+              track: track,
+              borderRadius: AppRadii.all(AppRadii.xl),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Track info ─────────────────────────────────────────────────────────────
+
+class _TrackInfo extends StatelessWidget {
+  const _TrackInfo({required this.controller});
+  final MonolithController controller;
 
   @override
   Widget build(BuildContext context) {
     final track = controller.currentTrack;
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final artworkSize =
-        math.max(120.0, math.min(availableWidth - 104, 248.0));
-    final totalDuration = controller.currentTrackDuration;
 
-    return GlassPanel(
-      key: const Key('player-deck'),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.xl,
-        AppSpacing.xl,
-        AppSpacing.xl,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    track.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.headlineMedium?.copyWith(
+                      fontWeight: AppType.title,
+                      letterSpacing: AppType.trackTight,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    track.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleMedium?.copyWith(
+                      color: scheme.primary,
+                      fontWeight: AppType.body,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            _SourceBadge(source: track.source),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SourceBadge extends StatelessWidget {
+  const _SourceBadge({required this.source});
+  final TrackSource source;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final label = switch (source) {
+      TrackSource.mock => 'Demo',
+      TrackSource.device => 'Library',
+      TrackSource.downloaded => 'Downloaded',
+      TrackSource.imported => 'Imported',
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      track.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          textTheme.headlineSmall?.copyWith(fontSize: 30),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      track.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHigh
-                      .withValues(alpha: 0.64),
-                  borderRadius: AppRadii.all(AppRadii.pill),
-                  border: Border.all(
-                    color:
-                        scheme.outlineVariant.withValues(alpha: 0.35),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.xs + 3,
-                  ),
-                  child: Text(
-                    _sourceLabel(track.source),
-                    style: textTheme.labelMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          Center(
-            child: AnimatedBuilder(
-              animation: artworkAnimation,
-              builder: (context, child) {
-                final pulse = controller.isPlaying
-                    ? 1 +
-                          (math.sin(
-                                artworkAnimation.value * math.pi * 2,
-                              ) *
-                              0.028)
-                    : 1.0;
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: AppRadii.all(AppRadii.pill),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.5),
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              fontWeight: AppType.label,
+              letterSpacing: AppType.trackWide,
+            ),
+      ),
+    );
+  }
+}
 
-                return Transform.scale(
-                  scale: pulse,
-                  child: Container(
-                    width: artworkSize,
-                    height: artworkSize,
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          scheme.secondary.withValues(alpha: 0.38),
-                          scheme.primary.withValues(alpha: 0.12),
-                          scheme.surfaceContainerLow
-                              .withValues(alpha: 0.18),
-                        ],
-                      ),
-                      border: Border.all(
-                        color: scheme.primary.withValues(
-                          alpha: controller.isPlaying ? 0.28 : 0.2,
-                        ),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: scheme.primary.withValues(
-                            alpha:
-                                controller.isPlaying ? 0.22 : 0.16,
-                          ),
-                          blurRadius:
-                              controller.isPlaying ? 34 : 28,
-                          offset: const Offset(0, AppSpacing.lg),
-                        ),
-                      ],
-                    ),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: scheme.outlineVariant
-                              .withValues(alpha: 0.32),
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        child: ClipOval(
-                          child: SizedBox.expand(
-                            child: Transform.rotate(
-                              angle: controller.isPlaying
-                                  ? artworkAnimation.value *
-                                        math.pi *
-                                        2
-                                  : 0,
-                              child: Hero(
-                                tag: 'player-artwork-${track.id}',
-                                child: TrackArtwork(
-                                  track: track,
-                                  borderRadius:
-                                      AppRadii.all(AppRadii.pill),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+// ── Progress ───────────────────────────────────────────────────────────────
+
+class _ProgressSection extends StatelessWidget {
+  const _ProgressSection({required this.controller});
+  final MonolithController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final elapsed = PlayerPage.formatDuration(controller.currentPosition);
+    final total = PlayerPage.formatDuration(controller.currentTrackDuration);
+
+    return Column(
+      children: [
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 4,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+            activeTrackColor: scheme.primary,
+            inactiveTrackColor:
+                scheme.outlineVariant.withValues(alpha: 0.5),
+            thumbColor: Colors.white,
+            overlayColor: scheme.primary.withValues(alpha: 0.16),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          _Visualizer(
-            animation: animation,
-            isPlaying: controller.isPlaying,
-            colorA: scheme.primary,
-            colorB: scheme.tertiary,
+          child: Slider(
+            value: controller.playbackProgress,
+            onChanged: controller.setPlaybackProgress,
           ),
-          const SizedBox(height: AppSpacing.md),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 5,
-              thumbShape:
-                  const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape:
-                  const RoundSliderOverlayShape(overlayRadius: 14),
-            ),
-            child: Slider(
-              value: controller.playbackProgress,
-              onChanged: controller.setPlaybackProgress,
-            ),
-          ),
-          Row(
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(PlayerPage._formatDuration(controller.currentPosition)),
-              Text(PlayerPage._formatDuration(totalDuration)),
+              Text(
+                elapsed,
+                style: textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: AppType.body,
+                ),
+              ),
+              Text(
+                total,
+                style: textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: AppType.body,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _DeckToggleButton(
-                key: const Key('player-shuffle'),
-                onPressed: controller.toggleShuffle,
-                icon: controller.shuffleEnabled
-                    ? AppIcons.shuffleFill
-                    : AppIcons.shuffle,
-                tooltip: 'Shuffle',
-                active: controller.shuffleEnabled,
-              ),
-              _DeckIconButton(
-                key: const Key('player-prev'),
-                onPressed: controller.previousTrack,
-                icon: AppIcons.skipBack,
-                tooltip: 'Previous track',
-              ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [scheme.primary, scheme.secondary],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Transport ──────────────────────────────────────────────────────────────
+
+class _TransportControls extends StatelessWidget {
+  const _TransportControls({required this.controller});
+  final MonolithController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final track = controller.currentTrack;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Shuffle
+          _ToggleButton(
+            key: const Key('player-shuffle'),
+            icon: controller.shuffleEnabled
+                ? AppIcons.shuffleFill
+                : AppIcons.shuffle,
+            active: controller.shuffleEnabled,
+            onPressed: controller.toggleShuffle,
+            tooltip: 'Shuffle',
+          ),
+          // Previous
+          _TransportButton(
+            key: const Key('player-prev'),
+            icon: AppIcons.skipBack,
+            onPressed: controller.previousTrack,
+            size: 28,
+            tooltip: 'Previous',
+          ),
+          // Play / pause (large)
+          GestureDetector(
+            onTap: track.canPlay ? controller.togglePlayback : null,
+            child: AnimatedContainer(
+              duration: AppMotion.durFast,
+              curve: AppMotion.standard,
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.36),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          scheme.primary.withValues(alpha: 0.28),
-                      blurRadius: 18,
-                      offset: const Offset(0, AppSpacing.sm + AppSpacing.xs),
-                    ),
-                  ],
-                ),
-                child: IconButton(
-                  key: const Key('player-play-toggle'),
-                  onPressed:
-                      track.canPlay ? controller.togglePlayback : null,
-                  iconSize: 38,
+                ],
+              ),
+              child: Center(
+                child: PhosphorIcon(
+                  controller.isPlaying ? AppIcons.pause : AppIcons.play,
                   color: Colors.white,
-                  icon: PhosphorIcon(
-                    controller.isPlaying ? AppIcons.pause : AppIcons.play,
-                  ),
-                  tooltip: controller.isPlaying ? 'Pause' : 'Play',
+                  size: 28,
                 ),
               ),
-              _DeckIconButton(
-                key: const Key('playback-next'),
-                onPressed: track.canPlay
-                    ? () => controller.nextTrack(openPlayer: true)
-                    : null,
-                icon: AppIcons.skipForward,
-                tooltip: 'Next track',
-              ),
-              _DeckToggleButton(
-                key: const Key('player-repeat'),
-                onPressed: controller.cycleRepeatMode,
-                icon: PlayerPage._repeatIcon(controller.repeatMode),
-                tooltip: 'Repeat',
-                active: controller.repeatMode != RepeatMode.off,
-              ),
-            ],
+            ),
+          ),
+          // Next
+          _TransportButton(
+            key: const Key('playback-next'),
+            icon: AppIcons.skipForward,
+            onPressed: track.canPlay
+                ? () => controller.nextTrack(openPlayer: true)
+                : null,
+            size: 28,
+            tooltip: 'Next',
+          ),
+          // Repeat
+          _ToggleButton(
+            key: const Key('player-repeat'),
+            icon: _repeatIcon(controller.repeatMode),
+            active: controller.repeatMode != RepeatMode.off,
+            onPressed: controller.cycleRepeatMode,
+            tooltip: 'Repeat',
           ),
         ],
       ),
     );
   }
 
-  static String _sourceLabel(TrackSource source) {
-    switch (source) {
-      case TrackSource.mock:
-        return 'Placeholder';
-      case TrackSource.device:
-        return 'Device library';
-      case TrackSource.downloaded:
-        return 'Downloaded';
-      case TrackSource.imported:
-        return 'Files import';
-    }
-  }
+  static PhosphorIconData _repeatIcon(RepeatMode mode) => switch (mode) {
+        RepeatMode.off => AppIcons.repeat,
+        RepeatMode.all => AppIcons.repeatFill,
+        RepeatMode.one => AppIcons.repeatOne,
+      };
 }
 
-class _DeckIconButton extends StatelessWidget {
-  const _DeckIconButton({
+class _TransportButton extends StatelessWidget {
+  const _TransportButton({
     super.key,
-    required this.onPressed,
     required this.icon,
+    required this.onPressed,
+    required this.size,
     required this.tooltip,
   });
 
+  final PhosphorIconData icon;
   final VoidCallback? onPressed;
-  final PhosphorIconData icon;
+  final double size;
   final String tooltip;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh.withValues(alpha: 0.72),
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.45),
-        ),
-      ),
-      child: IconButton(
-        onPressed: onPressed,
-        icon: PhosphorIcon(icon),
-        iconSize: 26,
-        tooltip: tooltip,
-      ),
+    return IconButton(
+      onPressed: onPressed,
+      icon: PhosphorIcon(icon, size: size),
+      color: scheme.onSurface,
+      tooltip: tooltip,
+      padding: const EdgeInsets.all(AppSpacing.sm),
     );
   }
 }
 
-class _DeckToggleButton extends StatelessWidget {
-  const _DeckToggleButton({
+class _ToggleButton extends StatelessWidget {
+  const _ToggleButton({
     super.key,
-    required this.onPressed,
     required this.icon,
-    required this.tooltip,
     required this.active,
+    required this.onPressed,
+    required this.tooltip,
   });
 
-  final VoidCallback onPressed;
   final PhosphorIconData icon;
-  final String tooltip;
   final bool active;
+  final VoidCallback onPressed;
+  final String tooltip;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: active
-            ? scheme.primary.withValues(alpha: 0.12)
-            : scheme.surfaceContainerHighest.withValues(alpha: 0.58),
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: active
-              ? scheme.primary.withValues(alpha: 0.36)
-              : scheme.outlineVariant.withValues(alpha: 0.45),
-        ),
-      ),
-      child: IconButton(
-        key: key,
-        onPressed: onPressed,
-        icon: PhosphorIcon(icon),
-        tooltip: tooltip,
-      ),
+    return IconButton(
+      onPressed: onPressed,
+      icon: PhosphorIcon(icon, size: 22),
+      color: active ? scheme.primary : scheme.onSurfaceVariant,
+      tooltip: tooltip,
+      padding: const EdgeInsets.all(AppSpacing.sm),
     );
   }
 }
 
-class _Visualizer extends StatelessWidget {
-  const _Visualizer({
-    required this.animation,
-    required this.isPlaying,
-    required this.colorA,
-    required this.colorB,
-  });
+// ── Up Next ────────────────────────────────────────────────────────────────
 
-  final Animation<double> animation;
-  final bool isPlaying;
-  final Color colorA;
-  final Color colorB;
+class _UpNextSection extends StatelessWidget {
+  const _UpNextSection({required this.controller});
+  final MonolithController controller;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 54,
-      child: AnimatedBuilder(
-        animation: animation,
-        builder: (context, _) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: List.generate(18, (index) {
-              final wave = math.sin(
-                (animation.value * math.pi * 2) + index / 2,
-              );
-              final height = isPlaying ? 10 + (wave.abs() * 30) : 8.0;
-              return AnimatedContainer(
-                duration: AppMotion.durFast,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: 5,
-                height: height,
-                decoration: BoxDecoration(
-                  borderRadius: AppRadii.all(AppRadii.pill),
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [colorA, colorB],
-                  ),
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Up Next',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: AppType.title,
+                  letterSpacing: AppType.trackSnug,
                 ),
-              );
-            }),
-          );
-        },
-      ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (controller.upNextTracks.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+            child: Text(
+              'End of queue',
+              style: textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        else
+          for (final track in controller.upNextTracks) ...[
+            _QueueTile(track: track),
+            Divider(
+              height: 1,
+              color: scheme.outlineVariant.withValues(alpha: 0.4),
+            ),
+          ],
+      ],
     );
   }
 }
 
 class _QueueTile extends StatelessWidget {
   const _QueueTile({required this.track});
-
   final Track track;
 
   @override
@@ -512,44 +480,50 @@ class _QueueTile extends StatelessWidget {
     final controller = AppScope.read(context);
     final scheme = Theme.of(context).colorScheme;
 
-    return Material(
-      color: scheme.surfaceContainerLowest,
-      borderRadius: AppRadii.all(AppRadii.md),
-      child: InkWell(
-        onTap: () => controller.selectTrack(track, openPlayer: true),
-        borderRadius: AppRadii.all(AppRadii.md),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 58,
-                height: 58,
-                child: TrackArtwork(
-                  track: track,
-                  borderRadius: AppRadii.all(AppRadii.sm),
-                ),
+    return InkWell(
+      onTap: () => controller.selectTrack(track, openPlayer: true),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 48,
+              height: 48,
+              child: TrackArtwork(
+                track: track,
+                borderRadius: AppRadii.all(AppRadii.sm),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      track.title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Text(
-                      '${track.artist} • ${track.genre}',
-                      style: Theme.of(context).textTheme.bodyMedium
-                          ?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    track.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: AppType.label,
+                        ),
+                  ),
+                  Text(
+                    track.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
               ),
-              PhosphorIcon(AppIcons.caretRight),
-            ],
-          ),
+            ),
+            PhosphorIcon(
+              AppIcons.caretRight,
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+          ],
         ),
       ),
     );

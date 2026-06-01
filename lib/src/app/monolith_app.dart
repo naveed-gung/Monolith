@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../features/shell/presentation/music_shell.dart';
 import 'state/app_controller.dart';
 import 'state/app_scope.dart';
+import 'theme/design_tokens.dart';
 import 'theme/monolith_theme.dart';
 
 class MonolithApp extends StatefulWidget {
@@ -97,8 +98,12 @@ class _MonolithAppState extends State<MonolithApp> {
             title: 'Monolith',
             debugShowCheckedModeBanner: false,
             themeMode: _controller.themeMode,
-            theme: MonolithTheme.light,
-            darkTheme: MonolithTheme.dark,
+            theme: MonolithTheme.light(
+              AccentSwatch.of(_controller.accentPreset),
+            ),
+            darkTheme: MonolithTheme.dark(
+              AccentSwatch.of(_controller.accentPreset),
+            ),
             home: const MusicShell(),
           );
         },

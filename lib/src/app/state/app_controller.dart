@@ -8,6 +8,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 import '../../core/data/demo_catalog.dart';
 import '../../core/models/music_models.dart';
+import '../theme/design_tokens.dart';
 import '../../core/services/download_store.dart';
 import '../../core/services/local_media_service.dart';
 import '../../core/services/media_downloader.dart';
@@ -49,6 +50,7 @@ class MonolithController extends ChangeNotifier {
   AppTab _currentTab = AppTab.downloads;
   LibraryCategory _selectedCategory = LibraryCategory.tracks;
   ThemePreference _themePreference = ThemePreference.system;
+  AccentPreset _accentPreset = AccentSwatch.fallback;
   RepeatMode _repeatMode = RepeatMode.all;
 
   int _selectedTrackIndex = 0;
@@ -89,6 +91,7 @@ class MonolithController extends ChangeNotifier {
   AppTab get currentTab => _currentTab;
   LibraryCategory get selectedCategory => _selectedCategory;
   ThemePreference get themePreference => _themePreference;
+  AccentPreset get accentPreset => _accentPreset;
   RepeatMode get repeatMode => _repeatMode;
   Track get currentTrack => tracks[_selectedTrackIndex];
   bool get isPlaying => _isPlaying;
@@ -371,10 +374,14 @@ class MonolithController extends ChangeNotifier {
   }
 
   void setThemePreference(ThemePreference preference) {
-    if (_themePreference == preference) {
-      return;
-    }
+    if (_themePreference == preference) return;
     _themePreference = preference;
+    notifyListeners();
+  }
+
+  void setAccentPreset(AccentPreset preset) {
+    if (_accentPreset == preset) return;
+    _accentPreset = preset;
     notifyListeners();
   }
 

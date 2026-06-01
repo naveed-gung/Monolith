@@ -1,0 +1,78 @@
+name: iOS Builder Standby
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_label:
+        description: Artifact label for the generated unsigned IPA
+        required: false
+        default: ipa
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  package-ios:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    env:
+      CI: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cocoapods/repos
+            ~/Library/Caches/CocoaPods
+            ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile', 'ios/Runner.xcodeproj/project.pbxproj', 'pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Precache iOS artifacts
+        run: flutter precache --ios
+
+      - name: Verify iOS 16 deployment target
+        run: |
+          grep -q "IPHONEOS_DEPLOYMENT_TARGET = 16.0;" ios/Runner.xcodeproj/project.pbxproj
+          grep -q "<string>16.0</string>" ios/Flutter/AppFrameworkInfo.plist
+          grep -q "platform :ios, '16.0'" ios/Podfile
+
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign --no-pub
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p build/ios/unsigned/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ios/unsigned/Payload/
+          cd build/ios/unsigned
+          zip -qry ../Monolith-unsigned.ipa Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_label }}
+          path: build/ios/Monolith-unsigned.ipa
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3

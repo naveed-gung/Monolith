@@ -11,6 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+.claude 
 
 # IntelliJ related
 *.iml
@@ -79,5 +80,4 @@ third_party/flutter-engine-maven/
 
 
 CLAUDE.md
-
-yet-to-be-fixed.md
+checkup.md

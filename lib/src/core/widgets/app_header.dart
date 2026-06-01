@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+
+import '../../app/theme/design_tokens.dart';
+import 'app_icons.dart';
 
 class AppHeader extends StatelessWidget {
   const AppHeader({
@@ -18,27 +22,41 @@ class AppHeader extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenInset,
+        AppSpacing.lg,
+        AppSpacing.screenInset,
+        AppSpacing.lg,
+      ),
       child: Row(
         children: [
           IconButton.filledTonal(
             key: const Key('menu-button'),
             onPressed: onMenuPressed,
-            icon: const Icon(Icons.download_rounded),
+            icon: PhosphorIcon(AppIcons.downloadFill, size: 20),
             tooltip: 'Downloads',
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Monolith', style: textTheme.headlineMedium),
+              child: Text(
+                'Monolith',
+                style: textTheme.headlineMedium,
+              ),
             ),
           ),
           FilledButton.tonalIcon(
             key: const Key('settings-button'),
             onPressed: onProfilePressed,
-            icon: const Icon(Icons.tune_rounded),
+            icon: PhosphorIcon(AppIcons.settings, size: 18),
             label: Text(statusLabel),
+            style: FilledButton.styleFrom(
+              foregroundColor: scheme.onSurfaceVariant,
+              textStyle: textTheme.labelMedium?.copyWith(
+                fontWeight: AppType.label,
+              ),
+            ),
           ),
         ],
       ),

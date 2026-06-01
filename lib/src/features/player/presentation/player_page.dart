@@ -1,10 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../app/state/app_controller.dart';
 import '../../../app/state/app_scope.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
+import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/glass_panel.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
@@ -14,7 +17,12 @@ class PlayerPage extends StatelessWidget {
     super.key,
     required this.animation,
     required this.artworkAnimation,
-    this.padding = const EdgeInsets.fromLTRB(20, 8, 20, 132),
+    this.padding = const EdgeInsets.fromLTRB(
+      AppSpacing.screenInset,
+      AppSpacing.sm,
+      AppSpacing.screenInset,
+      AppSpacing.xxxl,
+    ),
   });
 
   final Animation<double> animation;
@@ -31,7 +39,8 @@ class PlayerPage extends StatelessWidget {
         final availableWidth = constraints.maxWidth.isFinite
             ? constraints.maxWidth
             : MediaQuery.sizeOf(context).width;
-        final deckWidth = math.max(0.0, math.min(availableWidth - 40, 420.0));
+        final deckWidth =
+            math.max(0.0, math.min(availableWidth - 40, 420.0));
 
         return ListView(
           padding: padding,
@@ -47,16 +56,16 @@ class PlayerPage extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: AppSpacing.xxl),
             SectionHeader(
               title: 'Next songs',
               actionLabel: 'Queue',
               onAction: controller.openPlayer,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             if (controller.upNextTracks.isEmpty)
               GlassPanel(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Text(
                   'This is the only track in the active queue.',
                   style: textTheme.bodyLarge,
@@ -65,7 +74,7 @@ class PlayerPage extends StatelessWidget {
             else
               for (final queuedTrack in controller.upNextTracks) ...[
                 _QueueTile(track: queuedTrack),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
               ],
           ],
         );
@@ -73,25 +82,21 @@ class PlayerPage extends StatelessWidget {
     );
   }
 
-  static IconData _repeatIcon(RepeatMode mode) {
+  static PhosphorIconData _repeatIcon(RepeatMode mode) {
     switch (mode) {
       case RepeatMode.off:
-        return Icons.repeat_rounded;
+        return AppIcons.repeat;
       case RepeatMode.all:
-        return Icons.repeat_on_rounded;
+        return AppIcons.repeatFill;
       case RepeatMode.one:
-        return Icons.repeat_one_on_rounded;
+        return AppIcons.repeatOne;
     }
-  }
-
-  static Color _repeatColor(BuildContext context, RepeatMode mode) {
-    final scheme = Theme.of(context).colorScheme;
-    return mode == RepeatMode.off ? scheme.onSurfaceVariant : scheme.primary;
   }
 
   static String _formatDuration(Duration duration) {
     final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final seconds =
+        duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
   }
 }
@@ -114,12 +119,18 @@ class _PlaybackDeck extends StatelessWidget {
     final track = controller.currentTrack;
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final artworkSize = math.max(120.0, math.min(availableWidth - 104, 248.0));
+    final artworkSize =
+        math.max(120.0, math.min(availableWidth - 104, 248.0));
     final totalDuration = controller.currentTrackDuration;
 
     return GlassPanel(
       key: const Key('player-deck'),
-      padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        AppSpacing.xl,
+        AppSpacing.xl,
+        AppSpacing.xl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -134,9 +145,10 @@ class _PlaybackDeck extends StatelessWidget {
                       track.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: textTheme.headlineSmall?.copyWith(fontSize: 30),
+                      style:
+                          textTheme.headlineSmall?.copyWith(fontSize: 30),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       track.artist,
                       maxLines: 1,
@@ -148,19 +160,21 @@ class _PlaybackDeck extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHigh.withValues(alpha: 0.64),
-                  borderRadius: BorderRadius.circular(999),
+                  color: scheme.surfaceContainerHigh
+                      .withValues(alpha: 0.64),
+                  borderRadius: AppRadii.all(AppRadii.pill),
                   border: Border.all(
-                    color: scheme.outlineVariant.withValues(alpha: 0.35),
+                    color:
+                        scheme.outlineVariant.withValues(alpha: 0.35),
                   ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.xs + 3,
                   ),
                   child: Text(
                     _sourceLabel(track.source),
@@ -172,14 +186,16 @@ class _PlaybackDeck extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xl),
           Center(
             child: AnimatedBuilder(
               animation: artworkAnimation,
               builder: (context, child) {
                 final pulse = controller.isPlaying
                     ? 1 +
-                          (math.sin(artworkAnimation.value * math.pi * 2) *
+                          (math.sin(
+                                artworkAnimation.value * math.pi * 2,
+                              ) *
                               0.028)
                     : 1.0;
 
@@ -188,14 +204,15 @@ class _PlaybackDeck extends StatelessWidget {
                   child: Container(
                     width: artworkSize,
                     height: artworkSize,
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
                           scheme.secondary.withValues(alpha: 0.38),
                           scheme.primary.withValues(alpha: 0.12),
-                          scheme.surfaceContainerLow.withValues(alpha: 0.18),
+                          scheme.surfaceContainerLow
+                              .withValues(alpha: 0.18),
                         ],
                       ),
                       border: Border.all(
@@ -206,10 +223,12 @@ class _PlaybackDeck extends StatelessWidget {
                       boxShadow: [
                         BoxShadow(
                           color: scheme.primary.withValues(
-                            alpha: controller.isPlaying ? 0.22 : 0.16,
+                            alpha:
+                                controller.isPlaying ? 0.22 : 0.16,
                           ),
-                          blurRadius: controller.isPlaying ? 34 : 28,
-                          offset: const Offset(0, 18),
+                          blurRadius:
+                              controller.isPlaying ? 34 : 28,
+                          offset: const Offset(0, AppSpacing.lg),
                         ),
                       ],
                     ),
@@ -217,22 +236,26 @@ class _PlaybackDeck extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: scheme.outlineVariant.withValues(alpha: 0.32),
+                          color: scheme.outlineVariant
+                              .withValues(alpha: 0.32),
                         ),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(AppSpacing.md),
                         child: ClipOval(
                           child: SizedBox.expand(
                             child: Transform.rotate(
                               angle: controller.isPlaying
-                                  ? artworkAnimation.value * math.pi * 2
+                                  ? artworkAnimation.value *
+                                        math.pi *
+                                        2
                                   : 0,
                               child: Hero(
                                 tag: 'player-artwork-${track.id}',
                                 child: TrackArtwork(
                                   track: track,
-                                  borderRadius: BorderRadius.circular(999),
+                                  borderRadius:
+                                      AppRadii.all(AppRadii.pill),
                                 ),
                               ),
                             ),
@@ -245,19 +268,21 @@ class _PlaybackDeck extends StatelessWidget {
               },
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
           _Visualizer(
             animation: animation,
             isPlaying: controller.isPlaying,
             colorA: scheme.primary,
             colorB: scheme.tertiary,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               trackHeight: 5,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+              thumbShape:
+                  const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape:
+                  const RoundSliderOverlayShape(overlayRadius: 14),
             ),
             child: Slider(
               value: controller.playbackProgress,
@@ -271,21 +296,23 @@ class _PlaybackDeck extends StatelessWidget {
               Text(PlayerPage._formatDuration(totalDuration)),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _DeckToggleButton(
                 key: const Key('player-shuffle'),
                 onPressed: controller.toggleShuffle,
-                icon: Icons.shuffle_rounded,
+                icon: controller.shuffleEnabled
+                    ? AppIcons.shuffleFill
+                    : AppIcons.shuffle,
                 tooltip: 'Shuffle',
                 active: controller.shuffleEnabled,
               ),
               _DeckIconButton(
                 key: const Key('player-prev'),
                 onPressed: controller.previousTrack,
-                icon: Icons.skip_previous_rounded,
+                icon: AppIcons.skipBack,
                 tooltip: 'Previous track',
               ),
               DecoratedBox(
@@ -296,21 +323,21 @@ class _PlaybackDeck extends StatelessWidget {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: scheme.primary.withValues(alpha: 0.28),
+                      color:
+                          scheme.primary.withValues(alpha: 0.28),
                       blurRadius: 18,
-                      offset: const Offset(0, 10),
+                      offset: const Offset(0, AppSpacing.sm + AppSpacing.xs),
                     ),
                   ],
                 ),
                 child: IconButton(
                   key: const Key('player-play-toggle'),
-                  onPressed: track.canPlay ? controller.togglePlayback : null,
+                  onPressed:
+                      track.canPlay ? controller.togglePlayback : null,
                   iconSize: 38,
                   color: Colors.white,
-                  icon: Icon(
-                    controller.isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
+                  icon: PhosphorIcon(
+                    controller.isPlaying ? AppIcons.pause : AppIcons.play,
                   ),
                   tooltip: controller.isPlaying ? 'Pause' : 'Play',
                 ),
@@ -320,7 +347,7 @@ class _PlaybackDeck extends StatelessWidget {
                 onPressed: track.canPlay
                     ? () => controller.nextTrack(openPlayer: true)
                     : null,
-                icon: Icons.skip_next_rounded,
+                icon: AppIcons.skipForward,
                 tooltip: 'Next track',
               ),
               _DeckToggleButton(
@@ -360,7 +387,7 @@ class _DeckIconButton extends StatelessWidget {
   });
 
   final VoidCallback? onPressed;
-  final IconData icon;
+  final PhosphorIconData icon;
   final String tooltip;
 
   @override
@@ -377,7 +404,7 @@ class _DeckIconButton extends StatelessWidget {
       ),
       child: IconButton(
         onPressed: onPressed,
-        icon: Icon(icon),
+        icon: PhosphorIcon(icon),
         iconSize: 26,
         tooltip: tooltip,
       ),
@@ -395,7 +422,7 @@ class _DeckToggleButton extends StatelessWidget {
   });
 
   final VoidCallback onPressed;
-  final IconData icon;
+  final PhosphorIconData icon;
   final String tooltip;
   final bool active;
 
@@ -418,7 +445,7 @@ class _DeckToggleButton extends StatelessWidget {
       child: IconButton(
         key: key,
         onPressed: onPressed,
-        icon: Icon(icon),
+        icon: PhosphorIcon(icon),
         tooltip: tooltip,
       ),
     );
@@ -454,12 +481,12 @@ class _Visualizer extends StatelessWidget {
               );
               final height = isPlaying ? 10 + (wave.abs() * 30) : 8.0;
               return AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
+                duration: AppMotion.durFast,
                 margin: const EdgeInsets.symmetric(horizontal: 3),
                 width: 5,
                 height: height,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: AppRadii.all(AppRadii.pill),
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
@@ -487,12 +514,12 @@ class _QueueTile extends StatelessWidget {
 
     return Material(
       color: scheme.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: AppRadii.all(AppRadii.md),
       child: InkWell(
         onTap: () => controller.selectTrack(track, openPlayer: true),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: AppRadii.all(AppRadii.md),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
             children: [
               SizedBox(
@@ -500,10 +527,10 @@ class _QueueTile extends StatelessWidget {
                 height: 58,
                 child: TrackArtwork(
                   track: track,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: AppRadii.all(AppRadii.sm),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,14 +541,13 @@ class _QueueTile extends StatelessWidget {
                     ),
                     Text(
                       '${track.artist} • ${track.genre}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded),
+              PhosphorIcon(AppIcons.caretRight),
             ],
           ),
         ),

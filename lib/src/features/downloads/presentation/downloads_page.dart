@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../app/state/app_controller.dart';
 import '../../../app/state/app_scope.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
+import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/glass_panel.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
@@ -13,14 +16,13 @@ enum _DownloadsSortOrder { titleAsc, titleDesc }
 
 String _formatDurationLabel(Duration duration) {
   final minutes = duration.inMinutes;
-  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  final seconds =
+      duration.inSeconds.remainder(60).toString().padLeft(2, '0');
   return '$minutes:$seconds';
 }
 
 String _formatEtaLabel(Duration duration) {
-  if (duration.inMinutes >= 1) {
-    return _formatDurationLabel(duration);
-  }
+  if (duration.inMinutes >= 1) return _formatDurationLabel(duration);
   return '${duration.inSeconds}s';
 }
 
@@ -62,7 +64,6 @@ class _DownloadsPageState extends State<DownloadsPage> {
   _DownloadsSortOrder _sortOrder = _DownloadsSortOrder.titleAsc;
 
   bool get _hasUrl => _urlController.text.trim().isNotEmpty;
-
   bool get _hasCustomName => _nameController.text.trim().isNotEmpty;
 
   @override
@@ -82,7 +83,8 @@ class _DownloadsPageState extends State<DownloadsPage> {
   }
 
   List<Track> _visibleOfflineTracks(MonolithController controller) {
-    final query = _downloadsFilterController.text.trim().toLowerCase();
+    final query =
+        _downloadsFilterController.text.trim().toLowerCase();
     final filtered = controller.offlineTracks
         .where((track) {
           final matchesSource = switch (_downloadsFilter) {
@@ -92,34 +94,27 @@ class _DownloadsPageState extends State<DownloadsPage> {
             _DownloadsLibraryFilter.imported =>
               track.source == TrackSource.imported,
           };
-
-          if (!matchesSource) {
-            return false;
-          }
-
-          if (query.isEmpty) {
-            return true;
-          }
-
-          final haystack = '${track.title} ${track.artist} ${track.album}'
-              .toLowerCase();
+          if (!matchesSource) return false;
+          if (query.isEmpty) return true;
+          final haystack =
+              '${track.title} ${track.artist} ${track.album}'
+                  .toLowerCase();
           return haystack.contains(query);
         })
         .toList(growable: false);
 
     int compareTracks(Track left, Track right) {
-      final titleCompare = left.title.toLowerCase().compareTo(
-        right.title.toLowerCase(),
-      );
+      final titleCompare = left.title
+          .toLowerCase()
+          .compareTo(right.title.toLowerCase());
       if (titleCompare != 0) {
         return _sortOrder == _DownloadsSortOrder.titleAsc
             ? titleCompare
             : -titleCompare;
       }
-
-      final artistCompare = left.artist.toLowerCase().compareTo(
-        right.artist.toLowerCase(),
-      );
+      final artistCompare = left.artist
+          .toLowerCase()
+          .compareTo(right.artist.toLowerCase());
       return _sortOrder == _DownloadsSortOrder.titleAsc
           ? artistCompare
           : -artistCompare;
@@ -136,15 +131,20 @@ class _DownloadsPageState extends State<DownloadsPage> {
     final offlineTracks = _visibleOfflineTracks(controller);
 
     final content = ListView(
-      padding: EdgeInsets.fromLTRB(20, widget.embedded ? 20 : 12, 20, 28),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.screenInset,
+        widget.embedded ? AppSpacing.xl : AppSpacing.md,
+        AppSpacing.screenInset,
+        AppSpacing.xxl,
+      ),
       children: [
         SectionHeader(
           title: 'Your downloads',
           actionLabel: '${offlineTracks.length} saved',
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         GlassPanel(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -157,53 +157,50 @@ class _DownloadsPageState extends State<DownloadsPage> {
                   hintText: 'Title, artist, or album',
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.md),
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: AppSpacing.sm + AppSpacing.xs,
+                runSpacing: AppSpacing.sm + AppSpacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   ChoiceChip(
                     key: const Key('downloads-filter-all'),
                     label: const Text('All'),
-                    selected: _downloadsFilter == _DownloadsLibraryFilter.all,
+                    selected:
+                        _downloadsFilter == _DownloadsLibraryFilter.all,
                     showCheckmark: false,
-                    onSelected: (_) {
-                      setState(() {
-                        _downloadsFilter = _DownloadsLibraryFilter.all;
-                      });
-                    },
+                    onSelected: (_) => setState(() {
+                      _downloadsFilter = _DownloadsLibraryFilter.all;
+                    }),
                   ),
                   ChoiceChip(
                     key: const Key('downloads-filter-downloaded'),
                     label: const Text('Downloaded'),
-                    selected:
-                        _downloadsFilter == _DownloadsLibraryFilter.downloaded,
+                    selected: _downloadsFilter ==
+                        _DownloadsLibraryFilter.downloaded,
                     showCheckmark: false,
-                    onSelected: (_) {
-                      setState(() {
-                        _downloadsFilter = _DownloadsLibraryFilter.downloaded;
-                      });
-                    },
+                    onSelected: (_) => setState(() {
+                      _downloadsFilter =
+                          _DownloadsLibraryFilter.downloaded;
+                    }),
                   ),
                   ChoiceChip(
                     key: const Key('downloads-filter-imported'),
                     label: const Text('Imported'),
-                    selected:
-                        _downloadsFilter == _DownloadsLibraryFilter.imported,
+                    selected: _downloadsFilter ==
+                        _DownloadsLibraryFilter.imported,
                     showCheckmark: false,
-                    onSelected: (_) {
-                      setState(() {
-                        _downloadsFilter = _DownloadsLibraryFilter.imported;
-                      });
-                    },
+                    onSelected: (_) => setState(() {
+                      _downloadsFilter = _DownloadsLibraryFilter.imported;
+                    }),
                   ),
                   ConstrainedBox(
                     constraints: const BoxConstraints(minWidth: 170),
                     child: DropdownButtonFormField<_DownloadsSortOrder>(
                       key: const Key('downloads-sort-field'),
                       initialValue: _sortOrder,
-                      decoration: const InputDecoration(labelText: 'Sort'),
+                      decoration:
+                          const InputDecoration(labelText: 'Sort'),
                       items: const [
                         DropdownMenuItem(
                           value: _DownloadsSortOrder.titleAsc,
@@ -215,12 +212,8 @@ class _DownloadsPageState extends State<DownloadsPage> {
                         ),
                       ],
                       onChanged: (value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setState(() {
-                          _sortOrder = value;
-                        });
+                        if (value == null) return;
+                        setState(() => _sortOrder = value);
                       },
                     ),
                   ),
@@ -229,10 +222,10 @@ class _DownloadsPageState extends State<DownloadsPage> {
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.md),
         if (offlineTracks.isEmpty)
           GlassPanel(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Text(
               controller.offlineTracks.isEmpty
                   ? 'No saved downloads yet. Start one below and it will show up here.'
@@ -243,11 +236,13 @@ class _DownloadsPageState extends State<DownloadsPage> {
         else
           for (final track in offlineTracks) ...[
             _OfflineTrackTile(track: track),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
           ],
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xl),
+
+        // ── Downloader ─────────────────────────────────────────────────
         GlassPanel(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(AppSpacing.xl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -255,15 +250,15 @@ class _DownloadsPageState extends State<DownloadsPage> {
                 'Audio downloader',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 controller.downloaderError ??
                     'Paste a supported link, inspect the metadata, edit the filename, then download audio with cover art.',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: AppSpacing.lg),
               TextField(
                 controller: _urlController,
                 keyboardType: TextInputType.url,
@@ -273,10 +268,9 @@ class _DownloadsPageState extends State<DownloadsPage> {
                   hintText: 'https://www.youtube.com/watch?v=...',
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.md),
               FilledButton.icon(
-                onPressed:
-                    !_hasUrl ||
+                onPressed: !_hasUrl ||
                         _loadingPreview ||
                         controller.downloaderError != null
                     ? null
@@ -287,25 +281,28 @@ class _DownloadsPageState extends State<DownloadsPage> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.auto_awesome_rounded),
-                label: Text(_loadingPreview ? 'Inspecting…' : 'Inspect link'),
+                    : PhosphorIcon(AppIcons.inspect, size: 18),
+                label: Text(
+                  _loadingPreview ? 'Inspecting…' : 'Inspect link',
+                ),
               ),
               if (_errorMessage != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Text(
                   _errorMessage!,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: scheme.error),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: scheme.error),
                 ),
               ],
             ],
           ),
         ),
         if (_preview != null) ...[
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
           GlassPanel(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -316,14 +313,14 @@ class _DownloadsPageState extends State<DownloadsPage> {
                     ),
                     IconButton(
                       onPressed: _clearPreview,
-                      icon: const Icon(Icons.close_rounded),
+                      icon: PhosphorIcon(AppIcons.close),
                       tooltip: 'Clear detected details',
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md),
                 _PreviewTile(preview: _preview!),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 TextField(
                   controller: _nameController,
                   decoration: const InputDecoration(
@@ -331,7 +328,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
                     hintText: 'Edit the output name before downloading',
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md),
                 FilledButton.icon(
                   onPressed: _submitting || !_hasUrl || !_hasCustomName
                       ? null
@@ -342,24 +339,28 @@ class _DownloadsPageState extends State<DownloadsPage> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.download_rounded),
-                  label: Text(_submitting ? 'Starting…' : 'Download audio'),
+                      : PhosphorIcon(AppIcons.downloadFill, size: 18),
+                  label: Text(
+                    _submitting ? 'Starting…' : 'Download audio',
+                  ),
                 ),
               ],
             ),
           ),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xl),
+
+        // ── Activity ───────────────────────────────────────────────────
         SectionHeader(
           title: 'Download activity',
           actionLabel: controller.downloadTasks.isEmpty
               ? null
               : '${controller.downloadTasks.length} jobs',
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         if (controller.downloadTasks.isEmpty)
           GlassPanel(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Text(
               'No download jobs yet.',
               style: Theme.of(context).textTheme.bodyLarge,
@@ -378,18 +379,17 @@ class _DownloadsPageState extends State<DownloadsPage> {
               onRetry: task.canRetry
                   ? () => controller.retryDownload(task.processId)
                   : null,
-              onCancel: task.isActive || task.canPause
-                  ? () => controller.cancelDownload(task.processId)
-                  : null,
+              onCancel:
+                  task.isActive || task.canPause
+                      ? () => controller.cancelDownload(task.processId)
+                      : null,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
           ],
       ],
     );
 
-    if (widget.embedded) {
-      return content;
-    }
+    if (widget.embedded) return content;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Downloads')),
@@ -402,51 +402,35 @@ class _DownloadsPageState extends State<DownloadsPage> {
       _loadingPreview = true;
       _errorMessage = null;
     });
-
     try {
-      final preview = await controller.inspectDownload(_urlController.text);
+      final preview =
+          await controller.inspectDownload(_urlController.text);
       setState(() {
         _preview = preview;
         _nameController.text = preview.suggestedFileName;
       });
     } catch (error) {
-      setState(() {
-        _errorMessage = error.toString();
-      });
+      setState(() => _errorMessage = error.toString());
     } finally {
-      if (mounted) {
-        setState(() {
-          _loadingPreview = false;
-        });
-      }
+      if (mounted) setState(() => _loadingPreview = false);
     }
   }
 
   Future<void> _startDownload(MonolithController controller) async {
-    if (_preview == null) {
-      return;
-    }
-
+    if (_preview == null) return;
     setState(() {
       _submitting = true;
       _errorMessage = null;
     });
-
     try {
       await controller.startAudioDownload(
         preview: _preview!,
         fileName: _nameController.text,
       );
     } catch (error) {
-      setState(() {
-        _errorMessage = error.toString();
-      });
+      setState(() => _errorMessage = error.toString());
     } finally {
-      if (mounted) {
-        setState(() {
-          _submitting = false;
-        });
-      }
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -462,7 +446,6 @@ class _DownloadsPageState extends State<DownloadsPage> {
     final normalized = value.trim();
     final matchesCurrentPreview =
         _preview != null && _preview!.url == normalized;
-
     setState(() {
       _errorMessage = null;
       if (!matchesCurrentPreview) {
@@ -482,18 +465,17 @@ class _OfflineTrackTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = AppScope.read(context);
     final scheme = Theme.of(context).colorScheme;
-    final sourceLabel = track.source == TrackSource.imported
-        ? 'Imported'
-        : 'Downloaded';
+    final sourceLabel =
+        track.source == TrackSource.imported ? 'Imported' : 'Downloaded';
 
     return GlassPanel(
       key: Key('downloaded-track-${track.id}'),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => controller.selectTrack(track, openPlayer: true),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: AppRadii.all(AppRadii.lg),
           child: Row(
             children: [
               SizedBox(
@@ -501,10 +483,10 @@ class _OfflineTrackTile extends StatelessWidget {
                 height: 58,
                 child: TrackArtwork(
                   track: track,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: AppRadii.all(AppRadii.sm),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -515,19 +497,20 @@ class _OfflineTrackTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       track.artist,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.sm),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
                       children: [
                         _DetailChip(label: 'Source', value: sourceLabel),
                         _DetailChip(label: 'Album', value: track.album),
@@ -540,7 +523,7 @@ class _OfflineTrackTile extends StatelessWidget {
                 onPressed: track.canPlay
                     ? () => controller.selectTrack(track, openPlayer: true)
                     : null,
-                icon: const Icon(Icons.play_arrow_rounded),
+                icon: PhosphorIcon(AppIcons.play, size: 22),
                 tooltip: 'Play track',
               ),
             ],
@@ -563,7 +546,7 @@ class _PreviewTile extends StatelessWidget {
     return Row(
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: AppRadii.all(AppRadii.sm),
           child: SizedBox(
             width: 72,
             height: 72,
@@ -572,27 +555,27 @@ class _PreviewTile extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: scheme.surfaceContainerHigh,
                     ),
-                    child: Icon(
-                      Icons.music_note_rounded,
+                    child: PhosphorIcon(
+                      AppIcons.musicNote,
                       color: scheme.primary,
                     ),
                   )
                 : Image.network(
                     preview.thumbnailUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => DecoratedBox(
+                    errorBuilder: (_, _, _) => DecoratedBox(
                       decoration: BoxDecoration(
                         color: scheme.surfaceContainerHigh,
                       ),
-                      child: Icon(
-                        Icons.music_note_rounded,
+                      child: PhosphorIcon(
+                        AppIcons.musicNote,
                         color: scheme.primary,
                       ),
                     ),
                   ),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -601,7 +584,7 @@ class _PreviewTile extends StatelessWidget {
                 preview.title,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 preview.uploader ?? 'Unknown uploader',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -609,10 +592,10 @@ class _PreviewTile extends StatelessWidget {
                 ),
               ),
               if (preview.duration != null) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.xs),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
                   children: [
                     _DetailChip(
                       label: 'Time',
@@ -621,7 +604,9 @@ class _PreviewTile extends StatelessWidget {
                     if (preview.estimatedSizeBytes != null)
                       _DetailChip(
                         label: 'Size',
-                        value: _formatBytesLabel(preview.estimatedSizeBytes!),
+                        value: _formatBytesLabel(
+                          preview.estimatedSizeBytes!,
+                        ),
                       ),
                   ],
                 ),
@@ -654,7 +639,7 @@ class _DownloadTaskTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return GlassPanel(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -670,14 +655,15 @@ class _DownloadTaskTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       task.fileName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -688,32 +674,32 @@ class _DownloadTaskTile extends StatelessWidget {
                   if (onPause != null)
                     _TaskActionButton(
                       onPressed: onPause!,
-                      icon: Icons.pause_rounded,
+                      icon: AppIcons.pause,
                       tooltip: 'Pause download',
                     ),
                   if (onResume != null)
                     _TaskActionButton(
                       onPressed: onResume!,
-                      icon: Icons.play_arrow_rounded,
+                      icon: AppIcons.play,
                       tooltip: 'Resume download',
                     ),
                   if (onRetry != null)
                     _TaskActionButton(
                       onPressed: onRetry!,
-                      icon: Icons.refresh_rounded,
+                      icon: AppIcons.refresh,
                       tooltip: 'Retry download',
                     ),
                   if (onCancel != null)
                     _TaskActionButton(
                       onPressed: onCancel!,
-                      icon: Icons.close_rounded,
+                      icon: AppIcons.close,
                       tooltip: 'Cancel download',
                     ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           LinearProgressIndicator(
             value: task.status == DownloadTaskStatus.completed
                 ? 1
@@ -723,17 +709,17 @@ class _DownloadTaskTile extends StatelessWidget {
                 ? null
                 : task.progress,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             task.statusLabel,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: _statusColor(context, task.status),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.xs),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
             children: [
               if (task.mediaDuration != null)
                 _DetailChip(
@@ -760,35 +746,40 @@ class _DownloadTaskTile extends StatelessWidget {
                       '${_formatBytesLabel(task.downloadSpeedBytesPerSecond!)}/s',
                 ),
               if (task.eta > Duration.zero)
-                _DetailChip(label: 'ETA', value: _formatEtaLabel(task.eta)),
+                _DetailChip(
+                  label: 'ETA',
+                  value: _formatEtaLabel(task.eta),
+                ),
             ],
           ),
           if (task.errorMessage != null) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               task.errorMessage!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: scheme.error),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: scheme.error),
             ),
           ],
           if (task.latestDetailLine != null &&
               (task.status == DownloadTaskStatus.paused ||
                   task.status == DownloadTaskStatus.cancelled ||
                   task.status == DownloadTaskStatus.failed)) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             DecoratedBox(
               decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(14),
+                color: scheme.surfaceContainerHighest
+                    .withValues(alpha: 0.55),
+                borderRadius: AppRadii.all(AppRadii.sm),
                 border: Border.all(
                   color: scheme.outlineVariant.withValues(alpha: 0.4),
                 ),
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
+                  horizontal: AppSpacing.sm + AppSpacing.xs,
+                  vertical: AppSpacing.sm,
                 ),
                 child: Text(
                   task.latestDetailLine!,
@@ -807,7 +798,10 @@ class _DownloadTaskTile extends StatelessWidget {
     );
   }
 
-  static Color _statusColor(BuildContext context, DownloadTaskStatus status) {
+  static Color _statusColor(
+    BuildContext context,
+    DownloadTaskStatus status,
+  ) {
     final scheme = Theme.of(context).colorScheme;
     switch (status) {
       case DownloadTaskStatus.completed:
@@ -838,13 +832,16 @@ class _DetailChip extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHigh.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppRadii.all(AppRadii.pill),
         border: Border.all(
           color: scheme.outlineVariant.withValues(alpha: 0.42),
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
         child: Text(
           '$label $value',
           style: Theme.of(context).textTheme.labelSmall,
@@ -862,7 +859,7 @@ class _TaskActionButton extends StatelessWidget {
   });
 
   final VoidCallback onPressed;
-  final IconData icon;
+  final PhosphorIconData icon;
   final String tooltip;
 
   @override
@@ -870,7 +867,7 @@ class _TaskActionButton extends StatelessWidget {
     return IconButton(
       visualDensity: VisualDensity.compact,
       onPressed: onPressed,
-      icon: Icon(icon, size: 18),
+      icon: PhosphorIcon(icon, size: 18),
       tooltip: tooltip,
     );
   }

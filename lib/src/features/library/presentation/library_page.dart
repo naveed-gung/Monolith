@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../app/state/app_controller.dart';
 import '../../../app/state/app_scope.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
+import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/glass_panel.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
@@ -29,22 +32,14 @@ class LibraryPage extends StatelessWidget {
     Future<void> handleFilesImport() async {
       try {
         final message = await controller.importAudioFiles();
-        if (!context.mounted || message == null) {
-          return;
-        }
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        if (!context.mounted || message == null) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
       } catch (error) {
-        if (!context.mounted) {
-          return;
-        }
-
+        if (!context.mounted) return;
         final message = error.toString().replaceFirst('Bad state: ', '');
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
       }
     }
 
@@ -66,13 +61,13 @@ class LibraryPage extends StatelessWidget {
                   decoration: const InputDecoration(labelText: 'Title'),
                   textCapitalization: TextCapitalization.words,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: artistController,
                   decoration: const InputDecoration(labelText: 'Artist'),
                   textCapitalization: TextCapitalization.words,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: albumController,
                   decoration: const InputDecoration(labelText: 'Album'),
@@ -101,9 +96,7 @@ class LibraryPage extends StatelessWidget {
       artistController.dispose();
       albumController.dispose();
 
-      if (shouldSave != true) {
-        return;
-      }
+      if (shouldSave != true) return;
 
       final message = await controller.renameTrackMetadata(
         track: track,
@@ -111,9 +104,7 @@ class LibraryPage extends StatelessWidget {
         artist: updatedArtist,
         album: updatedAlbum,
       );
-      if (!context.mounted) {
-        return;
-      }
+      if (!context.mounted) return;
       showMessage(message);
     }
 
@@ -138,14 +129,10 @@ class LibraryPage extends StatelessWidget {
         },
       );
 
-      if (confirmed != true) {
-        return;
-      }
+      if (confirmed != true) return;
 
       final message = await controller.deleteTrack(track);
-      if (!context.mounted) {
-        return;
-      }
+      if (!context.mounted) return;
       showMessage(message);
     }
 
@@ -156,7 +143,12 @@ class LibraryPage extends StatelessWidget {
         showDragHandle: true,
         builder: (sheetContext) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenInset,
+              AppSpacing.sm,
+              AppSpacing.screenInset,
+              AppSpacing.xxl,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,27 +157,27 @@ class LibraryPage extends StatelessWidget {
                   'Add to playlist',
                   style: Theme.of(sheetContext).textTheme.titleLarge,
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Pick an existing playlist or create a new one for this track.',
+                  'Pick an existing playlist or create a new one.',
                   style: Theme.of(sheetContext).textTheme.bodyMedium,
                 ),
                 if (controller.playlistNames.isNotEmpty) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
                     children: [
-                      for (final playlistName in controller.playlistNames)
+                      for (final name in controller.playlistNames)
                         ActionChip(
-                          label: Text(playlistName),
+                          label: Text(name),
                           onPressed: () =>
-                              Navigator.of(sheetContext).pop(playlistName),
+                              Navigator.of(sheetContext).pop(name),
                         ),
                     ],
                   ),
                 ],
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.lg),
                 TextField(
                   controller: playlistController,
                   decoration: const InputDecoration(
@@ -194,7 +186,7 @@ class LibraryPage extends StatelessWidget {
                   ),
                   textCapitalization: TextCapitalization.words,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 Row(
                   children: [
                     Expanded(
@@ -203,13 +195,13 @@ class LibraryPage extends StatelessWidget {
                         child: const Text('Cancel'),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: FilledButton.icon(
                         onPressed: () => Navigator.of(
                           sheetContext,
                         ).pop(playlistController.text.trim()),
-                        icon: const Icon(Icons.add_circle_outline_rounded),
+                        icon: PhosphorIcon(AppIcons.plusCircle, size: 18),
                         label: const Text('Create & add'),
                       ),
                     ),
@@ -222,17 +214,13 @@ class LibraryPage extends StatelessWidget {
       );
       playlistController.dispose();
 
-      if (playlistName == null || playlistName.trim().isEmpty) {
-        return;
-      }
+      if (playlistName == null || playlistName.trim().isEmpty) return;
 
       final message = controller.addTrackToPlaylist(
         track: track,
         playlistName: playlistName,
       );
-      if (!context.mounted) {
-        return;
-      }
+      if (!context.mounted) return;
       showMessage(message);
     }
 
@@ -246,9 +234,7 @@ class LibraryPage extends StatelessWidget {
           await Share.share(summary);
         }
       } catch (error) {
-        if (!context.mounted) {
-          return;
-        }
+        if (!context.mounted) return;
         showMessage('Sharing failed: $error');
       }
     }
@@ -259,36 +245,39 @@ class LibraryPage extends StatelessWidget {
         showDragHandle: true,
         builder: (sheetContext) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.xl,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const Icon(Icons.edit_rounded),
+                  leading: PhosphorIcon(AppIcons.edit),
                   title: const Text('Edit'),
                   subtitle: const Text('Change name and other details'),
-                  onTap: () =>
-                      Navigator.of(sheetContext).pop(_TrackLibraryAction.edit),
+                  onTap: () => Navigator.of(sheetContext)
+                      .pop(_TrackLibraryAction.edit),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.playlist_add_rounded),
+                  leading: PhosphorIcon(AppIcons.addToPlaylist),
                   title: const Text('Add to playlist'),
-                  onTap: () => Navigator.of(
-                    sheetContext,
-                  ).pop(_TrackLibraryAction.addToPlaylist),
+                  onTap: () => Navigator.of(sheetContext)
+                      .pop(_TrackLibraryAction.addToPlaylist),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.share_rounded),
+                  leading: PhosphorIcon(AppIcons.share),
                   title: const Text('Share'),
-                  onTap: () =>
-                      Navigator.of(sheetContext).pop(_TrackLibraryAction.share),
+                  onTap: () => Navigator.of(sheetContext)
+                      .pop(_TrackLibraryAction.share),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded),
+                  leading: PhosphorIcon(AppIcons.delete),
                   title: const Text('Delete'),
-                  onTap: () => Navigator.of(
-                    sheetContext,
-                  ).pop(_TrackLibraryAction.delete),
+                  onTap: () => Navigator.of(sheetContext)
+                      .pop(_TrackLibraryAction.delete),
                 ),
               ],
             ),
@@ -315,15 +304,20 @@ class LibraryPage extends StatelessWidget {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 220),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenInset,
+        0,
+        AppSpacing.screenInset,
+        AppSpacing.xxxl + AppSpacing.xxl,
+      ),
       children: [
         GlassPanel(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppSpacing.xl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Device library', style: textTheme.headlineMedium),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 controller.isLibraryLoading
                     ? 'Scanning your device and loading downloaded audio.'
@@ -334,14 +328,14 @@ class LibraryPage extends StatelessWidget {
                   color: scheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: AppSpacing.lg),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final compactActions = constraints.maxWidth < 360;
 
                   return DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
+                      borderRadius: AppRadii.all(AppRadii.lg),
                       gradient: LinearGradient(
                         colors: [
                           scheme.primaryContainer,
@@ -351,7 +345,7 @@ class LibraryPage extends StatelessWidget {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(AppSpacing.lg),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -361,32 +355,33 @@ class LibraryPage extends StatelessWidget {
                               color: scheme.onPrimaryContainer,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: AppSpacing.sm),
                           Text(
                             '${controller.currentTrack.artist} • ${controller.currentTrack.album}',
                             style: textTheme.bodyLarge?.copyWith(
-                              color: scheme.onPrimaryContainer.withOpacity(
-                                0.84,
-                              ),
+                              color: scheme.onPrimaryContainer
+                                  .withValues(alpha: 0.84),
                             ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: AppSpacing.lg),
                           if (compactActions)
                             Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.stretch,
                               children: [
                                 FilledButton.icon(
                                   key: const Key('hero-resume-button'),
-                                  onPressed: controller.currentTrack.canPlay
-                                      ? () => controller.selectTrack(
-                                          controller.currentTrack,
-                                          openPlayer: true,
-                                        )
-                                      : null,
-                                  icon: const Icon(Icons.play_arrow_rounded),
+                                  onPressed:
+                                      controller.currentTrack.canPlay
+                                          ? () => controller.selectTrack(
+                                              controller.currentTrack,
+                                              openPlayer: true,
+                                            )
+                                          : null,
+                                  icon: PhosphorIcon(AppIcons.play, size: 18),
                                   label: const Text('Open player'),
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: AppSpacing.md),
                                 FilledButton.tonalIcon(
                                   key: const Key('hero-import-button'),
                                   onPressed: controller.isImportingAudio
@@ -396,43 +391,44 @@ class LibraryPage extends StatelessWidget {
                                       ? const SizedBox(
                                           width: 18,
                                           height: 18,
-                                          child: CircularProgressIndicator(
+                                          child:
+                                              CircularProgressIndicator(
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Icon(Icons.audio_file_rounded),
+                                      : PhosphorIcon(AppIcons.fileAudio, size: 18),
                                   label: Text(
                                     controller.isImportingAudio
                                         ? 'Importing audio'
                                         : 'Import from Files',
                                   ),
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: AppSpacing.md),
                                 OutlinedButton.icon(
-                                  onPressed: () {
-                                    controller.refreshLibrary(
-                                      retryPermissionRequest: true,
-                                    );
-                                  },
-                                  icon: const Icon(Icons.sync_rounded),
+                                  onPressed: () =>
+                                      controller.refreshLibrary(
+                                    retryPermissionRequest: true,
+                                  ),
+                                  icon: PhosphorIcon(AppIcons.scanDevice, size: 18),
                                   label: const Text('Rescan device'),
                                 ),
                               ],
                             )
                           else
                             Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
+                              spacing: AppSpacing.md,
+                              runSpacing: AppSpacing.md,
                               children: [
                                 FilledButton.icon(
                                   key: const Key('hero-resume-button'),
-                                  onPressed: controller.currentTrack.canPlay
-                                      ? () => controller.selectTrack(
-                                          controller.currentTrack,
-                                          openPlayer: true,
-                                        )
-                                      : null,
-                                  icon: const Icon(Icons.play_arrow_rounded),
+                                  onPressed:
+                                      controller.currentTrack.canPlay
+                                          ? () => controller.selectTrack(
+                                              controller.currentTrack,
+                                              openPlayer: true,
+                                            )
+                                          : null,
+                                  icon: PhosphorIcon(AppIcons.play, size: 18),
                                   label: const Text('Open player'),
                                 ),
                                 FilledButton.tonalIcon(
@@ -444,11 +440,12 @@ class LibraryPage extends StatelessWidget {
                                       ? const SizedBox(
                                           width: 18,
                                           height: 18,
-                                          child: CircularProgressIndicator(
+                                          child:
+                                              CircularProgressIndicator(
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Icon(Icons.audio_file_rounded),
+                                      : PhosphorIcon(AppIcons.fileAudio, size: 18),
                                   label: Text(
                                     controller.isImportingAudio
                                         ? 'Importing audio'
@@ -456,12 +453,11 @@ class LibraryPage extends StatelessWidget {
                                   ),
                                 ),
                                 OutlinedButton.icon(
-                                  onPressed: () {
-                                    controller.refreshLibrary(
-                                      retryPermissionRequest: true,
-                                    );
-                                  },
-                                  icon: const Icon(Icons.sync_rounded),
+                                  onPressed: () =>
+                                      controller.refreshLibrary(
+                                    retryPermissionRequest: true,
+                                  ),
+                                  icon: PhosphorIcon(AppIcons.scanDevice, size: 18),
                                   label: const Text('Rescan device'),
                                 ),
                               ],
@@ -475,24 +471,27 @@ class LibraryPage extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xl),
         _CategorySelector(
           selected: controller.selectedCategory,
           onSelected: controller.selectLibraryCategory,
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: AppSpacing.xxl),
         switch (controller.selectedCategory) {
           LibraryCategory.tracks => _TracksView(
-            controller: controller,
-            onEditTrack: editTrack,
-            onDeleteTrack: deleteTrack,
-            onAddToPlaylist: addTrackToPlaylist,
-            onShareTrack: shareTrack,
-            onOpenTrackMenu: openTrackMenu,
-          ),
-          LibraryCategory.artists => _ArtistsView(controller: controller),
-          LibraryCategory.albums => _AlbumsView(controller: controller),
-          LibraryCategory.playlists => _PlaylistsView(controller: controller),
+              controller: controller,
+              onEditTrack: editTrack,
+              onDeleteTrack: deleteTrack,
+              onAddToPlaylist: addTrackToPlaylist,
+              onShareTrack: shareTrack,
+              onOpenTrackMenu: openTrackMenu,
+            ),
+          LibraryCategory.artists =>
+            _ArtistsView(controller: controller),
+          LibraryCategory.albums =>
+            _AlbumsView(controller: controller),
+          LibraryCategory.playlists =>
+            _PlaylistsView(controller: controller),
         },
       ],
     );
@@ -500,7 +499,10 @@ class LibraryPage extends StatelessWidget {
 }
 
 class _CategorySelector extends StatelessWidget {
-  const _CategorySelector({required this.selected, required this.onSelected});
+  const _CategorySelector({
+    required this.selected,
+    required this.onSelected,
+  });
 
   final LibraryCategory selected;
   final ValueChanged<LibraryCategory> onSelected;
@@ -519,7 +521,7 @@ class _CategorySelector extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: labels.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm + AppSpacing.xs),
         itemBuilder: (context, index) {
           final category = labels.keys.elementAt(index);
           final active = category == selected;
@@ -528,7 +530,10 @@ class _CategorySelector extends StatelessWidget {
             selected: active,
             onSelected: (_) => onSelected(category),
             showCheckmark: false,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
           );
         },
       ),
@@ -562,10 +567,10 @@ class _TracksView extends StatelessWidget {
           title: 'Tracks',
           actionLabel: '${controller.tracks.length} total',
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.md),
         if (controller.isLibraryLoading)
           const Padding(
-            padding: EdgeInsets.all(20),
+            padding: EdgeInsets.all(AppSpacing.xl),
             child: Center(child: CircularProgressIndicator()),
           )
         else
@@ -578,24 +583,24 @@ class _TracksView extends StatelessWidget {
               onShare: () => onShareTrack(track),
               onShowMenu: () => onOpenTrackMenu(track),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
           ],
-        const SizedBox(height: 28),
+        const SizedBox(height: AppSpacing.xxl),
         SectionHeader(
           title: 'Latest arrivals',
           actionLabel: 'Albums',
           onAction: () =>
               controller.selectLibraryCategory(LibraryCategory.albums),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.md),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: controller.highlightedTracks.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
+            crossAxisSpacing: AppSpacing.md,
+            mainAxisSpacing: AppSpacing.md,
             childAspectRatio: 0.76,
           ),
           itemBuilder: (context, index) {
@@ -630,10 +635,10 @@ class _ArtistsView extends StatelessWidget {
           actionLabel: 'Search',
           onAction: () => controller.selectTab(AppTab.search),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.md),
         for (final artist in artists) ...[
           GlassPanel(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             child: Row(
               children: [
                 CircleAvatar(
@@ -646,7 +651,7 @@ class _ArtistsView extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -656,10 +661,11 @@ class _ArtistsView extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
-                        '${controller.tracks.where((track) => track.artist == artist).length} tracks available',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                        '${controller.tracks.where((t) => t.artist == artist).length} tracks available',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -667,16 +673,16 @@ class _ArtistsView extends StatelessWidget {
                 IconButton(
                   onPressed: () {
                     final track = controller.tracks.firstWhere(
-                      (candidate) => candidate.artist == artist,
+                      (t) => t.artist == artist,
                     );
                     controller.selectTrack(track, openPlayer: true);
                   },
-                  icon: const Icon(Icons.play_circle_fill_rounded),
+                  icon: PhosphorIcon(AppIcons.playCircle, size: 28),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
         ],
       ],
     );
@@ -699,15 +705,15 @@ class _AlbumsView extends StatelessWidget {
           onAction: () =>
               controller.selectLibraryCategory(LibraryCategory.tracks),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.md),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: controller.albumHighlights.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
+            crossAxisSpacing: AppSpacing.md,
+            mainAxisSpacing: AppSpacing.md,
             childAspectRatio: 0.76,
           ),
           itemBuilder: (context, index) {
@@ -743,21 +749,25 @@ class _PlaylistsView extends StatelessWidget {
           onAction: () =>
               controller.selectLibraryCategory(LibraryCategory.tracks),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.md),
         for (final playlistName in playlists) ...[
           Builder(
             builder: (context) {
-              final playlistTracks = controller.tracksForPlaylist(playlistName);
-              final leadTrack = controller.leadTrackForPlaylist(playlistName);
+              final playlistTracks =
+                  controller.tracksForPlaylist(playlistName);
+              final leadTrack =
+                  controller.leadTrackForPlaylist(playlistName);
 
               return GlassPanel(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(AppSpacing.lg),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: AppRadii.all(AppRadii.lg),
                   onTap: leadTrack == null
                       ? null
-                      : () =>
-                            controller.selectTrack(leadTrack, openPlayer: true),
+                      : () => controller.selectTrack(
+                          leadTrack,
+                          openPlayer: true,
+                        ),
                   child: Row(
                     children: [
                       SizedBox(
@@ -767,46 +777,56 @@ class _PlaylistsView extends StatelessWidget {
                             ? DecoratedBox(
                                 decoration: BoxDecoration(
                                   color: scheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(18),
+                                  borderRadius: AppRadii.all(AppRadii.md),
                                 ),
-                                child: Icon(
-                                  Icons.queue_music_rounded,
+                                child: PhosphorIcon(
+                                  AppIcons.queue,
                                   color: scheme.onPrimaryContainer,
                                 ),
                               )
                             : TrackArtwork(
                                 track: leadTrack,
-                                borderRadius: BorderRadius.circular(18),
+                                borderRadius: AppRadii.all(AppRadii.md),
                               ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               playlistName,
-                              style: Theme.of(context).textTheme.titleMedium,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium,
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: AppSpacing.xs),
                             Text(
                               playlistTracks.isEmpty
                                   ? 'No tracks yet'
                                   : '${playlistTracks.length} tracks',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: scheme.onSurfaceVariant),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
                             ),
                             if (playlistTracks.isNotEmpty) ...[
-                              const SizedBox(height: 8),
+                              const SizedBox(height: AppSpacing.sm),
                               Text(
                                 playlistTracks
                                     .take(2)
-                                    .map((track) => track.title)
+                                    .map((t) => t.title)
                                     .join(' • '),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: scheme.onSurfaceVariant),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
                               ),
                             ],
                           ],
@@ -819,7 +839,7 @@ class _PlaylistsView extends StatelessWidget {
                                 leadTrack,
                                 openPlayer: true,
                               ),
-                        icon: const Icon(Icons.play_circle_fill_rounded),
+                        icon: PhosphorIcon(AppIcons.playCircle, size: 28),
                       ),
                     ],
                   ),
@@ -827,7 +847,7 @@ class _PlaylistsView extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
         ],
       ],
     );
@@ -866,17 +886,17 @@ class _TrackTile extends StatelessWidget {
             onPressed: onShare,
             backgroundColor: scheme.secondaryContainer,
             foregroundColor: scheme.onSecondaryContainer,
-            icon: Icons.share_rounded,
+            icon: AppIcons.share,
             label: 'Share',
             borderRadius: const BorderRadius.horizontal(
-              left: Radius.circular(22),
+              left: Radius.circular(AppRadii.md),
             ),
           ),
           _CardSlidableAction(
             onPressed: onEdit,
             backgroundColor: scheme.primaryContainer,
             foregroundColor: scheme.onPrimaryContainer,
-            icon: Icons.edit_rounded,
+            icon: AppIcons.edit,
             label: 'Edit',
           ),
         ],
@@ -889,27 +909,27 @@ class _TrackTile extends StatelessWidget {
             onPressed: onAddToPlaylist,
             backgroundColor: scheme.tertiaryContainer,
             foregroundColor: scheme.onTertiaryContainer,
-            icon: Icons.playlist_add_rounded,
+            icon: AppIcons.addToPlaylist,
             label: 'Playlist',
           ),
           _CardSlidableAction(
             onPressed: onDelete,
             backgroundColor: scheme.errorContainer,
             foregroundColor: scheme.onErrorContainer,
-            icon: Icons.delete_outline_rounded,
+            icon: AppIcons.delete,
             label: 'Delete',
             borderRadius: const BorderRadius.horizontal(
-              right: Radius.circular(22),
+              right: Radius.circular(AppRadii.md),
             ),
           ),
         ],
       ),
       child: GlassPanel(
         opacity: controller.currentTrack.id == track.id ? 0.82 : 0.68,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: InkWell(
           onTap: () => controller.selectTrack(track, openPlayer: true),
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: AppRadii.all(AppRadii.md),
           child: Row(
             children: [
               SizedBox(
@@ -917,10 +937,10 @@ class _TrackTile extends StatelessWidget {
                 height: 58,
                 child: TrackArtwork(
                   track: track,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: AppRadii.all(AppRadii.sm),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -929,26 +949,25 @@ class _TrackTile extends StatelessWidget {
                       track.title,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       '${track.artist} • ${track.album}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
               IconButton(
                 onPressed: onShowMenu,
-                icon: const Icon(Icons.more_horiz_rounded),
+                icon: PhosphorIcon(AppIcons.more, size: 20),
                 tooltip: 'Track actions',
               ),
               IconButton(
                 onPressed: track.canPlay
                     ? () => controller.selectTrack(track, openPlayer: true)
                     : null,
-                icon: const Icon(Icons.play_arrow_rounded),
+                icon: PhosphorIcon(AppIcons.play, size: 20),
                 tooltip: 'Play track',
               ),
             ],
@@ -972,7 +991,7 @@ class _CardSlidableAction extends StatelessWidget {
   final VoidCallback onPressed;
   final Color backgroundColor;
   final Color foregroundColor;
-  final IconData icon;
+  final PhosphorIconData icon;
   final String label;
   final BorderRadius borderRadius;
 
@@ -988,19 +1007,24 @@ class _CardSlidableAction extends StatelessWidget {
             child: InkWell(
               onTap: onPressed,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm + AppSpacing.xs,
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(icon, color: foregroundColor),
-                    const SizedBox(height: 8),
+                    PhosphorIcon(icon, color: foregroundColor),
+                    const SizedBox(height: AppSpacing.sm),
                     Text(
                       label,
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: foregroundColor,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelMedium
+                          ?.copyWith(
+                            color: foregroundColor,
+                            fontWeight: AppType.label,
+                          ),
                     ),
                   ],
                 ),
@@ -1030,23 +1054,23 @@ class _AlbumTile extends StatelessWidget {
 
     return Material(
       color: scheme.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: AppRadii.all(AppRadii.lg),
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: AppRadii.all(AppRadii.lg),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(AppSpacing.sm + AppSpacing.xs),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: TrackArtwork(
                   track: track,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: AppRadii.all(AppRadii.md),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 track.title,
                 maxLines: 1,
@@ -1057,9 +1081,9 @@ class _AlbumTile extends StatelessWidget {
                 '${track.artist} • ${track.genre}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),

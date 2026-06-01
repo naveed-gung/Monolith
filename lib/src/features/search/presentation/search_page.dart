@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../app/state/app_scope.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
+import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/glass_panel.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
@@ -50,36 +53,44 @@ class _SearchPageState extends State<SearchPage> {
     final results = controller.searchResults;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 132),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenInset,
+        0,
+        AppSpacing.screenInset,
+        AppSpacing.xxxl,
+      ),
       children: [
         GlassPanel(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(AppSpacing.xl),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Search library', style: textTheme.headlineMedium),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               Text(
                 'Search imported device songs and downloaded audio files.',
                 style: textTheme.bodyLarge?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: AppSpacing.lg),
               TextField(
                 key: const Key('search-field'),
                 controller: _queryController,
                 onChanged: controller.setSearchQuery,
                 decoration: InputDecoration(
                   hintText: 'Artists, songs, albums',
-                  prefixIcon: const Icon(Icons.search_rounded),
+                  prefixIcon: PhosphorIcon(
+                    AppIcons.navSearch(false),
+                    size: 20,
+                  ),
                   suffixIcon: controller.hasSearchFilters
                       ? IconButton(
                           onPressed: () {
                             controller.clearSearchFilters();
                             _queryController.clear();
                           },
-                          icon: const Icon(Icons.close_rounded),
+                          icon: PhosphorIcon(AppIcons.close, size: 20),
                           tooltip: 'Clear search',
                         )
                       : null,
@@ -88,16 +99,16 @@ class _SearchPageState extends State<SearchPage> {
             ],
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: AppSpacing.xxl),
         if (!controller.hasSearchFilters) ...[
           SectionHeader(
             title: 'Recent library',
             actionLabel: '${controller.tracks.length} items',
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md),
           for (final track in controller.tracks.take(6)) ...[
             _SearchResultTile(track: track),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
           ],
         ] else ...[
           SectionHeader(
@@ -108,10 +119,10 @@ class _SearchPageState extends State<SearchPage> {
               _queryController.clear();
             },
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md),
           if (results.isEmpty)
             GlassPanel(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               child: Text(
                 'No matches yet. Try a broader artist, song, or album term.',
                 style: textTheme.bodyLarge,
@@ -120,7 +131,7 @@ class _SearchPageState extends State<SearchPage> {
           else
             for (final track in results) ...[
               _SearchResultTile(track: track),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
             ],
         ],
       ],
@@ -140,13 +151,13 @@ class _SearchResultTile extends StatelessWidget {
 
     return Material(
       color: scheme.surfaceContainerLowest,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: AppRadii.all(AppRadii.md),
       child: InkWell(
         key: Key('search-track-${track.id}'),
         onTap: () => controller.selectTrack(track, openPlayer: true),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: AppRadii.all(AppRadii.md),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
             children: [
               SizedBox(
@@ -154,10 +165,10 @@ class _SearchResultTile extends StatelessWidget {
                 height: 68,
                 child: TrackArtwork(
                   track: track,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: AppRadii.all(AppRadii.sm),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,14 +177,13 @@ class _SearchResultTile extends StatelessWidget {
                       track.title,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       '${track.artist} • ${track.album}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(color: scheme.onSurfaceVariant),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.xs + 2),
                     Text(
                       track.blurb,
                       maxLines: 2,
@@ -187,7 +197,7 @@ class _SearchResultTile extends StatelessWidget {
                 onPressed: track.canPlay
                     ? () => controller.selectTrack(track, openPlayer: true)
                     : null,
-                icon: const Icon(Icons.play_circle_fill_rounded),
+                icon: PhosphorIcon(AppIcons.playCircle, size: 28),
                 tooltip: 'Play now',
               ),
             ],

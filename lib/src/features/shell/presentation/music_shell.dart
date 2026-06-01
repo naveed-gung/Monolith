@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../app/state/app_controller.dart';
 import '../../../app/state/app_scope.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
 import '../../../core/widgets/app_header.dart';
+import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/atmosphere.dart';
 import '../../../core/widgets/glass_panel.dart';
 import '../../../core/widgets/section_header.dart';
@@ -17,7 +20,7 @@ import '../../search/presentation/search_page.dart';
 import '../../settings/presentation/settings_page.dart';
 
 const _kBottomNavigationFootprint = 104.0;
-const _kMiniPlayerBottomGap = 14.0;
+const _kMiniPlayerBottomGap = AppSpacing.md;
 
 class MusicShell extends StatefulWidget {
   const MusicShell({super.key});
@@ -66,17 +69,11 @@ class _MusicShellState extends State<MusicShell> with TickerProviderStateMixin {
 
   void _handleControllerChanged() {
     final controller = _controller;
-    if (controller == null || !mounted) {
-      return;
-    }
+    if (controller == null || !mounted) return;
 
     if (controller.isPlaying) {
-      if (!_visualizerController.isAnimating) {
-        _visualizerController.repeat();
-      }
-      if (!_artworkController.isAnimating) {
-        _artworkController.repeat();
-      }
+      if (!_visualizerController.isAnimating) _visualizerController.repeat();
+      if (!_artworkController.isAnimating) _artworkController.repeat();
     } else {
       _visualizerController.stop();
       _artworkController.stop();
@@ -124,14 +121,14 @@ class _MusicShellState extends State<MusicShell> with TickerProviderStateMixin {
                 child: IgnorePointer(
                   ignoring: !controller.isPlayerOpen,
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 320),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
+                    duration: AppMotion.durMedium,
+                    switchInCurve: AppMotion.standard,
+                    switchOutCurve: AppMotion.exit,
                     transitionBuilder: (child, animation) {
                       final curve = CurvedAnimation(
                         parent: animation,
-                        curve: Curves.easeOutCubic,
-                        reverseCurve: Curves.easeInCubic,
+                        curve: AppMotion.standard,
+                        reverseCurve: AppMotion.exit,
                       );
                       return FadeTransition(
                         opacity: curve,
@@ -236,15 +233,15 @@ class _NarrowShell extends StatelessWidget {
         ),
         if (showMiniPlayer)
           Positioned(
-            left: 16,
-            right: 16,
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
             bottom: _kBottomNavigationFootprint + _kMiniPlayerBottomGap,
             child: AnimatedSlide(
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeOutCubic,
+              duration: AppMotion.durMedium,
+              curve: AppMotion.standard,
               offset: showMiniPlayer ? Offset.zero : const Offset(0, 0.18),
               child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 180),
+                duration: AppMotion.durFast,
                 opacity: showMiniPlayer ? 1 : 0,
                 child: _MiniPlayer(controller: controller),
               ),
@@ -271,12 +268,17 @@ class _WideShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.xl,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _RailNavigation(controller: controller),
-          const SizedBox(width: 18),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             flex: 2,
             child: GlassPanel(
@@ -293,43 +295,41 @@ class _WideShell extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: AppSpacing.lg),
           SizedBox(
             width: 320,
             child: Column(
               children: [
                 AnimatedOpacity(
-                  duration: const Duration(milliseconds: 180),
+                  duration: AppMotion.durFast,
                   opacity: controller.isPlayerOpen ? 0.25 : 1,
                   child: IgnorePointer(
                     ignoring: controller.isPlayerOpen,
                     child: _MiniPlayer(controller: controller),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.lg),
                 GlassPanel(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(AppSpacing.xl),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SectionHeader(title: 'Operations'),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.md),
                       Text(
                         'Theme: ${controller.themePreference.name}',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.sm),
                       Text(
                         'Queue: ${controller.queueLabel}',
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.lg),
                       if (controller.upNextTracks.isNotEmpty)
-                        for (final track in controller.upNextTracks.take(
-                          2,
-                        )) ...[
+                        for (final track in controller.upNextTracks.take(2)) ...[
                           _QueuePreview(track: track),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
                         ],
                     ],
                   ),
@@ -350,28 +350,29 @@ class _RailNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selected = AppTab.values.indexOf(controller.currentTab);
     return GlassPanel(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
       child: NavigationRail(
-        selectedIndex: AppTab.values.indexOf(controller.currentTab),
+        selectedIndex: selected,
         onDestinationSelected: (index) =>
             controller.selectTab(AppTab.values[index]),
         labelType: NavigationRailLabelType.all,
-        destinations: const [
+        destinations: [
           NavigationRailDestination(
-            icon: Icon(Icons.library_music_outlined),
-            selectedIcon: Icon(Icons.library_music),
-            label: Text('Library'),
+            icon: PhosphorIcon(AppIcons.navLibrary(false), size: 26),
+            selectedIcon: PhosphorIcon(AppIcons.navLibrary(true), size: 26),
+            label: const Text('Library'),
           ),
           NavigationRailDestination(
-            icon: Icon(Icons.download_outlined),
-            selectedIcon: Icon(Icons.download),
-            label: Text('Downloads'),
+            icon: PhosphorIcon(AppIcons.navDownloads(false), size: 26),
+            selectedIcon: PhosphorIcon(AppIcons.navDownloads(true), size: 26),
+            label: const Text('Downloads'),
           ),
           NavigationRailDestination(
-            icon: Icon(Icons.search_outlined),
-            selectedIcon: Icon(Icons.search),
-            label: Text('Search'),
+            icon: PhosphorIcon(AppIcons.navSearch(false), size: 26),
+            selectedIcon: PhosphorIcon(AppIcons.navSearch(true), size: 26),
+            label: const Text('Search'),
           ),
         ],
       ),
@@ -386,36 +387,49 @@ class _BottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final selected = AppTab.values.indexOf(controller.currentTab);
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.sm + AppSpacing.xs,
+        ),
         child: GlassPanel(
           child: NavigationBar(
-            selectedIndex: AppTab.values.indexOf(controller.currentTab),
+            selectedIndex: selected,
             height: 72,
             onDestinationSelected: (index) =>
                 controller.selectTab(AppTab.values[index]),
-            destinations: const [
+            destinations: [
               NavigationDestination(
-                icon: Icon(
-                  Icons.library_music_outlined,
-                  key: Key('nav-library-icon'),
+                icon: PhosphorIcon(
+                  AppIcons.navLibrary(false),
+                  key: const Key('nav-library-icon'),
+                  size: 26,
                 ),
-                selectedIcon: Icon(Icons.library_music),
+                selectedIcon: PhosphorIcon(AppIcons.navLibrary(true), size: 26),
                 label: 'Library',
               ),
               NavigationDestination(
-                icon: Icon(
-                  Icons.download_outlined,
-                  key: Key('nav-downloads-icon'),
+                icon: PhosphorIcon(
+                  AppIcons.navDownloads(false),
+                  key: const Key('nav-downloads-icon'),
+                  size: 26,
                 ),
-                selectedIcon: Icon(Icons.download),
+                selectedIcon:
+                    PhosphorIcon(AppIcons.navDownloads(true), size: 26),
                 label: 'Downloads',
               ),
               NavigationDestination(
-                icon: Icon(Icons.search_outlined, key: Key('nav-search-icon')),
-                selectedIcon: Icon(Icons.search),
+                icon: PhosphorIcon(
+                  AppIcons.navSearch(false),
+                  key: const Key('nav-search-icon'),
+                  size: 26,
+                ),
+                selectedIcon: PhosphorIcon(AppIcons.navSearch(true), size: 26),
                 label: 'Search',
               ),
             ],
@@ -438,12 +452,12 @@ class _MiniPlayer extends StatelessWidget {
 
     return GlassPanel(
       key: const Key('mini-player'),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: controller.openPlayer,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: AppRadii.all(AppRadii.lg),
           child: Row(
             children: [
               SizedBox(
@@ -453,11 +467,11 @@ class _MiniPlayer extends StatelessWidget {
                   tag: 'player-artwork-${track.id}',
                   child: TrackArtwork(
                     track: track,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: AppRadii.all(AppRadii.md),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,11 +496,11 @@ class _MiniPlayer extends StatelessWidget {
               ),
               IconButton(
                 onPressed: track.canPlay ? controller.togglePlayback : null,
-                icon: Icon(
-                  controller.isPlaying ? Icons.pause_circle : Icons.play_circle,
+                icon: PhosphorIcon(
+                  controller.isPlaying ? AppIcons.pauseCircle : AppIcons.playCircle,
                   color: scheme.primary,
+                  size: 36,
                 ),
-                iconSize: 36,
               ),
             ],
           ),
@@ -524,18 +538,21 @@ class _PlayerOverlay extends StatelessWidget {
         Positioned.fill(
           child: GestureDetector(
             onTap: controller.closePlayer,
-            child: ColoredBox(color: Colors.black.withValues(alpha: 0.32)),
+            child: ColoredBox(
+              color: Colors.black.withValues(alpha: 0.32),
+            ),
           ),
         ),
         SafeArea(
           child: Align(
-            alignment: wideLayout ? Alignment.center : Alignment.bottomCenter,
+            alignment:
+                wideLayout ? Alignment.center : Alignment.bottomCenter,
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                wideLayout ? 32 : 10,
-                wideLayout ? 24 : 10,
-                wideLayout ? 32 : 10,
-                wideLayout ? 24 : 0,
+                wideLayout ? AppSpacing.xxl : AppSpacing.sm + AppSpacing.xs,
+                wideLayout ? AppSpacing.xl : AppSpacing.sm + AppSpacing.xs,
+                wideLayout ? AppSpacing.xxl : AppSpacing.sm + AppSpacing.xs,
+                wideLayout ? AppSpacing.xl : 0,
               ),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
@@ -546,12 +563,17 @@ class _PlayerOverlay extends StatelessWidget {
                   key: const Key('player-overlay-sheet'),
                   color: scheme.surface.withValues(alpha: 0.96),
                   elevation: 28,
-                  borderRadius: BorderRadius.circular(wideLayout ? 34 : 30),
+                  borderRadius: AppRadii.all(AppRadii.xl),
                   clipBehavior: Clip.antiAlias,
                   child: Column(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 14, 12, 10),
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.lg,
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          AppSpacing.sm,
+                        ),
                         child: Row(
                           children: [
                             Expanded(
@@ -561,10 +583,12 @@ class _PlayerOverlay extends StatelessWidget {
                                   Container(
                                     width: 42,
                                     height: 4,
-                                    margin: const EdgeInsets.only(bottom: 12),
+                                    margin: const EdgeInsets.only(
+                                      bottom: AppSpacing.md,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: scheme.outlineVariant,
-                                      borderRadius: BorderRadius.circular(999),
+                                      borderRadius: AppRadii.all(AppRadii.pill),
                                     ),
                                   ),
                                   Text(
@@ -583,7 +607,7 @@ class _PlayerOverlay extends StatelessWidget {
                             IconButton(
                               key: const Key('player-overlay-close'),
                               onPressed: controller.closePlayer,
-                              icon: const Icon(Icons.close_rounded),
+                              icon: PhosphorIcon(AppIcons.close),
                               tooltip: 'Close player',
                             ),
                           ],
@@ -594,7 +618,12 @@ class _PlayerOverlay extends StatelessWidget {
                         child: PlayerPage(
                           animation: animation,
                           artworkAnimation: artworkAnimation,
-                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.screenInset,
+                            AppSpacing.sm,
+                            AppSpacing.screenInset,
+                            AppSpacing.xxl,
+                          ),
                         ),
                       ),
                     ],
@@ -623,10 +652,10 @@ class _QueuePreview extends StatelessWidget {
           height: 48,
           child: TrackArtwork(
             track: track,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: AppRadii.all(AppRadii.sm),
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.sm + AppSpacing.xs),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

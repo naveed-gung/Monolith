@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
+import '../../app/theme/design_tokens.dart';
 import '../models/music_models.dart';
 import 'artwork_painters.dart';
 
@@ -10,15 +11,16 @@ class TrackArtwork extends StatelessWidget {
   const TrackArtwork({
     super.key,
     required this.track,
-    this.borderRadius = const BorderRadius.all(Radius.circular(24)),
+    this.borderRadius,
   });
 
   final Track track;
-  final BorderRadius borderRadius;
+  final BorderRadius? borderRadius;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(borderRadius: borderRadius, child: _buildArtwork());
+    final r = borderRadius ?? AppRadii.all(AppRadii.lg);
+    return ClipRRect(borderRadius: r, child: _buildArtwork());
   }
 
   Widget _buildArtwork() {
@@ -28,7 +30,7 @@ class TrackArtwork extends StatelessWidget {
         return Image.file(
           artworkFile,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _fallbackArtwork(),
+          errorBuilder: (_, _, _) => _fallbackArtwork(),
         );
       }
     }
@@ -47,7 +49,7 @@ class TrackArtwork extends StatelessWidget {
       return Image.network(
         track.artworkUrl!,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallbackArtwork(),
+        errorBuilder: (_, _, _) => _fallbackArtwork(),
       );
     }
 

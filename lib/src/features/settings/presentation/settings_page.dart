@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/state/app_scope.dart';
+import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
+import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/glass_panel.dart';
 import '../../../core/widgets/section_header.dart';
 
@@ -14,9 +17,15 @@ class SettingsPage extends StatelessWidget {
   static final Uri _githubUri = Uri.parse('https://github.com/naveed-gung/');
   static final Uri _portfolioUri = Uri.parse('https://naveed-gung.dev/');
 
-  static Future<void> _openExternalLink(BuildContext context, Uri uri) async {
+  static Future<void> _openExternalLink(
+    BuildContext context,
+    Uri uri,
+  ) async {
     final messenger = ScaffoldMessenger.of(context);
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
 
     if (!launched && context.mounted) {
       messenger.showSnackBar(
@@ -32,49 +41,72 @@ class SettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 180),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.screenInset,
+          0,
+          AppSpacing.screenInset,
+          AppSpacing.xxxl + AppSpacing.xxl,
+        ),
         children: [
           Text('Settings', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             'Tune the shell, playback behavior, and how the app reacts to imported media.',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xl),
+
+          // ── Appearance ──────────────────────────────────────────────────
           GlassPanel(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SectionHeader(title: 'Appearance'),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.md),
                 SegmentedButton<ThemePreference>(
-                  segments: const [
+                  segments: [
                     ButtonSegment(
                       value: ThemePreference.system,
-                      label: Text('System'),
-                      icon: Icon(Icons.brightness_auto_rounded),
+                      label: const Text('System'),
+                      icon: PhosphorIcon(AppIcons.themeSystem, size: 18),
                     ),
                     ButtonSegment(
                       value: ThemePreference.light,
-                      label: Text('Light'),
-                      icon: Icon(Icons.light_mode_rounded),
+                      label: const Text('Light'),
+                      icon: PhosphorIcon(AppIcons.themeLight, size: 18),
                     ),
                     ButtonSegment(
                       value: ThemePreference.dark,
-                      label: Text('Dark'),
-                      icon: Icon(Icons.dark_mode_rounded),
+                      label: const Text('Dark'),
+                      icon: PhosphorIcon(AppIcons.themeDark, size: 18),
                     ),
                   ],
                   selected: {controller.themePreference},
-                  onSelectionChanged: (selection) {
-                    controller.setThemePreference(selection.first);
-                  },
+                  onSelectionChanged: (selection) =>
+                      controller.setThemePreference(selection.first),
                 ),
-                const SizedBox(height: 18),
-                SwitchListTile.adaptive(
+                const SizedBox(height: AppSpacing.lg),
+                const SectionHeader(title: 'Accent colour'),
+                const SizedBox(height: AppSpacing.md),
+                Wrap(
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.md,
+                  children: [
+                    for (final swatch in AccentSwatch.all)
+                      _AccentDot(
+                        swatch: swatch,
+                        selected:
+                            controller.accentPreset == swatch.preset,
+                        onTap: () =>
+                            controller.setAccentPreset(swatch.preset),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   value: controller.immersiveCanvas,
                   onChanged: controller.setImmersiveCanvas,
@@ -86,15 +118,17 @@ class SettingsPage extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
+
+          // ── Playback ─────────────────────────────────────────────────────
           GlassPanel(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SectionHeader(title: 'Playback rules'),
-                const SizedBox(height: 8),
-                SwitchListTile.adaptive(
+                const SizedBox(height: AppSpacing.sm),
+                SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   value: controller.downloadsOnWifi,
                   onChanged: controller.setDownloadsOnWifi,
@@ -103,7 +137,7 @@ class SettingsPage extends StatelessWidget {
                     'Protect cellular bandwidth for offline sync.',
                   ),
                 ),
-                SwitchListTile.adaptive(
+                SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   value: controller.normalizeAudio,
                   onChanged: controller.setNormalizeAudio,
@@ -112,7 +146,7 @@ class SettingsPage extends StatelessWidget {
                     'Balance playback levels between source masters.',
                   ),
                 ),
-                SwitchListTile.adaptive(
+                SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   value: controller.smoothTransitions,
                   onChanged: controller.setSmoothTransitions,
@@ -124,59 +158,65 @@ class SettingsPage extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
+
+          // ── Shortcuts ───────────────────────────────────────────────────
           GlassPanel(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SectionHeader(title: 'Workspace shortcuts'),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.travel_explore_rounded),
+                  leading: PhosphorIcon(AppIcons.compass),
                   title: const Text('Reset search'),
                   subtitle: const Text(
                     'Clear the current search state for a fresh browse.',
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
+                  trailing: PhosphorIcon(AppIcons.caretRight),
                   onTap: controller.clearSearchFilters,
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.play_circle_outline_rounded),
+                  leading: PhosphorIcon(AppIcons.playCircle),
                   title: const Text('Open player cockpit'),
                   subtitle: const Text(
                     'Jump back into the active queue and playback controls.',
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded),
+                  trailing: PhosphorIcon(AppIcons.caretRight),
                   onTap: controller.openPlayer,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
+
+          // ── Developer card ───────────────────────────────────────────────
           GlassPanel(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(AppSpacing.xl),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SectionHeader(title: 'Developer'),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 Row(
                   children: [
                     Container(
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(16),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.14),
+                        borderRadius: AppRadii.all(AppRadii.sm),
                         border: Border.all(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.outline.withValues(alpha: 0.18),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withValues(alpha: 0.18),
                         ),
                       ),
                       clipBehavior: Clip.antiAlias,
@@ -184,30 +224,33 @@ class SettingsPage extends StatelessWidget {
                         _profileImageAsset,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
-                          return Icon(
-                            Icons.person_rounded,
+                          return PhosphorIcon(
+                            AppIcons.person,
                             color: Theme.of(context).colorScheme.primary,
                           );
                         },
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Naveed Gung',
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style:
+                                Theme.of(context).textTheme.titleMedium,
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: AppSpacing.xs),
                           Text(
                             'Developer',
-                            style: Theme.of(context).textTheme.bodyMedium
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
                                 ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
                                 ),
                           ),
                         ],
@@ -215,20 +258,21 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.lg),
                 Row(
                   children: [
                     IconButton.filledTonal(
                       tooltip: 'GitHub',
-                      onPressed: () => _openExternalLink(context, _githubUri),
+                      onPressed: () =>
+                          _openExternalLink(context, _githubUri),
                       icon: const FaIcon(FontAwesomeIcons.github),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.md),
                     IconButton.filledTonal(
                       tooltip: 'Portfolio',
                       onPressed: () =>
                           _openExternalLink(context, _portfolioUri),
-                      icon: const Icon(Icons.language_rounded),
+                      icon: PhosphorIcon(AppIcons.globe),
                     ),
                   ],
                 ),
@@ -236,6 +280,56 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AccentDot extends StatelessWidget {
+  const _AccentDot({
+    required this.swatch,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AccentSwatch swatch;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: swatch.label,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: AppMotion.durFast,
+          curve: AppMotion.standard,
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: swatch.base,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected
+                  ? Theme.of(context).colorScheme.onSurface
+                  : Colors.transparent,
+              width: 2.5,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: swatch.base.withValues(alpha: 0.45),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : null,
+          ),
+          child: selected
+              ? Icon(Icons.check_rounded, color: swatch.on, size: 18)
+              : null,
+        ),
       ),
     );
   }

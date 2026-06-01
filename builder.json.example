@@ -10,10 +10,6 @@
     "scheme": "Runner",
     "signing": false
   },
-  "mobai": {
-    "url": "http://localhost:8686",
-    "device_id": ""
-  },
   "flutter": {
     "watch": {
       "dirs": ["lib"],

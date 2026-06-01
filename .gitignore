@@ -55,7 +55,7 @@ android/build/
 *.xcresult
 DerivedData/
 
-# MobAI / ios-builder local configuration overrides
+# ios-builder local configuration overrides
 builder.local.json
 builder.override.json
 

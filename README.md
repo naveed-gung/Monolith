@@ -175,16 +175,12 @@ Notes:
 - Requires macOS tooling for build and signing.
 - The public-safe GitHub standby flow is prepared, but real-world iOS iteration is currently centered on jailbroken iOS 16 hardware.
 
-## Windows To iPhone Standby
-
-Monolith is now prepared for a public-safe, manual-only GitHub Actions flow that can later be used with MobAI's `ios-builder` tooling from Windows.
+## iOS Build Notes
 
 - The iOS workflow is `workflow_dispatch` only, so pushing the repo will not auto-trigger macOS builds.
-- The prepared workflow uploads an unsigned IPA artifact using the generic artifact name `ipa`, which aligns with `ios-builder`'s expected download flow.
+- The prepared workflow uploads an unsigned IPA artifact.
 - No signing material, provisioning profiles, certificates, or local build artifacts are committed.
 - The repository is ready for a public GitHub repo as long as you do not add secrets, signing files, or generated release/debug artifacts.
-
-See `docs/ios-builder-setup.md` for the standby setup and later activation steps.
 
 See `docs/development.md` for the full development and validation guide.
 
@@ -226,7 +222,6 @@ The current widget suite is used as the primary fast validation path for shell n
 
 - `docs/architecture.md`: application structure and data flow.
 - `docs/development.md`: setup, commands, validation, and workflow notes.
-- `docs/ios-builder-setup.md`: public-safe Windows-to-iPhone standby setup for later MobAI testing.
 - `docs/media-playback.md`: background playback and system media integration.
 
 ## Troubleshooting

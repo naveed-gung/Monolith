@@ -189,7 +189,7 @@ class _MusicShellState extends State<MusicShell> with TickerProviderStateMixin {
     return AppHeader(
       onMenuPressed: _openDownloads,
       onProfilePressed: _openSettings,
-      statusLabel: 'Downloads',
+      statusLabel: 'Settings',
     );
   }
 

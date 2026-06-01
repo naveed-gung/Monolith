@@ -10,6 +10,8 @@ import '../../../core/widgets/section_header.dart';
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
+  static const String _profileImageUrl =
+      'https://instagram.fbey14-1.fna.fbcdn.net/v/t51.82787-19/686301220_18456986572128279_8286432443934980707_n.jpg?stp=dst-jpg_s150x150_tt6&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLmRqYW5nby44MjAuYzIifQ&_nc_ht=instagram.fbey14-1.fna.fbcdn.net&_nc_cat=103&_nc_oc=Q6cZ2gHtyfTH7K3Lc9pGTvFyu_nZ5WN6qJmOg2hxtpx2Gac754AFbI9by2GpF5crOzv9JVU&_nc_ohc=uethdjYg3_wQ7kNvwGkoIsS&_nc_gid=heHnhb94kUj3arP70RiR5g&edm=AOQ1c0wBAAAA&ccb=7-5&oh=00_Af_BszPRvnsZQGdsndvsId00ph1pC9tEP7pki8Bjd1dIbg&oe=6A232DF5&_nc_sid=8b3546';
   static final Uri _githubUri = Uri.parse('https://github.com/naveed-gung/');
   static final Uri _portfolioUri = Uri.parse('https://naveed-gung.dev/');
 
@@ -165,17 +167,29 @@ class SettingsPage extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      width: 48,
-                      height: 48,
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
                         color: Theme.of(
                           context,
                         ).colorScheme.primary.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outline.withValues(alpha: 0.18),
+                        ),
                       ),
-                      child: Icon(
-                        Icons.person_rounded,
-                        color: Theme.of(context).colorScheme.primary,
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.network(
+                        _profileImageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(
+                            Icons.person_rounded,
+                            color: Theme.of(context).colorScheme.primary,
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 14),

@@ -1,88 +1,125 @@
-<svg width="1280" height="900" viewBox="0 0 1280 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="1280" height="900" viewBox="0 0 1280 900" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Monolith architecture map</title>
+  <desc id="desc">A layered Monolith architecture diagram showing the application layer above controller state and core services, with feature presentation at the bottom, using icon-based cards and rounded containers.</desc>
   <defs>
-    <linearGradient id="bg" x1="120" y1="40" x2="1160" y2="860" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#08161E"/>
-      <stop offset="1" stop-color="#102B36"/>
+    <linearGradient id="bg" x1="90" y1="40" x2="1185" y2="860" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07161B"/>
+      <stop offset="0.55" stop-color="#0D252C"/>
+      <stop offset="1" stop-color="#102B38"/>
     </linearGradient>
-    <linearGradient id="app" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#1BB29B"/>
-      <stop offset="1" stop-color="#11728A"/>
+    <linearGradient id="appCard" x1="112" y1="170" x2="1168" y2="314" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1EB9A4"/>
+      <stop offset="1" stop-color="#147D90"/>
     </linearGradient>
-    <linearGradient id="state" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#1D5E75"/>
-      <stop offset="1" stop-color="#0F3143"/>
+    <linearGradient id="stateCard" x1="112" y1="344" x2="612" y2="584" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1B5569"/>
+      <stop offset="1" stop-color="#102E42"/>
     </linearGradient>
-    <linearGradient id="svc" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#18242B"/>
-      <stop offset="1" stop-color="#0C161C"/>
+    <linearGradient id="serviceCard" x1="668" y1="344" x2="1168" y2="584" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#151F26"/>
+      <stop offset="1" stop-color="#0B141A"/>
     </linearGradient>
-    <linearGradient id="feat" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#B96A2E"/>
-      <stop offset="1" stop-color="#8D4C1F"/>
+    <linearGradient id="featureCard" x1="112" y1="628" x2="1168" y2="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A8622E"/>
+      <stop offset="1" stop-color="#82461E"/>
     </linearGradient>
+    <filter id="shadow" x="80" y="154" width="1120" height="692" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="14"/>
+      <feGaussianBlur stdDeviation="16"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0117647 0 0 0 0 0.0784314 0 0 0 0 0.101961 0 0 0 0.34 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
   </defs>
   <rect width="1280" height="900" rx="36" fill="url(#bg)"/>
-  <text x="88" y="94" fill="#F4F7F8" font-size="42" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Monolith Architecture Map</text>
-  <text x="88" y="132" fill="#94B2B8" font-size="18" font-family="Segoe UI, Arial, sans-serif">Controller-first orchestration with feature-scoped UI and shared platform integration.</text>
+  <circle cx="1110" cy="126" r="148" fill="#31C7B4" fill-opacity="0.08"/>
+  <circle cx="166" cy="748" r="172" fill="#6FC3FF" fill-opacity="0.07"/>
+  <text x="88" y="96" fill="#F4F7F8" font-size="42" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Monolith Architecture Map</text>
+  <text x="88" y="136" fill="#9AB6BC" font-size="18" font-family="Segoe UI, Arial, sans-serif">Controller-first orchestration with shared services, platform integration, and feature-scoped presentation.</text>
 
-  <rect x="88" y="180" width="1104" height="110" rx="28" fill="url(#app)"/>
-  <text x="124" y="236" fill="#F7FBFC" font-size="30" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Application Layer</text>
-  <text x="124" y="272" fill="#DCF4EF" font-size="18" font-family="Segoe UI, Arial, sans-serif">main.dart initializes background playback, MonolithApp scopes the controller, and the shell renders the shared mobile experience.</text>
-  <rect x="914" y="206" width="242" height="54" rx="18" fill="#F7FBFC" fill-opacity="0.14"/>
-  <text x="958" y="240" fill="#F7FBFC" font-size="18" font-family="Segoe UI, Arial, sans-serif">MaterialApp + Theme</text>
+  <g filter="url(#shadow)">
+    <rect x="112" y="170" width="1056" height="124" rx="30" fill="url(#appCard)"/>
+    <rect x="112" y="344" width="500" height="222" rx="30" fill="url(#stateCard)" stroke="#5C8F9B" stroke-opacity="0.42" stroke-width="2"/>
+    <rect x="668" y="344" width="500" height="222" rx="30" fill="url(#serviceCard)" stroke="#506773" stroke-opacity="0.42" stroke-width="2"/>
+    <rect x="112" y="628" width="1056" height="192" rx="30" fill="url(#featureCard)"/>
+  </g>
 
-  <rect x="88" y="332" width="540" height="212" rx="28" fill="url(#state)" stroke="#5A96A6" stroke-opacity="0.4"/>
-  <text x="124" y="390" fill="#F7FBFC" font-size="30" font-family="Segoe UI, Arial, sans-serif" font-weight="700">State Core</text>
-  <text x="124" y="426" fill="#C8DCE4" font-size="18" font-family="Segoe UI, Arial, sans-serif">MonolithController manages queue selection, playback, downloads, playlists, theme, and app navigation.</text>
-  <rect x="124" y="462" width="138" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.12"/>
-  <text x="153" y="486" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">Playback</text>
-  <rect x="274" y="462" width="150" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.12"/>
-  <text x="307" y="486" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">Downloads</text>
-  <rect x="436" y="462" width="146" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.12"/>
-  <text x="474" y="486" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">Playlists</text>
-  <rect x="124" y="510" width="128" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.12"/>
-  <text x="159" y="534" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">Library</text>
-  <rect x="264" y="510" width="116" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.12"/>
-  <text x="298" y="534" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">Theme</text>
-  <rect x="392" y="510" width="152" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.12"/>
-  <text x="425" y="534" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">Navigation</text>
+  <g>
+    <rect x="144" y="198" width="68" height="68" rx="18" fill="#F4FCFB" fill-opacity="0.18"/>
+    <rect x="159" y="213" width="16" height="16" rx="4" fill="#F7FBFC"/>
+    <rect x="181" y="213" width="16" height="16" rx="4" fill="#F7FBFC"/>
+    <rect x="159" y="235" width="16" height="16" rx="4" fill="#F7FBFC"/>
+    <rect x="181" y="235" width="16" height="16" rx="4" fill="#F7FBFC"/>
+    <text x="232" y="222" fill="#F7FBFC" font-size="31" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Application Layer</text>
+    <text x="232" y="257" fill="#DDF4F1" font-size="18" font-family="Segoe UI, Arial, sans-serif">`main.dart` initializes playback support, `MonolithApp` scopes the controller, and the shell launches the shared mobile UI.</text>
+    <rect x="896" y="201" width="226" height="58" rx="18" fill="#F7FBFC" fill-opacity="0.14"/>
+    <text x="935" y="238" fill="#F7FBFC" font-size="18" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Theme + App Shell</text>
+  </g>
 
-  <rect x="652" y="332" width="540" height="212" rx="28" fill="url(#svc)" stroke="#58737E" stroke-opacity="0.4"/>
-  <text x="688" y="390" fill="#F7FBFC" font-size="30" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Core Services</text>
-  <text x="688" y="426" fill="#B4C7CD" font-size="18" font-family="Segoe UI, Arial, sans-serif">Shared services isolate storage, device media access, import flow, and downloader integration from the widgets.</text>
-  <rect x="688" y="462" width="186" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.1"/>
-  <text x="719" y="486" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">LocalMediaService</text>
-  <rect x="886" y="462" width="162" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.1"/>
-  <text x="925" y="486" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">DownloadStore</text>
-  <rect x="1060" y="462" width="96" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.1"/>
-  <text x="1088" y="486" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">Models</text>
-  <rect x="688" y="510" width="212" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.1"/>
-  <text x="726" y="534" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">ManualAudioImportService</text>
-  <rect x="912" y="510" width="208" height="36" rx="18" fill="#F7FBFC" fill-opacity="0.1"/>
-  <text x="953" y="534" fill="#F7FBFC" font-size="15" font-family="Segoe UI, Arial, sans-serif">MediaDownloader</text>
+  <g>
+    <circle cx="172" cy="402" r="34" fill="#F7FBFC" fill-opacity="0.14"/>
+    <path d="M158 402C158 394.268 164.268 388 172 388C179.732 388 186 394.268 186 402C186 409.732 179.732 416 172 416C164.268 416 158 409.732 158 402ZM166 402C166 405.314 168.686 408 172 408C175.314 408 178 405.314 178 402C178 398.686 175.314 396 172 396C168.686 396 166 398.686 166 402Z" fill="#F7FBFC"/>
+    <path d="M171 377H173V385H171V377ZM171 419H173V427H171V419ZM147 401H155V403H147V401ZM189 401H197V403H189V401Z" fill="#F7FBFC"/>
+    <text x="224" y="392" fill="#F7FBFC" font-size="31" font-family="Segoe UI, Arial, sans-serif" font-weight="700">State Core</text>
+    <text x="224" y="427" fill="#C9DCE3" font-size="18" font-family="Segoe UI, Arial, sans-serif">`MonolithController` coordinates playback, downloads, playlists, library state, theme, and navigation in one application source of truth.</text>
+    <rect x="224" y="464" width="118" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.12"/>
+    <text x="252" y="486" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Playback</text>
+    <rect x="352" y="464" width="122" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.12"/>
+    <text x="382" y="486" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Downloads</text>
+    <rect x="484" y="464" width="104" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.12"/>
+    <text x="512" y="486" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Theme</text>
+    <rect x="224" y="512" width="114" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.12"/>
+    <text x="257" y="534" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Library</text>
+    <rect x="348" y="512" width="112" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.12"/>
+    <text x="377" y="534" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Queue</text>
+    <rect x="470" y="512" width="116" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.12"/>
+    <text x="490" y="534" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Navigation</text>
+  </g>
 
-  <rect x="88" y="598" width="1104" height="198" rx="28" fill="url(#feat)"/>
-  <text x="124" y="656" fill="#FFF5EB" font-size="30" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Feature Presentation</text>
-  <text x="124" y="692" fill="#F5DDC9" font-size="18" font-family="Segoe UI, Arial, sans-serif">Feature widgets stay mostly declarative: they read controller state, dispatch actions, and render the Library, Downloads, Player, Search, Settings, and Shell surfaces.</text>
-  <rect x="124" y="724" width="128" height="38" rx="19" fill="#FFF5EB" fill-opacity="0.14"/>
-  <text x="162" y="749" fill="#FFF5EB" font-size="15" font-family="Segoe UI, Arial, sans-serif">Shell</text>
-  <rect x="266" y="724" width="138" height="38" rx="19" fill="#FFF5EB" fill-opacity="0.14"/>
-  <text x="299" y="749" fill="#FFF5EB" font-size="15" font-family="Segoe UI, Arial, sans-serif">Library</text>
-  <rect x="418" y="724" width="152" height="38" rx="19" fill="#FFF5EB" fill-opacity="0.14"/>
-  <text x="452" y="749" fill="#FFF5EB" font-size="15" font-family="Segoe UI, Arial, sans-serif">Downloads</text>
-  <rect x="584" y="724" width="132" height="38" rx="19" fill="#FFF5EB" fill-opacity="0.14"/>
-  <text x="620" y="749" fill="#FFF5EB" font-size="15" font-family="Segoe UI, Arial, sans-serif">Player</text>
-  <rect x="730" y="724" width="126" height="38" rx="19" fill="#FFF5EB" fill-opacity="0.14"/>
-  <text x="767" y="749" fill="#FFF5EB" font-size="15" font-family="Segoe UI, Arial, sans-serif">Search</text>
-  <rect x="870" y="724" width="136" height="38" rx="19" fill="#FFF5EB" fill-opacity="0.14"/>
-  <text x="902" y="749" fill="#FFF5EB" font-size="15" font-family="Segoe UI, Arial, sans-serif">Settings</text>
+  <g>
+    <circle cx="728" cy="402" r="34" fill="#F7FBFC" fill-opacity="0.08"/>
+    <path d="M711 392C711 385.925 715.925 381 722 381H734C740.075 381 745 385.925 745 392V412C745 418.075 740.075 423 734 423H722C715.925 423 711 418.075 711 412V392ZM719 393V411C719 412.105 719.895 413 721 413H735C736.105 413 737 412.105 737 411V393C737 391.895 736.105 391 735 391H721C719.895 391 719 391.895 719 393Z" fill="#F7FBFC"/>
+    <path d="M723 396H733V400H723V396ZM723 404H733V408H723V404Z" fill="#F7FBFC"/>
+    <text x="780" y="392" fill="#F7FBFC" font-size="31" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Core Services</text>
+    <text x="780" y="427" fill="#BACBD1" font-size="18" font-family="Segoe UI, Arial, sans-serif">Storage, media access, imports, download integration, and shared models stay isolated from widgets so the presentation layer remains thin.</text>
+    <rect x="780" y="464" width="150" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.08"/>
+    <text x="806" y="486" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Local media</text>
+    <rect x="940" y="464" width="136" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.08"/>
+    <text x="971" y="486" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Store</text>
+    <rect x="1086" y="464" width="82" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.08"/>
+    <text x="1105" y="486" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Models</text>
+    <rect x="780" y="512" width="164" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.08"/>
+    <text x="809" y="534" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Manual import</text>
+    <rect x="954" y="512" width="160" height="34" rx="17" fill="#F7FBFC" fill-opacity="0.08"/>
+    <text x="982" y="534" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Downloader</text>
+  </g>
 
-  <path d="M358 290V332" stroke="#50D4C2" stroke-width="4" stroke-linecap="round"/>
-  <path d="M922 290V332" stroke="#6FB6C9" stroke-width="4" stroke-linecap="round"/>
-  <path d="M358 544V598" stroke="#E6A56E" stroke-width="4" stroke-linecap="round"/>
-  <path d="M922 544V598" stroke="#E6A56E" stroke-width="4" stroke-linecap="round"/>
-  <path d="M348 318L358 334L368 318" fill="none" stroke="#50D4C2" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M912 318L922 334L932 318" fill="none" stroke="#6FB6C9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M348 582L358 598L368 582" fill="none" stroke="#E6A56E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M912 582L922 598L932 582" fill="none" stroke="#E6A56E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <g>
+    <rect x="144" y="658" width="68" height="68" rx="18" fill="#FFF7EF" fill-opacity="0.14"/>
+    <rect x="159" y="676" width="38" height="28" rx="8" fill="#FFF5EB"/>
+    <rect x="164" y="682" width="10" height="16" rx="3" fill="#A8622E"/>
+    <rect x="178" y="682" width="14" height="6" rx="2" fill="#A8622E"/>
+    <rect x="178" y="692" width="14" height="6" rx="2" fill="#A8622E"/>
+    <text x="232" y="683" fill="#FFF5EB" font-size="31" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Feature Presentation</text>
+    <text x="232" y="718" fill="#F6DDC9" font-size="18" font-family="Segoe UI, Arial, sans-serif">Widgets stay mostly declarative: they render the shell and feature surfaces while reading controller state and dispatching user actions.</text>
+    <rect x="232" y="750" width="86" height="34" rx="17" fill="#FFF5EB" fill-opacity="0.14"/>
+    <text x="256" y="772" fill="#FFF5EB" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Shell</text>
+    <rect x="328" y="750" width="94" height="34" rx="17" fill="#FFF5EB" fill-opacity="0.14"/>
+    <text x="353" y="772" fill="#FFF5EB" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Library</text>
+    <rect x="432" y="750" width="106" height="34" rx="17" fill="#FFF5EB" fill-opacity="0.14"/>
+    <text x="455" y="772" fill="#FFF5EB" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Downloads</text>
+    <rect x="548" y="750" width="88" height="34" rx="17" fill="#FFF5EB" fill-opacity="0.14"/>
+    <text x="573" y="772" fill="#FFF5EB" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Player</text>
+    <rect x="646" y="750" width="88" height="34" rx="17" fill="#FFF5EB" fill-opacity="0.14"/>
+    <text x="671" y="772" fill="#FFF5EB" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Search</text>
+    <rect x="744" y="750" width="94" height="34" rx="17" fill="#FFF5EB" fill-opacity="0.14"/>
+    <text x="765" y="772" fill="#FFF5EB" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Settings</text>
+  </g>
+
+  <path d="M640 294V332" stroke="#5AD6C5" stroke-width="4" stroke-linecap="round"/>
+  <path d="M640 566V628" stroke="#E3A36F" stroke-width="4" stroke-linecap="round"/>
+  <path d="M628 316L640 334L652 316" fill="none" stroke="#5AD6C5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M628 606L640 624L652 606" fill="none" stroke="#E3A36F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

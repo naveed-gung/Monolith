@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/state/app_scope.dart';
 import '../../../core/models/music_models.dart';
@@ -7,6 +9,20 @@ import '../../../core/widgets/section_header.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
+
+  static final Uri _githubUri = Uri.parse('https://github.com/naveed-gung/');
+  static final Uri _portfolioUri = Uri.parse('https://naveed-gung.dev/');
+
+  static Future<void> _openExternalLink(BuildContext context, Uri uri) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    if (!launched && context.mounted) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not open ${uri.toString()}')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +150,74 @@ class SettingsPage extends StatelessWidget {
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: controller.openPlayer,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          GlassPanel(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SectionHeader(title: 'Developer'),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        Icons.person_rounded,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Naveed Gung',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Developer',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    IconButton.filledTonal(
+                      tooltip: 'GitHub',
+                      onPressed: () => _openExternalLink(context, _githubUri),
+                      icon: const FaIcon(FontAwesomeIcons.github),
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton.filledTonal(
+                      tooltip: 'Portfolio',
+                      onPressed: () =>
+                          _openExternalLink(context, _portfolioUri),
+                      icon: const Icon(Icons.language_rounded),
+                    ),
+                  ],
                 ),
               ],
             ),

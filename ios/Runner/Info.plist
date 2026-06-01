@@ -24,6 +24,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>Monolith needs access to your media library to import songs from your device.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Monolith uses local network access for audio session management.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

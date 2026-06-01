@@ -629,15 +629,21 @@ class MonolithController extends ChangeNotifier {
       album: resolvedAlbum,
     );
 
-    _tracks = _tracks
-        .map((existing) => existing.id == track.id ? updatedTrack : existing)
-        .toList(growable: false);
+    final tIdx = _tracks.indexWhere((t) => t.id == track.id);
+    if (tIdx != -1) {
+      final updated = List<Track>.of(_tracks);
+      updated[tIdx] = updatedTrack;
+      _tracks = List.unmodifiable(updated);
+    }
 
     if (track.source == TrackSource.downloaded ||
         track.source == TrackSource.imported) {
-      _downloadedTracks = _downloadedTracks
-          .map((existing) => existing.id == track.id ? updatedTrack : existing)
-          .toList(growable: false);
+      final dIdx = _downloadedTracks.indexWhere((t) => t.id == track.id);
+      if (dIdx != -1) {
+        final updated = List<Track>.of(_downloadedTracks);
+        updated[dIdx] = updatedTrack;
+        _downloadedTracks = List.unmodifiable(updated);
+      }
       await _downloadStore.saveTracks(_downloadedTracks);
     }
 
@@ -687,6 +693,24 @@ class MonolithController extends ChangeNotifier {
     }
 
     return '${track.title} is already in $normalizedName.';
+  }
+
+  void createEmptyPlaylist(String name) {
+    final n = name.trim();
+    if (n.isEmpty) return;
+    _playlistTrackIds.putIfAbsent(n, () => <String>{});
+    notifyListeners();
+  }
+
+  String removeTrackFromPlaylist({
+    required Track track,
+    required String playlistName,
+  }) {
+    final trackIds = _playlistTrackIds[playlistName];
+    if (trackIds == null) return 'Playlist not found.';
+    trackIds.remove(track.id);
+    notifyListeners();
+    return 'Removed ${track.title} from $playlistName.';
   }
 
   Future<DownloadPreview> inspectDownload(String rawUrl) async {
@@ -1405,9 +1429,29 @@ class MonolithController extends ChangeNotifier {
         await _audioPlayer.pause();
       }
     } catch (error) {
-      _isPlaying = false;
-      _libraryError = 'Unable to open ${track.title}: $error';
-      notifyListeners();
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      try {
+        await _audioPlayer.setAudioSource(
+          AudioSource.uri(
+            Uri.file(track.filePath!),
+            tag: _mediaItemForTrack(track),
+          ),
+        );
+        _currentTrackDuration = _audioPlayer.duration ?? track.duration;
+        final targetVolume = _normalizeAudio ? 0.84 : 1.0;
+        if (autoplay) {
+          await _audioPlayer.setVolume(0);
+          await _audioPlayer.play();
+          await _fadeVolume(to: targetVolume);
+        } else {
+          await _audioPlayer.setVolume(targetVolume);
+          await _audioPlayer.pause();
+        }
+      } catch (retryError) {
+        _isPlaying = false;
+        _libraryError = 'Unable to open ${track.title}: $retryError';
+        notifyListeners();
+      }
     }
   }
 

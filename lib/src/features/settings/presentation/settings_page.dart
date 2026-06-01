@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -13,12 +16,13 @@ class SettingsPage extends StatelessWidget {
 
   static final Uri _githubUri = Uri.parse('https://github.com/naveed-gung/');
   static final Uri _portfolioUri = Uri.parse('https://naveed-gung.dev/');
+  static final Uri _instagramUri = Uri.parse('https://instagram.com/naveed._.gung');
 
   static Future<void> _launch(BuildContext context, Uri uri) async {
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
         context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open ${uri.host}')),
+        SnackBar(content: Text('Could not open $uri')),
       );
     }
   }
@@ -78,6 +82,7 @@ class SettingsPage extends StatelessWidget {
               child: _DeveloperCard(
                 onGithub: () => _launch(context, _githubUri),
                 onPortfolio: () => _launch(context, _portfolioUri),
+                onInstagram: () => _launch(context, _instagramUri),
               ),
             ),
           ),
@@ -227,7 +232,7 @@ class SettingsPage extends StatelessWidget {
                 AppSpacing.screenInset,
                 0,
                 AppSpacing.screenInset,
-                AppSpacing.xxxl + AppSpacing.xxl,
+                AppSpacing.xxl,
               ),
               child: _SettingsGroup(
                 children: [
@@ -248,6 +253,30 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
           ),
+
+          // ── About ────────────────────────────────────────────────────
+          _SectionLabel(label: 'About'),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenInset,
+                0,
+                AppSpacing.screenInset,
+                AppSpacing.xxxl + AppSpacing.xxl,
+              ),
+              child: _SettingsGroup(
+                children: [
+                  _InfoRow(
+                    icon: AppIcons.musicNote,
+                    title: 'Version',
+                    trailing: '1.0.0',
+                  ),
+                  _Divider(),
+                  const _CheckUpdateButton(),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -257,9 +286,14 @@ class SettingsPage extends StatelessWidget {
 // ── Developer card ──────────────────────────────────────────────────────────
 
 class _DeveloperCard extends StatelessWidget {
-  const _DeveloperCard({required this.onGithub, required this.onPortfolio});
+  const _DeveloperCard({
+    required this.onGithub,
+    required this.onPortfolio,
+    required this.onInstagram,
+  });
   final VoidCallback onGithub;
   final VoidCallback onPortfolio;
+  final VoidCallback onInstagram;
 
   @override
   Widget build(BuildContext context) {
@@ -337,6 +371,12 @@ class _DeveloperCard extends StatelessWidget {
                 tooltip: 'GitHub',
                 onTap: onGithub,
                 child: const FaIcon(FontAwesomeIcons.github, size: 18),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              _ProfileButton(
+                tooltip: 'Instagram',
+                onTap: onInstagram,
+                child: const FaIcon(FontAwesomeIcons.instagram, size: 18),
               ),
               const SizedBox(width: AppSpacing.sm),
               _ProfileButton(
@@ -630,6 +670,217 @@ class _AccentDot extends StatelessWidget {
                   child: Icon(Icons.check_rounded, color: swatch.on, size: 16),
                 )
               : null,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Info row (non-tappable, shows a trailing value) ──────────────────────────
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.title,
+    required this.trailing,
+  });
+  final PhosphorIconData icon;
+  final String title;
+  final String trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: AppRadii.all(AppRadii.sm),
+            ),
+            child: Center(
+              child: PhosphorIcon(icon, size: 18, color: scheme.onPrimaryContainer),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Text(
+              title,
+              style: textTheme.bodyLarge?.copyWith(fontWeight: AppType.body),
+            ),
+          ),
+          Text(
+            trailing,
+            style: textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Check for updates button ─────────────────────────────────────────────────
+
+class _CheckUpdateButton extends StatefulWidget {
+  const _CheckUpdateButton();
+
+  @override
+  State<_CheckUpdateButton> createState() => _CheckUpdateButtonState();
+}
+
+class _CheckUpdateButtonState extends State<_CheckUpdateButton> {
+  static const _currentVersion = '1.0.0';
+  static const _apiUrl =
+      'https://api.github.com/repos/naveed-gung/Monolith/releases/latest';
+  static const _releasesUrl =
+      'https://github.com/naveed-gung/Monolith/releases';
+
+  bool _checking = false;
+
+  Future<void> _check() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    try {
+      final resp = await http
+          .get(Uri.parse(_apiUrl))
+          .timeout(const Duration(seconds: 10));
+      if (!mounted) return;
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        final tag =
+            (body['tag_name'] as String? ?? '').replaceFirst(RegExp('^v'), '');
+        if (_isNewer(tag, _currentVersion)) {
+          _showUpdateDialog(tag);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("You're up to date.")),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Check failed (${resp.statusCode}).')),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not check for updates.')),
+      );
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  bool _isNewer(String latest, String current) {
+    List<int> parse(String v) =>
+        v.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    final l = parse(latest);
+    final c = parse(current);
+    for (var i = 0; i < 3; i++) {
+      final lv = i < l.length ? l[i] : 0;
+      final cv = i < c.length ? c[i] : 0;
+      if (lv > cv) return true;
+      if (lv < cv) return false;
+    }
+    return false;
+  }
+
+  void _showUpdateDialog(String newVersion) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New version available'),
+        content: Text('Version $newVersion is available on GitHub.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              launchUrl(
+                Uri.parse(_releasesUrl),
+                mode: LaunchMode.externalApplication,
+              );
+            },
+            child: const Text('Download Now'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return InkWell(
+      onTap: _checking ? null : _check,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                borderRadius: AppRadii.all(AppRadii.sm),
+              ),
+              child: Center(
+                child: _checking
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.onPrimaryContainer,
+                        ),
+                      )
+                    : PhosphorIcon(
+                        AppIcons.refresh,
+                        size: 18,
+                        color: scheme.onPrimaryContainer,
+                      ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Check for updates',
+                    style:
+                        textTheme.bodyLarge?.copyWith(fontWeight: AppType.body),
+                  ),
+                  Text(
+                    _checking ? 'Checking…' : 'Tap to check GitHub releases',
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            if (!_checking)
+              PhosphorIcon(
+                AppIcons.caretRight,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+          ],
         ),
       ),
     );

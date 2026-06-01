@@ -94,6 +94,16 @@ class _MusicShellState extends State<MusicShell>
             children: [
               const Positioned.fill(child: Atmosphere()),
               currentPage,
+              // Mini player — above page content, below player overlay
+              if (!controller.isPlayerOpen)
+                Positioned(
+                  left: AppSpacing.lg,
+                  right: AppSpacing.lg,
+                  bottom: _kNavBarHeight +
+                      MediaQuery.of(context).viewPadding.bottom +
+                      _kMiniPlayerGap,
+                  child: _MiniPlayer(controller: controller),
+                ),
               // Player overlay
               Positioned.fill(
                 child: IgnorePointer(
@@ -147,21 +157,15 @@ class _MusicShellState extends State<MusicShell>
 
   Widget _buildPage(MonolithController controller) {
     final inner = switch (controller.currentTab) {
-      AppTab.library => _PageWithMiniPlayer(
+      AppTab.library => LibraryPage(
           key: const ValueKey('library'),
-          controller: controller,
-          child: LibraryPage(onOpenSettings: _openSettings),
+          onOpenSettings: _openSettings,
         ),
-      AppTab.downloads => _PageWithMiniPlayer(
-          key: const ValueKey('downloads'),
-          controller: controller,
-          child: const DownloadsPage(embedded: true),
+      AppTab.downloads => const DownloadsPage(
+          key: ValueKey('downloads'),
+          embedded: true,
         ),
-      AppTab.search => _PageWithMiniPlayer(
-          key: const ValueKey('search'),
-          controller: controller,
-          child: const SearchPage(),
-        ),
+      AppTab.search => const SearchPage(key: ValueKey('search')),
     };
 
     return AnimatedSwitcher(
@@ -199,35 +203,6 @@ class _MusicShellState extends State<MusicShell>
           ),
         ),
       ),
-    );
-  }
-}
-
-class _PageWithMiniPlayer extends StatelessWidget {
-  const _PageWithMiniPlayer({
-    super.key,
-    required this.controller,
-    required this.child,
-  });
-
-  final MonolithController controller;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        child,
-        if (!controller.isPlayerOpen)
-          Positioned(
-            left: AppSpacing.lg,
-            right: AppSpacing.lg,
-            bottom: _kNavBarHeight +
-                MediaQuery.of(context).padding.bottom +
-                _kMiniPlayerGap,
-            child: _MiniPlayer(controller: controller),
-          ),
-      ],
     );
   }
 }
@@ -307,38 +282,45 @@ class _NavItem extends StatelessWidget {
       AppTab.search => AppIcons.navSearch(isSelected),
     };
 
-    return InkResponse(
-      onTap: onTap,
-      radius: 32,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedScale(
-              scale: isSelected ? 1.12 : 1.0,
-              duration: AppMotion.durFast,
-              curve: AppMotion.standard,
-              child: PhosphorIcon(
-                icon,
-                size: 26,
-                color: isSelected
-                    ? scheme.primary
-                    : scheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 3),
-            AnimatedDefaultTextStyle(
-              duration: AppMotion.durFast,
-              style: Theme.of(context).textTheme.labelSmall!.copyWith(
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: label,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 32,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          child: ExcludeSemantics(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedScale(
+                  scale: isSelected ? 1.12 : 1.0,
+                  duration: AppMotion.durFast,
+                  curve: AppMotion.standard,
+                  child: PhosphorIcon(
+                    icon,
+                    size: 26,
                     color: isSelected
                         ? scheme.primary
                         : scheme.onSurfaceVariant,
-                    fontWeight: isSelected ? AppType.label : AppType.body,
                   ),
-              child: Text(label),
+                ),
+                const SizedBox(height: 3),
+                AnimatedDefaultTextStyle(
+                  duration: AppMotion.durFast,
+                  style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                        color: isSelected
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
+                        fontWeight: isSelected ? AppType.label : AppType.body,
+                      ),
+                  child: Text(label),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -428,6 +410,7 @@ class _MiniPlayer extends StatelessWidget {
                             icon: AppIcons.skipBack,
                             onPressed: controller.previousTrack,
                             size: 22,
+                            tooltip: 'Previous',
                           ),
                           _MiniButton(
                             icon: controller.isPlaying
@@ -438,12 +421,14 @@ class _MiniPlayer extends StatelessWidget {
                                 : null,
                             size: 32,
                             color: scheme.primary,
+                            tooltip: controller.isPlaying ? 'Pause' : 'Play',
                           ),
                           _MiniButton(
                             icon: AppIcons.skipForward,
                             onPressed: () =>
                                 controller.nextTrack(openPlayer: false),
                             size: 22,
+                            tooltip: 'Next',
                           ),
                         ],
                       ),
@@ -479,18 +464,21 @@ class _MiniButton extends StatelessWidget {
     required this.onPressed,
     required this.size,
     this.color,
+    this.tooltip,
   });
 
   final PhosphorIconData icon;
   final VoidCallback? onPressed;
   final double size;
   final Color? color;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return IconButton(
       onPressed: onPressed,
+      tooltip: tooltip,
       icon: PhosphorIcon(
         icon,
         size: size,
@@ -529,37 +517,31 @@ class _PlayerOverlay extends StatelessWidget {
       child: SafeArea(
         child: Column(
           children: [
-            // Drag handle + close
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenInset,
-                AppSpacing.lg,
-                AppSpacing.md,
-                0,
-              ),
-              child: Row(
-                children: [
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: scheme.outlineVariant,
-                        borderRadius: AppRadii.all(AppRadii.pill),
-                      ),
+            // Drag handle — swipe down to close
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onVerticalDragEnd: (details) {
+                if ((details.primaryVelocity ?? 0) > 450) {
+                  controller.closePlayer();
+                }
+              },
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenInset,
+                  AppSpacing.lg,
+                  AppSpacing.screenInset,
+                  AppSpacing.md,
+                ),
+                child: Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: scheme.outlineVariant,
+                      borderRadius: AppRadii.all(AppRadii.pill),
                     ),
                   ),
-                  const Spacer(),
-                  IconButton(
-                    key: const Key('player-overlay-close'),
-                    onPressed: controller.closePlayer,
-                    icon: PhosphorIcon(
-                      AppIcons.close,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                    tooltip: 'Close player',
-                  ),
-                ],
+                ),
               ),
             ),
             // Player content

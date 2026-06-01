@@ -360,9 +360,7 @@ class _TransportControls extends StatelessWidget {
           _TransportButton(
             key: const Key('playback-next'),
             icon: AppIcons.skipForward,
-            onPressed: track.canPlay
-                ? () => controller.nextTrack(openPlayer: true)
-                : null,
+            onPressed: () => controller.nextTrack(openPlayer: true),
             size: 28,
             tooltip: 'Next',
           ),

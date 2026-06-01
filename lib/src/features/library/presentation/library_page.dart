@@ -13,12 +13,220 @@ import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
 
-enum _TrackAction { edit, delete, addToPlaylist, share }
+enum _SortOrder { aToZ, zToA, newest, oldest }
 
-class LibraryPage extends StatelessWidget {
+enum _TrackAction { edit, delete, addToPlaylist, share, removeFromPlaylist }
+
+class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key, this.onOpenSettings});
-
   final VoidCallback? onOpenSettings;
+
+  @override
+  State<LibraryPage> createState() => _LibraryPageState();
+}
+
+class _LibraryPageState extends State<LibraryPage> {
+  _SortOrder _sortOrder = _SortOrder.aToZ;
+  // Non-null when user has drilled into an artist / album / playlist
+  String? _drillItem;
+
+  // ── Sort helpers ────────────────────────────────────────────────────────
+
+  List<Track> _sortedTracks(List<Track> src) {
+    final list = [...src];
+    switch (_sortOrder) {
+      case _SortOrder.aToZ:
+        list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      case _SortOrder.zToA:
+        list.sort((a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+      case _SortOrder.newest:
+        return list.reversed.toList();
+      case _SortOrder.oldest:
+        break; // keep insertion order
+    }
+    return list;
+  }
+
+  List<String> _sortedStrings(List<String> src) {
+    final list = [...src];
+    switch (_sortOrder) {
+      case _SortOrder.aToZ:
+        list.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      case _SortOrder.zToA:
+        list.sort((a, b) => b.toLowerCase().compareTo(a.toLowerCase()));
+      case _SortOrder.newest:
+        return list.reversed.toList();
+      case _SortOrder.oldest:
+        break;
+    }
+    return list;
+  }
+
+  // ── Track actions ────────────────────────────────────────────────────────
+
+  void _showMsg(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _editTrack(Track track, MonolithController controller) async {
+    final titleC = TextEditingController(text: track.title);
+    final artistC = TextEditingController(text: track.artist);
+    final albumC = TextEditingController(text: track.album);
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit details'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Title'), textCapitalization: TextCapitalization.words),
+            const SizedBox(height: AppSpacing.md),
+            TextField(controller: artistC, decoration: const InputDecoration(labelText: 'Artist'), textCapitalization: TextCapitalization.words),
+            const SizedBox(height: AppSpacing.md),
+            TextField(controller: albumC, decoration: const InputDecoration(labelText: 'Album'), textCapitalization: TextCapitalization.words),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    final t = titleC.text; final a = artistC.text; final al = albumC.text;
+    if (save != true || !mounted) return;
+    _showMsg(await controller.renameTrackMetadata(track: track, title: t, artist: a, album: al));
+  }
+
+  Future<void> _deleteTrack(Track track, MonolithController controller) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove track'),
+        content: Text('Remove ${track.title} from your library?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    _showMsg(await controller.deleteTrack(track));
+  }
+
+  Future<void> _addToPlaylist(Track track, MonolithController controller) async {
+    final playlistC = TextEditingController();
+    final name = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.screenInset, AppSpacing.sm, AppSpacing.screenInset, AppSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Add to playlist', style: Theme.of(ctx).textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.md),
+            if (controller.playlistNames.isNotEmpty)
+              Wrap(
+                spacing: AppSpacing.sm, runSpacing: AppSpacing.sm,
+                children: [
+                  for (final n in controller.playlistNames)
+                    ActionChip(label: Text(n), onPressed: () => Navigator.pop(ctx, n)),
+                ],
+              ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(controller: playlistC, decoration: const InputDecoration(labelText: 'New playlist name', hintText: 'Night drive mix'), textCapitalization: TextCapitalization.words),
+            const SizedBox(height: AppSpacing.lg),
+            Row(children: [
+              Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(child: FilledButton.icon(onPressed: () => Navigator.pop(ctx, playlistC.text.trim()), icon: PhosphorIcon(AppIcons.plusCircle, size: 18), label: const Text('Create & add'))),
+            ]),
+          ],
+        ),
+      ),
+    );
+    if (name == null || name.isEmpty || !mounted) return;
+    _showMsg(controller.addTrackToPlaylist(track: track, playlistName: name));
+  }
+
+  Future<void> _shareTrack(Track track) async {
+    try {
+      final fp = track.filePath;
+      if (fp != null && fp.trim().isNotEmpty) {
+        await Share.shareXFiles([XFile(fp)], text: '${track.title} • ${track.artist}');
+      } else {
+        await Share.share('${track.title} • ${track.artist}');
+      }
+    } catch (e) {
+      _showMsg('Sharing failed: $e');
+    }
+  }
+
+  Future<void> _openMenu(
+    Track track,
+    MonolithController controller, {
+    String? playlistContext,
+  }) async {
+    final action = await showModalBottomSheet<_TrackAction>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(leading: PhosphorIcon(AppIcons.edit), title: const Text('Edit details'), onTap: () => Navigator.pop(ctx, _TrackAction.edit)),
+            ListTile(leading: PhosphorIcon(AppIcons.addToPlaylist), title: const Text('Add to playlist'), onTap: () => Navigator.pop(ctx, _TrackAction.addToPlaylist)),
+            ListTile(leading: PhosphorIcon(AppIcons.share), title: const Text('Share'), onTap: () => Navigator.pop(ctx, _TrackAction.share)),
+            if (playlistContext != null)
+              ListTile(leading: PhosphorIcon(AppIcons.delete), title: const Text('Remove from playlist'), onTap: () => Navigator.pop(ctx, _TrackAction.removeFromPlaylist)),
+            ListTile(leading: PhosphorIcon(AppIcons.delete), title: const Text('Delete'), onTap: () => Navigator.pop(ctx, _TrackAction.delete)),
+          ],
+        ),
+      ),
+    );
+    switch (action) {
+      case _TrackAction.edit: await _editTrack(track, controller);
+      case _TrackAction.delete: await _deleteTrack(track, controller);
+      case _TrackAction.addToPlaylist: await _addToPlaylist(track, controller);
+      case _TrackAction.share: await _shareTrack(track);
+      case _TrackAction.removeFromPlaylist:
+        if (playlistContext != null) {
+          _showMsg(controller.removeTrackFromPlaylist(track: track, playlistName: playlistContext));
+        }
+      case null: return;
+    }
+  }
+
+  // ── Create playlist ───────────────────────────────────────────────────────
+
+  Future<void> _createPlaylist(MonolithController controller) async {
+    final nameC = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New playlist'),
+        content: TextField(
+          controller: nameC,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Playlist name', hintText: 'Night drive mix'),
+          textCapitalization: TextCapitalization.words,
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, nameC.text.trim()), child: const Text('Create')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty || !mounted) return;
+    controller.createEmptyPlaylist(name);
+    _showMsg('Created playlist "$name".');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,138 +234,86 @@ class LibraryPage extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    void showMsg(String msg) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(msg)));
-    }
-
-    Future<void> editTrack(Track track) async {
-      final titleC = TextEditingController(text: track.title);
-      final artistC = TextEditingController(text: track.artist);
-      final albumC = TextEditingController(text: track.album);
-      final save = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Edit details'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Title'), textCapitalization: TextCapitalization.words),
-              const SizedBox(height: AppSpacing.md),
-              TextField(controller: artistC, decoration: const InputDecoration(labelText: 'Artist'), textCapitalization: TextCapitalization.words),
-              const SizedBox(height: AppSpacing.md),
-              TextField(controller: albumC, decoration: const InputDecoration(labelText: 'Album'), textCapitalization: TextCapitalization.words),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
-          ],
-        ),
-      );
-      final t = titleC.text; final a = artistC.text; final al = albumC.text;
-      titleC.dispose(); artistC.dispose(); albumC.dispose();
-      if (save != true || !context.mounted) return;
-      showMsg(await controller.renameTrackMetadata(track: track, title: t, artist: a, album: al));
-    }
-
-    Future<void> deleteTrack(Track track) async {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Remove track'),
-          content: Text('Remove ${track.title} from your library?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-          ],
-        ),
-      );
-      if (ok != true || !context.mounted) return;
-      showMsg(await controller.deleteTrack(track));
-    }
-
-    Future<void> addToPlaylist(Track track) async {
-      final playlistC = TextEditingController();
-      final name = await showModalBottomSheet<String>(
-        context: context,
-        showDragHandle: true,
-        builder: (ctx) => Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.screenInset, AppSpacing.sm, AppSpacing.screenInset, AppSpacing.xxl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Add to playlist', style: Theme.of(ctx).textTheme.titleLarge),
-              const SizedBox(height: AppSpacing.md),
-              if (controller.playlistNames.isNotEmpty)
-                Wrap(
-                  spacing: AppSpacing.sm, runSpacing: AppSpacing.sm,
-                  children: [
-                    for (final n in controller.playlistNames)
-                      ActionChip(label: Text(n), onPressed: () => Navigator.pop(ctx, n)),
-                  ],
-                ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(controller: playlistC, decoration: const InputDecoration(labelText: 'New playlist name', hintText: 'Night drive mix'), textCapitalization: TextCapitalization.words),
-              const SizedBox(height: AppSpacing.lg),
-              Row(children: [
-                Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(child: FilledButton.icon(onPressed: () => Navigator.pop(ctx, playlistC.text.trim()), icon: PhosphorIcon(AppIcons.plusCircle, size: 18), label: const Text('Create & add'))),
-              ]),
-            ],
-          ),
-        ),
-      );
-      playlistC.dispose();
-      if (name == null || name.isEmpty || !context.mounted) return;
-      showMsg(controller.addTrackToPlaylist(track: track, playlistName: name));
-    }
-
-    Future<void> shareTrack(Track track) async {
-      try {
-        final fp = track.filePath;
-        if (fp != null && fp.trim().isNotEmpty) {
-          await Share.shareXFiles([XFile(fp)], text: '${track.title} • ${track.artist}');
-        } else {
-          await Share.share('${track.title} • ${track.artist}');
-        }
-      } catch (e) {
-        if (context.mounted) showMsg('Sharing failed: $e');
+    // When drilling into a category item, compute which tracks to show
+    Widget contentSliver;
+    if (_drillItem != null) {
+      final cat = controller.selectedCategory;
+      final List<Track> drillTracks;
+      if (cat == LibraryCategory.artists) {
+        drillTracks = _sortedTracks(
+          controller.tracks.where((t) => t.artist == _drillItem).toList(),
+        );
+      } else if (cat == LibraryCategory.albums) {
+        drillTracks = _sortedTracks(
+          controller.tracks.where((t) => t.album == _drillItem).toList(),
+        );
+      } else if (cat == LibraryCategory.playlists) {
+        drillTracks = _sortedTracks(controller.tracksForPlaylist(_drillItem!));
+      } else {
+        drillTracks = const [];
       }
-    }
 
-    Future<void> openMenu(Track track) async {
-      final action = await showModalBottomSheet<_TrackAction>(
-        context: context,
-        showDragHandle: true,
-        builder: (ctx) => Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(leading: PhosphorIcon(AppIcons.edit), title: const Text('Edit details'), onTap: () => Navigator.pop(ctx, _TrackAction.edit)),
-              ListTile(leading: PhosphorIcon(AppIcons.addToPlaylist), title: const Text('Add to playlist'), onTap: () => Navigator.pop(ctx, _TrackAction.addToPlaylist)),
-              ListTile(leading: PhosphorIcon(AppIcons.share), title: const Text('Share'), onTap: () => Navigator.pop(ctx, _TrackAction.share)),
-              ListTile(leading: PhosphorIcon(AppIcons.delete), title: const Text('Delete'), onTap: () => Navigator.pop(ctx, _TrackAction.delete)),
-            ],
-          ),
-        ),
+      contentSliver = _DrillTrackList(
+        title: _drillItem!,
+        tracks: drillTracks,
+        controller: controller,
+        playlistContext: cat == LibraryCategory.playlists ? _drillItem : null,
+        onBack: () => setState(() => _drillItem = null),
+        onMenu: (t, {String? playlistContext}) =>
+            _openMenu(t, controller, playlistContext: playlistContext),
       );
-      switch (action) {
-        case _TrackAction.edit: await editTrack(track);
-        case _TrackAction.delete: await deleteTrack(track);
-        case _TrackAction.addToPlaylist: await addToPlaylist(track);
-        case _TrackAction.share: await shareTrack(track);
-        case null: return;
-      }
+    } else {
+      final sortBtn = PopupMenuButton<_SortOrder>(
+        tooltip: 'Sort',
+        padding: EdgeInsets.zero,
+        icon: PhosphorIcon(
+          PhosphorIcons.arrowsDownUp(),
+          size: 18,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        initialValue: _sortOrder,
+        onSelected: (o) => setState(() => _sortOrder = o),
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: _SortOrder.aToZ,   child: Text('A → Z')),
+          PopupMenuItem(value: _SortOrder.zToA,   child: Text('Z → A')),
+          PopupMenuItem(value: _SortOrder.newest,  child: Text('Newest first')),
+          PopupMenuItem(value: _SortOrder.oldest,  child: Text('Oldest first')),
+        ],
+      );
+      contentSliver = switch (controller.selectedCategory) {
+        LibraryCategory.tracks => _TracksSilver(
+            controller: controller,
+            sortedTracks: _sortedTracks(controller.tracks),
+            sortedHighlights: _sortedTracks(controller.highlightedTracks),
+            onMenu: (t) => _openMenu(t, controller),
+            sortButton: sortBtn,
+          ),
+        LibraryCategory.artists => _ArtistSliver(
+            controller: controller,
+            sortedArtists: _sortedStrings(controller.libraryArtists),
+            onDrillIn: (name) => setState(() => _drillItem = name),
+            sortButton: sortBtn,
+          ),
+        LibraryCategory.albums => _AlbumSliver(
+            controller: controller,
+            sortedHighlights: _sortedTracks(controller.albumHighlights),
+            onDrillIn: (name) => setState(() => _drillItem = name),
+            sortButton: sortBtn,
+          ),
+        LibraryCategory.playlists => _PlaylistSliver(
+            controller: controller,
+            sortedPlaylists: _sortedStrings(controller.playlistNames),
+            onDrillIn: (name) => setState(() => _drillItem = name),
+            onCreatePlaylist: () => _createPlaylist(controller),
+            sortButton: sortBtn,
+          ),
+      };
     }
 
     return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
       slivers: [
-        // ── Large header ──────────────────────────────────────────────
+        // ── Large header ─────────────────────────────────────────────
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -193,7 +349,7 @@ class LibraryPage extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  onPressed: onOpenSettings,
+                  onPressed: widget.onOpenSettings,
                   icon: PhosphorIcon(AppIcons.settings, size: 22),
                   color: scheme.onSurfaceVariant,
                   tooltip: 'Settings',
@@ -202,6 +358,55 @@ class LibraryPage extends StatelessWidget {
             ),
           ),
         ),
+
+        // ── Library error banner ─────────────────────────────────────
+        if (controller.libraryError != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenInset,
+                AppSpacing.lg,
+                AppSpacing.screenInset,
+                0,
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.sm,
+                  AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: scheme.errorContainer,
+                  borderRadius: AppRadii.all(AppRadii.md),
+                ),
+                child: Row(
+                  children: [
+                    PhosphorIcon(
+                      PhosphorIcons.warning(),
+                      size: 18,
+                      color: scheme.error,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        controller.libraryError!,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: scheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => controller.refreshLibrary(
+                        retryPermissionRequest: true,
+                      ),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
 
         // ── Now playing hero ──────────────────────────────────────────
         SliverToBoxAdapter(
@@ -227,7 +432,10 @@ class LibraryPage extends StatelessWidget {
             ),
             child: _CategoryTabs(
               selected: controller.selectedCategory,
-              onSelected: controller.selectLibraryCategory,
+              onSelected: (cat) {
+                setState(() => _drillItem = null);
+                controller.selectLibraryCategory(cat);
+              },
             ),
           ),
         ),
@@ -236,26 +444,11 @@ class LibraryPage extends StatelessWidget {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.screenInset,
-            AppSpacing.xl,
+            AppSpacing.md,
             AppSpacing.screenInset,
             180,
           ),
-          sliver: switch (controller.selectedCategory) {
-            LibraryCategory.tracks => _TracksSilver(
-                controller: controller,
-                onEdit: editTrack,
-                onDelete: deleteTrack,
-                onPlaylist: addToPlaylist,
-                onShare: shareTrack,
-                onMenu: openMenu,
-              ),
-            LibraryCategory.artists =>
-              _ArtistSliver(controller: controller),
-            LibraryCategory.albums =>
-              _AlbumSliver(controller: controller),
-            LibraryCategory.playlists =>
-              _PlaylistSliver(controller: controller),
-          },
+          sliver: contentSliver,
         ),
       ],
     );
@@ -280,7 +473,6 @@ class _NowPlayingHero extends StatelessWidget {
       clip: true,
       child: Stack(
         children: [
-          // Artwork background (blurred)
           Positioned.fill(
             child: ImageFiltered(
               imageFilter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
@@ -289,12 +481,10 @@ class _NowPlayingHero extends StatelessWidget {
               ),
             ),
           ),
-          // Content
           Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Row(
               children: [
-                // Artwork
                 SizedBox(
                   width: 72,
                   height: 72,
@@ -307,7 +497,6 @@ class _NowPlayingHero extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.lg),
-                // Info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,13 +529,9 @@ class _NowPlayingHero extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Play button
                 FilledButton(
                   onPressed: canPlay
-                      ? () => controller.selectTrack(
-                            track,
-                            openPlayer: true,
-                          )
+                      ? () => controller.selectTrack(track, openPlayer: true)
                       : null,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.all(AppSpacing.md),
@@ -354,9 +539,7 @@ class _NowPlayingHero extends StatelessWidget {
                     shape: const CircleBorder(),
                   ),
                   child: PhosphorIcon(
-                    controller.isPlaying
-                        ? AppIcons.pauseCircle
-                        : AppIcons.playCircle,
+                    controller.isPlaying ? AppIcons.pauseCircle : AppIcons.playCircle,
                     size: 22,
                   ),
                 ),
@@ -369,7 +552,7 @@ class _NowPlayingHero extends StatelessWidget {
   }
 }
 
-// ── Category tabs ───────────────────────────────────────────────────────────
+// ── Category tabs ────────────────────────────────────────────────────────────
 
 class _CategoryTabs extends StatelessWidget {
   const _CategoryTabs({required this.selected, required this.onSelected});
@@ -380,7 +563,7 @@ class _CategoryTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final labels = {
+    const labels = {
       LibraryCategory.tracks: 'Tracks',
       LibraryCategory.artists: 'Artists',
       LibraryCategory.albums: 'Albums',
@@ -388,7 +571,7 @@ class _CategoryTabs extends StatelessWidget {
     };
 
     return SizedBox(
-      height: 36,
+      height: 40,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
@@ -418,7 +601,7 @@ class _CategoryTabs extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.lg,
-                        vertical: AppSpacing.xs,
+                        vertical: AppSpacing.sm,
                       ),
                       child: Text(
                         entry.value,
@@ -442,31 +625,133 @@ class _CategoryTabs extends StatelessWidget {
   }
 }
 
-// ── Tracks sliver ───────────────────────────────────────────────────────────
+// ── Drill-down track list ────────────────────────────────────────────────────
 
-class _TracksSilver extends StatelessWidget {
-  const _TracksSilver({
+class _DrillTrackList extends StatelessWidget {
+  const _DrillTrackList({
+    required this.title,
+    required this.tracks,
     required this.controller,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onPlaylist,
-    required this.onShare,
+    required this.onBack,
     required this.onMenu,
+    this.playlistContext,
   });
 
+  final String title;
+  final List<Track> tracks;
   final MonolithController controller;
-  final Future<void> Function(Track) onEdit;
-  final Future<void> Function(Track) onDelete;
-  final Future<void> Function(Track) onPlaylist;
-  final Future<void> Function(Track) onShare;
-  final Future<void> Function(Track) onMenu;
+  final VoidCallback onBack;
+  final Future<void> Function(Track, {String? playlistContext}) onMenu;
+  final String? playlistContext;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final tracks = controller.tracks;
-    final highlights = controller.highlightedTracks;
-    final gridRows = (highlights.length / 2).ceil();
+    final textTheme = Theme.of(context).textTheme;
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          // index 0: back header
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: onBack,
+                    icon: PhosphorIcon(PhosphorIcons.caretLeft(), size: 22),
+                    color: scheme.primary,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleLarge?.copyWith(
+                            fontWeight: AppType.title,
+                          ),
+                        ),
+                        Text(
+                          '${tracks.length} track${tracks.length == 1 ? '' : 's'}',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (tracks.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+              child: Center(
+                child: Text(
+                  'No tracks here yet',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            );
+          }
+
+          final track = tracks[index - 1];
+          final isLast = index == tracks.length;
+          return Column(
+            children: [
+              _TrackRow(
+                track: track,
+                isActive: controller.currentTrack.id == track.id,
+                onTap: () => controller.selectTrack(track, openPlayer: true),
+                onMenu: () => onMenu(track, playlistContext: playlistContext),
+              ),
+              if (!isLast)
+                Divider(
+                  height: 1,
+                  indent: 72,
+                  color: scheme.outlineVariant.withValues(alpha: 0.35),
+                ),
+            ],
+          );
+        },
+        childCount: tracks.isEmpty ? 2 : tracks.length + 1,
+      ),
+    );
+  }
+}
+
+// ── Tracks sliver ─────────────────────────────────────────────────────────────
+
+class _TracksSilver extends StatelessWidget {
+  const _TracksSilver({
+    required this.controller,
+    required this.sortedTracks,
+    required this.sortedHighlights,
+    required this.onMenu,
+    this.sortButton,
+  });
+
+  final MonolithController controller;
+  final List<Track> sortedTracks;
+  final List<Track> sortedHighlights;
+  final Future<void> Function(Track) onMenu;
+  final Widget? sortButton;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final gridRows = (sortedHighlights.length / 2).ceil();
 
     if (controller.isLibraryLoading) {
       return const SliverToBoxAdapter(
@@ -477,27 +762,24 @@ class _TracksSilver extends StatelessWidget {
       );
     }
 
-    // Build as flat list: [header] + [N track rows] + [grid header] + [M grid rows]
-    // Total = 1 + tracks.length + 1 + gridRows
-    final totalCount = 1 + tracks.length + 1 + gridRows;
+    final totalCount = 1 + sortedTracks.length + 1 + gridRows;
 
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
-          // 0: tracks section header
           if (index == 0) {
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.md),
               child: SectionHeader(
                 title: 'Tracks',
-                actionLabel: '${tracks.length} total',
+                actionLabel: '${sortedTracks.length} total',
+                trailing: sortButton,
               ),
             );
           }
-          // 1..tracks.length: track rows
-          if (index <= tracks.length) {
-            final track = tracks[index - 1];
-            final isLast = index == tracks.length;
+          if (index <= sortedTracks.length) {
+            final track = sortedTracks[index - 1];
+            final isLast = index == sortedTracks.length;
             return Column(
               children: [
                 _TrackRow(
@@ -515,22 +797,20 @@ class _TracksSilver extends StatelessWidget {
               ],
             );
           }
-          // tracks.length + 1: grid section header
-          if (index == tracks.length + 1) {
+          if (index == sortedTracks.length + 1) {
             return Padding(
               padding: const EdgeInsets.only(
                 top: AppSpacing.xxl,
                 bottom: AppSpacing.lg,
               ),
-              child: SectionHeader(title: 'Recent additions'),
+              child: const SectionHeader(title: 'Recent additions'),
             );
           }
-          // tracks.length + 2 .. totalCount - 1: grid rows (2 albums per row)
-          final row = index - tracks.length - 2;
+          final row = index - sortedTracks.length - 2;
           final aIdx = row * 2;
-          if (aIdx >= highlights.length) return const SizedBox.shrink();
-          final a = highlights[aIdx];
-          final b = aIdx + 1 < highlights.length ? highlights[aIdx + 1] : null;
+          if (aIdx >= sortedHighlights.length) return const SizedBox.shrink();
+          final a = sortedHighlights[aIdx];
+          final b = aIdx + 1 < sortedHighlights.length ? sortedHighlights[aIdx + 1] : null;
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.lg),
             child: Row(
@@ -547,8 +827,7 @@ class _TracksSilver extends StatelessWidget {
                   child: b != null
                       ? _AlbumCard(
                           track: b,
-                          onTap: () =>
-                              controller.selectTrack(b, openPlayer: true),
+                          onTap: () => controller.selectTrack(b, openPlayer: true),
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -604,8 +883,7 @@ class _TrackRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.bodyLarge?.copyWith(
-                      fontWeight:
-                          isActive ? AppType.title : AppType.body,
+                      fontWeight: isActive ? AppType.title : AppType.body,
                       color: isActive ? scheme.primary : null,
                     ),
                   ),
@@ -633,7 +911,7 @@ class _TrackRow extends StatelessWidget {
   }
 }
 
-// ── Album card ──────────────────────────────────────────────────────────────
+// ── Album card ───────────────────────────────────────────────────────────────
 
 class _AlbumCard extends StatelessWidget {
   const _AlbumCard({required this.track, required this.onTap});
@@ -680,55 +958,52 @@ class _AlbumCard extends StatelessWidget {
   }
 }
 
-// ── Artist sliver ───────────────────────────────────────────────────────────
+// ── Artist sliver ─────────────────────────────────────────────────────────────
 
 class _ArtistSliver extends StatelessWidget {
-  const _ArtistSliver({required this.controller});
+  const _ArtistSliver({
+    required this.controller,
+    required this.sortedArtists,
+    required this.onDrillIn,
+    this.sortButton,
+  });
+
   final MonolithController controller;
+  final List<String> sortedArtists;
+  final ValueChanged<String> onDrillIn;
+  final Widget? sortButton;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final artists = controller.libraryArtists;
 
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
           if (index == 0) {
-            return const Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.md),
-              child: SectionHeader(title: 'Artists'),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: SectionHeader(title: 'Artists', trailing: sortButton),
             );
           }
-          final artist = artists[index - 1];
-          final trackCount = controller.tracks
-              .where((t) => t.artist == artist)
-              .length;
-          final isLast = index == artists.length;
+          final artist = sortedArtists[index - 1];
+          final trackCount = controller.tracks.where((t) => t.artist == artist).length;
+          final isLast = index == sortedArtists.length;
 
           return Column(
             children: [
               InkWell(
-                onTap: () {
-                  final t = controller.tracks
-                      .firstWhere((t) => t.artist == artist);
-                  controller.selectTrack(t, openPlayer: true);
-                },
+                onTap: () => onDrillIn(artist),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: AppSpacing.md,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                   child: Row(
                     children: [
                       CircleAvatar(
                         radius: 24,
                         backgroundColor: scheme.primaryContainer,
                         child: Text(
-                          artist.substring(0, 1).toUpperCase(),
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
+                          artist.isNotEmpty ? artist.substring(0, 1).toUpperCase() : '?',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 color: scheme.onPrimaryContainer,
                                 fontWeight: AppType.label,
                               ),
@@ -740,7 +1015,7 @@ class _ArtistSliver extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(artist, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: AppType.body)),
-                            Text('$trackCount tracks', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                            Text('$trackCount track${trackCount == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
                           ],
                         ),
                       ),
@@ -754,47 +1029,53 @@ class _ArtistSliver extends StatelessWidget {
             ],
           );
         },
-        childCount: artists.length + 1,
+        childCount: sortedArtists.length + 1,
       ),
     );
   }
 }
 
-// ── Albums sliver ───────────────────────────────────────────────────────────
+// ── Albums sliver ─────────────────────────────────────────────────────────────
 
 class _AlbumSliver extends StatelessWidget {
-  const _AlbumSliver({required this.controller});
+  const _AlbumSliver({
+    required this.controller,
+    required this.sortedHighlights,
+    required this.onDrillIn,
+    this.sortButton,
+  });
+
   final MonolithController controller;
+  final List<Track> sortedHighlights;
+  final ValueChanged<String> onDrillIn;
+  final Widget? sortButton;
 
   @override
   Widget build(BuildContext context) {
-    final highlights = controller.albumHighlights;
-    final rows = (highlights.length / 2).ceil();
+    final rows = (sortedHighlights.length / 2).ceil();
 
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
           if (index == 0) {
-            return const Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.lg),
-              child: SectionHeader(title: 'Albums'),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+              child: SectionHeader(title: 'Albums', trailing: sortButton),
             );
           }
           final row = index - 1;
           if (row >= rows) return null;
-          final a = highlights[row * 2];
-          final b = row * 2 + 1 < highlights.length
-              ? highlights[row * 2 + 1]
-              : null;
+          final a = sortedHighlights[row * 2];
+          final b = row * 2 + 1 < sortedHighlights.length ? sortedHighlights[row * 2 + 1] : null;
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.lg),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: _AlbumCard(track: a, onTap: () => controller.selectTrack(a, openPlayer: true))),
+                Expanded(child: _AlbumCard(track: a, onTap: () => onDrillIn(a.album))),
                 if (b != null) ...[
                   const SizedBox(width: AppSpacing.md),
-                  Expanded(child: _AlbumCard(track: b, onTap: () => controller.selectTrack(b, openPlayer: true))),
+                  Expanded(child: _AlbumCard(track: b, onTap: () => onDrillIn(b.album))),
                 ] else
                   const Expanded(child: SizedBox()),
               ],
@@ -810,32 +1091,74 @@ class _AlbumSliver extends StatelessWidget {
 // ── Playlists sliver ─────────────────────────────────────────────────────────
 
 class _PlaylistSliver extends StatelessWidget {
-  const _PlaylistSliver({required this.controller});
+  const _PlaylistSliver({
+    required this.controller,
+    required this.sortedPlaylists,
+    required this.onDrillIn,
+    required this.onCreatePlaylist,
+    this.sortButton,
+  });
+
   final MonolithController controller;
+  final List<String> sortedPlaylists;
+  final ValueChanged<String> onDrillIn;
+  final VoidCallback onCreatePlaylist;
+  final Widget? sortButton;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final playlists = controller.playlistNames;
 
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
+          // index 0: header + create button
           if (index == 0) {
-            return const Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.md),
-              child: SectionHeader(title: 'Playlists'),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Row(
+                children: [
+                  const Expanded(child: SectionHeader(title: 'Playlists')),
+                  ?sortButton,
+                  FilledButton.icon(
+                    onPressed: onCreatePlaylist,
+                    icon: PhosphorIcon(AppIcons.plusCircle, size: 16),
+                    label: const Text('New'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.xs,
+                      ),
+                      minimumSize: const Size(0, 32),
+                      textStyle: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ),
+                ],
+              ),
             );
           }
-          final name = playlists[index - 1];
+          if (sortedPlaylists.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+              child: Center(
+                child: Text(
+                  'No playlists yet — tap New to create one',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                ),
+              ),
+            );
+          }
+          final name = sortedPlaylists[index - 1];
           final tracks = controller.tracksForPlaylist(name);
           final lead = controller.leadTrackForPlaylist(name);
-          final isLast = index == playlists.length;
+          final isLast = index == sortedPlaylists.length;
 
           return Column(
             children: [
               InkWell(
-                onTap: lead == null ? null : () => controller.selectTrack(lead, openPlayer: true),
+                onTap: () => onDrillIn(name),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                   child: Row(
@@ -859,7 +1182,7 @@ class _PlaylistSliver extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(name, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: AppType.body)),
-                            Text(tracks.isEmpty ? 'Empty' : '${tracks.length} tracks', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                            Text(tracks.isEmpty ? 'Empty' : '${tracks.length} track${tracks.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
                           ],
                         ),
                       ),
@@ -872,7 +1195,7 @@ class _PlaylistSliver extends StatelessWidget {
             ],
           );
         },
-        childCount: playlists.length + 1,
+        childCount: sortedPlaylists.isEmpty ? 2 : sortedPlaylists.length + 1,
       ),
     );
   }

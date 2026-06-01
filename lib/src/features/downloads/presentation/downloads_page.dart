@@ -32,6 +32,8 @@ String _fmtBytes(int b) {
   return '${v.toStringAsFixed(p)} ${u[i]}';
 }
 
+enum _SortOrder { aToZ, zToA, newest, oldest }
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
 class DownloadsPage extends StatefulWidget {
@@ -52,6 +54,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
   bool _submitting = false;
   String? _error;
   bool _showAdder = false;
+  _SortOrder _sortOrder = _SortOrder.aToZ;
 
   @override
   void dispose() {
@@ -63,10 +66,23 @@ class _DownloadsPageState extends State<DownloadsPage> {
 
   List<Track> _filtered(MonolithController controller) {
     final q = _filterC.text.trim().toLowerCase();
-    if (q.isEmpty) return controller.offlineTracks;
-    return controller.offlineTracks.where((t) {
-      return '${t.title} ${t.artist} ${t.album}'.toLowerCase().contains(q);
-    }).toList(growable: false);
+    var list = q.isEmpty
+        ? List<Track>.of(controller.offlineTracks)
+        : controller.offlineTracks
+            .where((t) =>
+                '${t.title} ${t.artist} ${t.album}'.toLowerCase().contains(q))
+            .toList(growable: false);
+    switch (_sortOrder) {
+      case _SortOrder.aToZ:
+        list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      case _SortOrder.zToA:
+        list.sort((a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+      case _SortOrder.newest:
+        list = list.reversed.toList();
+      case _SortOrder.oldest:
+        break;
+    }
+    return list;
   }
 
   @override
@@ -257,6 +273,25 @@ class _DownloadsPageState extends State<DownloadsPage> {
                     ),
                   ),
                 ),
+                // Sort
+                PopupMenuButton<_SortOrder>(
+                  tooltip: 'Sort',
+                  padding: EdgeInsets.zero,
+                  icon: PhosphorIcon(
+                    PhosphorIcons.arrowsDownUp(),
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  initialValue: _sortOrder,
+                  onSelected: (o) => setState(() => _sortOrder = o),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: _SortOrder.aToZ,   child: Text('A → Z')),
+                    PopupMenuItem(value: _SortOrder.zToA,   child: Text('Z → A')),
+                    PopupMenuItem(value: _SortOrder.newest,  child: Text('Newest first')),
+                    PopupMenuItem(value: _SortOrder.oldest,  child: Text('Oldest first')),
+                  ],
+                ),
+                const SizedBox(width: AppSpacing.xs),
                 // Inline filter
                 SizedBox(
                   width: 160,
@@ -266,7 +301,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
                     onChanged: (_) => setState(() {}),
                     style: textTheme.bodySmall,
                     decoration: InputDecoration(
-                      hintText: 'Filter…',
+                      hintText: 'Search for music',
                       hintStyle: textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -562,7 +597,8 @@ class _AdderCard extends StatelessWidget {
                 ),
               ),
             ),
-          ] else ...[
+          ],
+          ...[
             const SizedBox(height: AppSpacing.lg),
             TextField(
               controller: urlController,
@@ -680,6 +716,19 @@ class _PreviewRow extends StatelessWidget {
                 : Image.network(
                     preview.thumbnailUrl!,
                     fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        color: scheme.surfaceContainerHigh,
+                        child: const Center(
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      );
+                    },
                     errorBuilder: (_, _, _) => Container(
                       color: scheme.surfaceContainerHigh,
                       child: PhosphorIcon(AppIcons.musicNote, color: scheme.primary),

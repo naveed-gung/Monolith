@@ -8,11 +8,13 @@ class SectionHeader extends StatelessWidget {
     required this.title,
     this.actionLabel,
     this.onAction,
+    this.trailing,
   });
 
   final String title;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +48,7 @@ class SectionHeader extends StatelessWidget {
             ),
             child: Text(actionLabel!),
           ),
+        ?trailing,
       ],
     );
   }

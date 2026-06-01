@@ -84,6 +84,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
         .toList();
 
     final body = CustomScrollView(
+      physics: const BouncingScrollPhysics(),
       slivers: [
         // ── Header ────────────────────────────────────────────────────
         SliverToBoxAdapter(
@@ -138,31 +139,43 @@ class _DownloadsPageState extends State<DownloadsPage> {
           ),
         ),
 
-        // ── Adder panel (inline, not a sheet) ─────────────────────────
-        if (_showAdder)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenInset,
-                AppSpacing.lg,
-                AppSpacing.screenInset,
-                0,
-              ),
-              child: _AdderCard(
-                urlController: _urlC,
-                nameController: _nameC,
-                preview: _preview,
-                inspecting: _inspecting,
-                submitting: _submitting,
-                error: _error,
-                downloaderError: controller.downloaderError,
-                onInspect: () => _inspect(controller),
-                onDownload: () => _download(controller),
-                onClearPreview: _clearPreview,
-                onUrlChanged: _onUrlChanged,
+        // ── Adder panel (inline, animated expand) ─────────────────────
+        SliverToBoxAdapter(
+          child: ClipRect(
+            child: AnimatedSize(
+              duration: AppMotion.durMedium,
+              curve: AppMotion.emphasized,
+              alignment: Alignment.topCenter,
+              child: AnimatedOpacity(
+                duration: AppMotion.durFast,
+                opacity: _showAdder ? 1.0 : 0.0,
+                child: _showAdder
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.screenInset,
+                          AppSpacing.lg,
+                          AppSpacing.screenInset,
+                          0,
+                        ),
+                        child: _AdderCard(
+                          urlController: _urlC,
+                          nameController: _nameC,
+                          preview: _preview,
+                          inspecting: _inspecting,
+                          submitting: _submitting,
+                          error: _error,
+                          downloaderError: controller.downloaderError,
+                          onInspect: () => _inspect(controller),
+                          onDownload: () => _download(controller),
+                          onClearPreview: _clearPreview,
+                          onUrlChanged: _onUrlChanged,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
               ),
             ),
           ),
+        ),
 
         // ── Active jobs ────────────────────────────────────────────────
         if (activeTasks.isNotEmpty) ...[

@@ -32,6 +32,8 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Guard: controller may notify during deactivation, before full disposal.
+    if (!mounted) return;
     final q = AppScope.watch(context).searchQuery;
     if (_queryC.text != q) {
       _queryC.value = TextEditingValue(
@@ -50,6 +52,7 @@ class _SearchPageState extends State<SearchPage> {
     final hasFilter = controller.hasSearchFilters;
 
     return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
       slivers: [
         // ── Search header ─────────────────────────────────────────────
         SliverToBoxAdapter(

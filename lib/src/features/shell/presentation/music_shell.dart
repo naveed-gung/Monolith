@@ -146,33 +146,60 @@ class _MusicShellState extends State<MusicShell>
   }
 
   Widget _buildPage(MonolithController controller) {
-    return SafeArea(
-      bottom: false,
-      child: switch (controller.currentTab) {
-        AppTab.library => _PageWithMiniPlayer(
-            key: const ValueKey('library'),
-            controller: controller,
-            child: LibraryPage(onOpenSettings: _openSettings),
-          ),
+    final inner = switch (controller.currentTab) {
+      AppTab.library => _PageWithMiniPlayer(
+          key: const ValueKey('library'),
+          controller: controller,
+          child: LibraryPage(onOpenSettings: _openSettings),
+        ),
+      AppTab.downloads => _PageWithMiniPlayer(
+          key: const ValueKey('downloads'),
+          controller: controller,
+          child: const DownloadsPage(embedded: true),
+        ),
+      AppTab.search => _PageWithMiniPlayer(
+          key: const ValueKey('search'),
+          controller: controller,
+          child: const SearchPage(),
+        ),
+    };
 
-        AppTab.downloads => _PageWithMiniPlayer(
-            key: const ValueKey('downloads'),
-            controller: controller,
-            child: const DownloadsPage(embedded: true),
-          ),
-        AppTab.search => _PageWithMiniPlayer(
-            key: const ValueKey('search'),
-            controller: controller,
-            child: const SearchPage(),
-          ),
-      },
+    return AnimatedSwitcher(
+      duration: AppMotion.durFast,
+      switchInCurve: AppMotion.standard,
+      switchOutCurve: AppMotion.exit,
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: child,
+      ),
+      child: SafeArea(
+        key: ValueKey(controller.currentTab),
+        bottom: false,
+        child: inner,
+      ),
     );
   }
 
   Future<void> _openSettings() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const SettingsPage()));
+    await Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        pageBuilder: (_, _, _) => const SettingsPage(),
+        transitionDuration: AppMotion.durMedium,
+        reverseTransitionDuration: AppMotion.durFast,
+        transitionsBuilder: (_, animation, _, child) => FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: AppMotion.standard),
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.04),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(parent: animation, curve: AppMotion.emphasized),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
   }
 }
 

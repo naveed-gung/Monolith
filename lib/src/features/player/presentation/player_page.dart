@@ -33,6 +33,7 @@ class PlayerPage extends StatelessWidget {
 
     return ListView(
       padding: padding,
+      physics: const BouncingScrollPhysics(),
       children: [
         _ArtworkSection(
           controller: controller,
@@ -80,60 +81,61 @@ class _ArtworkSection extends StatelessWidget {
       360.0,
     );
 
+    // Play/pause scale handled here — NOT bass-driven.
     return Center(
-      child: AnimatedBuilder(
-        animation: animation, // visualizer controller — drives bass sim
-        builder: (context, child) {
-          // Multi-harmonic simulation: creates a convincing bass-like pulse
-          final t = animation.value;
-          final bass = controller.isPlaying
-              ? ((math.sin(t * math.pi * 2) *
-                          math.sin(t * math.pi * 3.1) *
-                          0.6 +
-                      math.sin(t * math.pi * 5.7).abs() * 0.4)
-                  .abs()
-                  .clamp(0.0, 1.0))
-              : 0.0;
+      child: AnimatedScale(
+        scale: controller.isPlaying ? 1.0 : 0.94,
+        duration: AppMotion.durMedium,
+        curve: AppMotion.standard,
+        child: RepaintBoundary(
+          child: AnimatedBuilder(
+            animation: animation,
+            builder: (context, child) {
+              final t = animation.value;
+              final bass = controller.isPlaying
+                  ? ((math.sin(t * math.pi * 2) *
+                              math.sin(t * math.pi * 3.1) *
+                              0.6 +
+                          math.sin(t * math.pi * 5.7).abs() * 0.4)
+                      .abs()
+                      .clamp(0.0, 1.0))
+                  : 0.0;
 
-          // Scale: gentle breathing + bass kick
-          final scale = controller.isPlaying ? 0.97 + bass * 0.05 : 0.94;
+              // Only the glow pulses — image/thumbnail stays at fixed size.
+              final glowRadius = 28 + bass * 52;
+              final glowAlpha = 0.18 + bass * 0.36;
 
-          // Glow: expands and brightens with bass intensity
-          final glowRadius = 28 + bass * 52;
-          final glowAlpha = 0.18 + bass * 0.36;
-
-          return Transform.scale(
-            scale: scale,
-            child: Container(
-              width: maxSize,
-              height: maxSize,
-              decoration: BoxDecoration(
+              return Container(
+                width: maxSize,
+                height: maxSize,
+                decoration: BoxDecoration(
+                  borderRadius: AppRadii.all(AppRadii.xl),
+                  boxShadow: [
+                    BoxShadow(
+                      color: scheme.primary.withValues(alpha: glowAlpha),
+                      blurRadius: glowRadius,
+                      spreadRadius: bass * 6,
+                      offset: const Offset(0, 16),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: child,
+              );
+            },
+            child: Hero(
+              tag: 'player-artwork-${track.id}',
+              child: ClipRRect(
                 borderRadius: AppRadii.all(AppRadii.xl),
-                boxShadow: [
-                  BoxShadow(
-                    color: scheme.primary.withValues(alpha: glowAlpha),
-                    blurRadius: glowRadius,
-                    spreadRadius: bass * 6,
-                    offset: const Offset(0, 16),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                child: TrackArtwork(
+                  track: track,
+                  borderRadius: AppRadii.all(AppRadii.xl),
+                ),
               ),
-              child: child,
-            ),
-          );
-        },
-        child: Hero(
-          tag: 'player-artwork-${track.id}',
-          child: ClipRRect(
-            borderRadius: AppRadii.all(AppRadii.xl),
-            child: TrackArtwork(
-              track: track,
-              borderRadius: AppRadii.all(AppRadii.xl),
             ),
           ),
         ),

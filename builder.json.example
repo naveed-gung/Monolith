@@ -1,0 +1,25 @@
+{
+  "project": "Monolith",
+  "platform": "ios",
+  "github": {
+    "owner": "YOUR_GITHUB_USERNAME",
+    "repo": "monolith"
+  },
+  "ios": {
+    "path": "ios",
+    "scheme": "Runner",
+    "signing": false
+  },
+  "mobai": {
+    "url": "http://localhost:8686",
+    "device_id": ""
+  },
+  "flutter": {
+    "watch": {
+      "dirs": ["lib"],
+      "patterns": [".dart"],
+      "ignore": [".g.dart", ".freezed.dart"],
+      "debounce": 100
+    }
+  }
+}

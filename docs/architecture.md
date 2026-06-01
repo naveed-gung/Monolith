@@ -1,123 +1,299 @@
 # Architecture
 
-## Overview
-
-Monolith is organized as a Flutter application with a controller-centered state model and feature-scoped presentation code. The architecture favors a single source of truth for playback, downloads, playlists, and navigation so Android and iOS can share the same UI behavior.
+> **Platform** Android · iOS &nbsp;|&nbsp; **Language** Dart / Flutter &nbsp;|&nbsp; **State** Single-controller ChangeNotifier
 
 ![Architecture map](assets/architecture-map.svg)
 
-The diagram above shows the intended layering: startup and theming at the top, controller state in the middle, shared services on the side, and feature widgets at the presentation edge.
+---
 
-## Top-Level Structure
+## Table of Contents
 
-### `lib/main.dart`
+1. [Design Philosophy](#design-philosophy)
+2. [Directory Map](#directory-map)
+3. [Layer Responsibilities](#layer-responsibilities)
+4. [State Ownership](#state-ownership)
+5. [Data Flows](#data-flows)
+6. [Persistence](#persistence)
+7. [Platform Integration](#platform-integration)
+8. [Dependency Graph (key)](#dependency-graph-key)
+9. [Known Trade-offs](#known-trade-offs)
+10. [Extension Points](#extension-points)
 
-Application entry point.
+---
 
-- ensures Flutter bindings are initialized
-- initializes `just_audio_background`
-- starts the app with `MonolithApp`
+## Design Philosophy
 
-### `lib/src/app/`
+Monolith is built around a single rule: **one controller owns all mutable state; widgets only read and call**.
 
-Application composition and global concerns.
+This means:
 
-- `monolith_app.dart`: creates and scopes the controller
-- `state/app_controller.dart`: central application state and orchestration
-- `state/app_scope.dart`: inherited access to the controller
-- `theme/`: light and dark theme definitions
+- Every screen derives its render from `MonolithController` properties via `AppScope.watch(context)`.
+- No widget holds playback, queue, or download state locally.
+- Side effects (play, download, import, preference write) are method calls on the controller — never direct field mutations in widgets.
 
-### `lib/src/core/`
+The consequence is predictable: you can trace any UI behaviour to one file (`app_controller.dart`) without hunting through widget trees.
 
-Reusable, non-feature-specific code.
+---
 
-- `models/`: `Track`, download models, enums, and shared value types
-- `services/`: local media access, download persistence, manual imports, downloader integration
-- `widgets/`: shared widgets such as artwork rendering
-- `data/`: demo and fallback data
+## Directory Map
 
-### `lib/src/features/`
+```
+lib/
+└── src/
+    ├── app/
+    │   ├── monolith_app.dart          # MaterialApp wiring, theme + accent injection
+    │   ├── state/
+    │   │   ├── app_controller.dart    # ★ ALL mutable state lives here
+    │   │   └── app_scope.dart         # InheritedWidget accessor (.watch / .read)
+    │   └── theme/
+    │       ├── design_tokens.dart     # Colors, spacing, radii, motion, typography
+    │       └── monolith_theme.dart    # ThemeData builder — light(accent) / dark(accent)
+    ├── core/
+    │   ├── data/
+    │   │   └── demo_catalog.dart      # Fallback tracks for first-launch / no library
+    │   ├── models/
+    │   │   └── music_models.dart      # Track, enums (AppTab, ThemePreference, …)
+    │   ├── services/
+    │   │   ├── download_store.dart    # JSON manifest + file I/O for offline audio
+    │   │   ├── local_media_service.dart # on_audio_query wrapper
+    │   │   ├── manual_audio_import_service.dart # file_selector flow
+    │   │   ├── media_downloader.dart  # yt-dlp bridge
+    │   │   └── media_downloader_models.dart
+    │   └── widgets/
+    │       ├── app_card.dart          # Solid-surface content card (no blur)
+    │       ├── app_header.dart        # Top bar with logo and settings button
+    │       ├── app_icons.dart         # Centralised Phosphor icon registry
+    │       ├── atmosphere.dart        # Ambient background gradient + glow orbs
+    │       ├── glass_panel.dart       # Frosted glass (mini-player, overlay only)
+    │       ├── section_header.dart    # Titled row with optional action link
+    │       └── track_artwork.dart     # File → QueryArtwork → URL → fallback painter
+    └── features/
+        ├── shell/presentation/music_shell.dart    # Root scaffold, nav, mini-player
+        ├── library/presentation/library_page.dart
+        ├── player/presentation/player_page.dart
+        ├── downloads/presentation/downloads_page.dart
+        ├── search/presentation/search_page.dart
+        └── settings/presentation/settings_page.dart
+```
 
-Presentation split by user-facing area.
+---
 
-- `shell/`: root scaffold, navigation, mini-player, and player overlay
-- `library/`: track, playlist, artist, and album browsing surfaces
-- `downloads/`: downloader form, activity state, offline track listing, filtering, and sorting
-- `player/`: full-screen now-playing experience
-- `search/`: search flow and track launch entry points
-- `settings/`: app preferences and toggles
+## Layer Responsibilities
+
+| Layer | What it owns | What it must not do |
+|---|---|---|
+| **App** | App lifecycle, theme selection, controller scoping | Business logic |
+| **Design Tokens** | Every colour, spacing, radius, curve, and duration | Hard-coded values in widgets |
+| **Controller** | All state mutations, service calls, stream subscriptions | Rendering |
+| **Core Widgets** | Reusable UI primitives | Feature-specific state |
+| **Feature Screens** | Layout, composition, user event wiring | State mutation (call controller methods only) |
+| **Services** | Platform I/O, file system, downloader process | UI concerns |
+
+---
 
 ## State Ownership
 
-`MonolithController` is the primary orchestration layer. It owns:
-
-- active tab selection
-- library category selection
-- playback position, duration, and repeat state
-- current track and queue navigation
-- playlist membership and creation
-- download tasks and downloader event subscriptions
-- imported and downloaded track persistence
-- theme mode
-
-This keeps feature widgets mostly declarative and reduces duplicated playback logic between the shell, library, downloads, and player views.
-
-## Data Flow
-
-### Local Library Import
-
-1. UI triggers a refresh or import action.
-2. `LocalMediaService` requests permission and queries songs through `on_audio_query`.
-3. Song models are mapped into shared `Track` objects.
-4. `MonolithController` rebuilds the app-level track list and keeps the selected item stable when possible.
-
-### Downloaded Audio
-
-1. User submits a supported media URL.
-2. The downloader service resolves metadata and starts the download.
-3. `MonolithController` listens to progress, state, error, and log streams.
-4. Completed downloads are persisted through `DownloadStore`.
-5. Downloaded entries are merged into the app track list.
+`MonolithController` (a `ChangeNotifier`) is the single source of truth. Its surface area:
 
 ### Playback
+| Property | Type | Description |
+|---|---|---|
+| `currentTrack` | `Track` | Active track in the queue |
+| `isPlaying` | `bool` | AudioPlayer stream-derived |
+| `playbackProgress` | `double` | Position / duration, 0.0–1.0 |
+| `currentPosition` | `Duration` | Millisecond-accurate position |
+| `currentTrackDuration` | `Duration` | Resolved from player or track metadata |
+| `repeatMode` | `RepeatMode` | off / all / one |
+| `shuffleEnabled` | `bool` | Queue shuffle state |
 
-1. User selects a playable track.
-2. `MonolithController` loads a tagged audio source into `AudioPlayer`.
-3. The media tag is exposed to `just_audio_background` as a `MediaItem`.
-4. Player streams update UI state for progress, duration, and playback state.
-5. System surfaces consume the same metadata for lock-screen and notification controls.
+### Navigation
+| Property | Type | Description |
+|---|---|---|
+| `currentTab` | `AppTab` | library / downloads / search |
+| `selectedCategory` | `LibraryCategory` | tracks / artists / albums / playlists |
+| `isPlayerOpen` | `bool` | Full-screen player overlay visible |
+
+### Library
+| Property | Type | Description |
+|---|---|---|
+| `tracks` | `List<Track>` | Merged: downloaded + device + demo fallback |
+| `offlineTracks` | `List<Track>` | Downloaded + imported only |
+| `isLibraryLoading` | `bool` | Permission request / scan in progress |
+| `hasLibraryPermission` | `bool` | OS read permission granted |
+
+### Downloads
+| Property | Type | Description |
+|---|---|---|
+| `downloadTasks` | `List<DownloadTaskInfo>` | All active, paused, and recent tasks |
+| `isDownloaderReady` | `bool` | yt-dlp binary initialised |
+
+### User Preferences *(persisted to SharedPreferences)*
+| Property | Key | Default |
+|---|---|---|
+| `themePreference` | `pref_theme` | `system` |
+| `accentPreset` | `pref_accent` | `coral` |
+| `downloadsOnWifi` | `pref_wifi_only` | `true` |
+| `normalizeAudio` | `pref_normalize` | `true` |
+| `smoothTransitions` | `pref_transitions` | `true` |
+| `immersiveCanvas` | `pref_canvas` | `true` |
+
+---
+
+## Data Flows
+
+### 1 · Device Library Import
+
+```
+UI (Library / Settings)
+  │
+  ▼
+MonolithController.refreshLibrary()
+  │
+  ├─► LocalMediaService.loadTracks()
+  │     └─ on_audio_query → OS media store
+  │         returns: List<SongModel>  →  List<Track>
+  │
+  ├─► DownloadStore.loadTracks()
+  │     returns: persisted downloaded/imported tracks
+  │
+  └─► _rebuildTracks()
+        merges both lists, preserves selected-track index
+        notifyListeners() → all widgets rebuild
+```
+
+### 2 · Audio Download
+
+```
+UI: DownloadsPage.onDownload()
+  │
+  ▼
+MonolithController.startAudioDownload()
+  │
+  ├─► _checkConnectivity()  ← throws if wifi-only + cellular
+  │
+  └─► _startManagedDownload()
+        │
+        ├─ MediaDownloader.download(request)   ← yt-dlp subprocess
+        │    emits: onProgress / onState / onError / onLog streams
+        │    → controller updates _downloadTasks + notifyListeners()
+        │
+        └─ on success:
+             DownloadStore.saveTracks()
+             LocalMediaService.scanMedia()
+             _rebuildTracks()
+             notifyListeners()
+```
+
+### 3 · Playback
+
+```
+UI: controller.selectTrack(track, openPlayer: true)
+  │
+  ▼
+_activateTrackIndex(index)
+  │
+  ├─► notifyListeners()  ← UI renders new track immediately
+  │
+  └─► _syncSelectedTrack(autoplay: true)
+        │
+        ├─ _fadeVolume(to: 0)          ← smooth transition out
+        ├─ AudioPlayer.setAudioSource( ← tagged with MediaItem
+        │    Uri.file(track.filePath),
+        │    tag: MediaItem(id, title, artist, …)
+        │  )
+        ├─ AudioPlayer.play()
+        └─ _fadeVolume(to: targetVolume)  ← normalize + fade in
+             just_audio_background publishes MediaItem
+             → Android notification + iOS lock screen
+```
+
+---
 
 ## Persistence
 
-Downloaded and imported audio metadata is stored through `DownloadStore`, which:
+### User Preferences
 
-- creates app-managed download and import directories
-- stores a manifest JSON file
-- resolves artwork files colocated with audio files
-- prunes manifest entries whose backing files are missing
+Written on every setter call via `SharedPreferences`. Loaded at bootstrap before `refreshLibrary()` so the first UI frame reflects saved state.
+
+### Downloaded / Imported Tracks
+
+`DownloadStore` manages a JSON manifest file inside the app's private storage:
+
+```
+[app documents]/monolith_downloads/
+  manifest.json          ← List<Track> as JSON
+  <filename>.mp3         ← audio file
+  <filename>.jpg         ← artwork (colocated)
+```
+
+On load, the store prunes manifest entries whose backing audio files are missing (handles manual deletion, storage clear, etc.).
+
+---
 
 ## Platform Integration
 
 ### Android
 
-- media-library permissions are declared in the manifest
-- background playback support is exposed through `AudioService`
-- notification controls are driven by `just_audio_background`
+| Requirement | Implementation |
+|---|---|
+| Background playback | `AudioService` foreground service via `just_audio_background` |
+| System media notification | `MediaButtonReceiver` + `AudioServiceActivity` base class |
+| Media metadata | `MediaItem` tag on every `setAudioSource` call |
+| Library read | `READ_MEDIA_AUDIO` (API 33+) + `READ_EXTERNAL_STORAGE` (≤ API 32) |
+| Incoming audio share | `ACTION_VIEW` + `ACTION_SEND` intent-filters on `audio/*` |
 
 ### iOS
 
-- library import uses the Apple media library path where supported
-- background audio capability is declared through `UIBackgroundModes`
-- `audio_session` configures the app as a music playback session
-- lock-screen now-playing metadata is supplied through the tagged media item
+| Requirement | Implementation |
+|---|---|
+| Background audio | `UIBackgroundModes: audio` in `Info.plist` |
+| Lock screen / Control Center | `audio_session` configured as `.music()` |
+| Apple Music import | `NSAppleMusicUsageDescription` usage description |
+| Files app import | `file_selector` document picker |
 
-## Tradeoffs
+---
 
-- A single controller keeps behavior consistent, but it also means playback, downloads, and navigation are tightly coordinated in one file.
-- `just_audio_background` is a good fit for the current single-player design. If Monolith grows into multiple coordinated players or richer custom media actions, moving to direct `audio_service` usage would provide more control.
+## Dependency Graph (key)
 
-## Where To Extend
+```
+MonolithApp
+  └── AppScope (InheritedWidget)
+        └── MonolithController
+              ├── AudioPlayer          (just_audio)
+              ├── just_audio_background (MediaSession bridge)
+              ├── audio_session        (iOS session config)
+              ├── DownloadStore        (JSON persistence)
+              ├── LocalMediaService    (on_audio_query)
+              ├── MediaDownloader      (yt-dlp subprocess)
+              ├── ManualAudioImportService (file_selector)
+              ├── SharedPreferences    (preference persistence)
+              └── Connectivity         (wifi-only enforcement)
+```
 
-- New feature surfaces should stay inside `lib/src/features/` and read state through `AppScope`.
-- New persistence or integration logic should live under `lib/src/core/services/`.
-- Cross-feature models and enums should remain in `lib/src/core/models/`.
+---
+
+## Known Trade-offs
+
+| Decision | Benefit | Cost |
+|---|---|---|
+| Single `MonolithController` | Consistent cross-feature behaviour; easy to trace | Large file; playback + downloads + nav in one place |
+| `ChangeNotifier` over Riverpod/Bloc | Zero boilerplate, easy testing via injection | Coarse-grained rebuilds if `notifyListeners()` fires frequently |
+| `just_audio_background` over raw `audio_service` | Significantly less setup code | Limited custom notification actions; single-player only |
+| Vendored Android plugins in `third_party/` | Stable, offline-capable builds | Manual update responsibility |
+| Simulated bass visualisation | No extra package, no FFT overhead | Not frequency-accurate; sine-wave approximation only |
+
+---
+
+## Extension Points
+
+| Where to add | What goes there |
+|---|---|
+| `lib/src/features/` | New user-facing screen (read state via `AppScope`, call controller methods) |
+| `lib/src/core/services/` | New platform integration or I/O layer |
+| `lib/src/core/models/music_models.dart` | New enums or shared value types |
+| `lib/src/core/widgets/` | New reusable UI primitive |
+| `lib/src/app/theme/design_tokens.dart` | New spacing, colour, or motion constant |
+| `MonolithController` | New state with `_field`, getter, setter + `_prefs?.setX()` persistence |
+
+> **Rule:** Feature widgets must never import from another feature's directory.  
+> Cross-feature communication goes through the controller.

@@ -16,11 +16,11 @@ The project is structured to keep platform UI parity high while still allowing e
 
 For iOS right now, the active device focus is jailbroken iOS 16 while the broader public-safe Windows-to-iPhone workflow remains on standby.
 
-## Overview
+## <img src="docs/assets/icons/ic-overview.svg" width="20" height="20" alt=""> Overview
 
 ![Monolith product overview](docs/assets/product-overview.svg)
 
-## Product Surface
+## <img src="docs/assets/icons/ic-product.svg" width="20" height="20" alt=""> Product Surface
 
 Monolith currently centers around three primary surfaces:
 
@@ -30,7 +30,7 @@ Monolith currently centers around three primary surfaces:
 
 Playback is powered by `just_audio`, with `just_audio_background` handling system-facing media metadata and `audio_session` pinning the app to a music-friendly playback session so the current track can surface correctly on iOS lock screen, iOS Control Center, and Android's media notification deck.
 
-## Experience Pillars
+## <img src="docs/assets/icons/ic-pillars.svg" width="20" height="20" alt=""> Experience Pillars
 
 | Pillar | What it delivers |
 | --- | --- |
@@ -39,7 +39,7 @@ Playback is powered by `just_audio`, with `just_audio_background` handling syste
 | System integration | Android notification controls, headset media buttons, iOS lock screen, and iOS Control Center are treated as first-class playback surfaces. |
 | Library ownership | Imports, playlists, manifest-backed downloads, and local reconciliation are built around a permanent collection model rather than disposable streaming sessions. |
 
-## Download Pipeline
+## <img src="docs/assets/icons/ic-download.svg" width="20" height="20" alt=""> Download Pipeline
 
 Monolith downloads music from YouTube-source inputs for offline playback and local library management.
 
@@ -47,7 +47,7 @@ Monolith downloads music from YouTube-source inputs for offline playback and loc
 - The current checked-in mobile implementation uses `youtube_explode_dart` as the active backend rather than shipping `yt-dlp` binaries inside the app.
 - Downloaded tracks are persisted locally, reconciled into manifest-backed storage, and surfaced back through the Library and Player experiences.
 
-## Core Capabilities
+## <img src="docs/assets/icons/ic-capabilities.svg" width="20" height="20" alt=""> Core Capabilities
 
 - Shared Flutter UI for Android and iOS.
 - Local device-library import using `on_audio_query`.
@@ -59,7 +59,7 @@ Monolith downloads music from YouTube-source inputs for offline playback and loc
 - Background playback metadata for Android notifications and iOS lock-screen controls.
 - Light and dark themes driven by the app controller.
 
-## Architecture Summary
+## <img src="docs/assets/icons/ic-architecture.svg" width="20" height="20" alt=""> Architecture Summary
 
 Monolith uses a controller-driven architecture with a thin app shell and feature-oriented presentation layers.
 
@@ -83,7 +83,7 @@ The main orchestration point is `MonolithController` in `lib/src/app/state/app_c
 
 More detail is available in `docs/architecture.md`.
 
-## Repository Layout
+## <img src="docs/assets/icons/ic-repository.svg" width="20" height="20" alt=""> Repository Layout
 
 ```text
 lib/
@@ -106,7 +106,7 @@ Important folders:
 - `third_party/on_audio_query_android`: vendored Android plugin override required for current Android Gradle Plugin compatibility.
 - `third_party/file_selector_android`: vendored override used to keep build tooling aligned with the repository toolchain.
 
-## Getting Started
+## <img src="docs/assets/icons/ic-getting-started.svg" width="20" height="20" alt=""> Getting Started
 
 ### Prerequisites
 
@@ -133,7 +133,7 @@ flutter devices
 flutter run -d <device-id>
 ```
 
-## Development Workflow
+## <img src="docs/assets/icons/ic-workflow.svg" width="20" height="20" alt=""> Development Workflow
 
 ![Monolith development workflow](docs/assets/development-workflow.svg)
 
@@ -160,7 +160,7 @@ Notes:
 - The current downloader flow targets YouTube-source audio acquisition and is described in yt-dlp terms for product direction, while the in-app implementation currently uses `youtube_explode_dart`.
 - The repository keeps local plugin overrides in `third_party/` to avoid AGP and Kotlin drift.
 
-## Platform Focus
+## <img src="docs/assets/icons/ic-platform.svg" width="20" height="20" alt=""> Platform Focus
 
 ### Android
 
@@ -175,7 +175,7 @@ Notes:
 - Requires macOS tooling for build and signing.
 - The public-safe GitHub standby flow is prepared, but real-world iOS iteration is currently centered on jailbroken iOS 16 hardware.
 
-## iOS Build Notes
+## <img src="docs/assets/icons/ic-ios.svg" width="20" height="20" alt=""> iOS Build Notes
 
 - The iOS workflow is `workflow_dispatch` only, so pushing the repo will not auto-trigger macOS builds.
 - The prepared workflow uploads an unsigned IPA artifact.
@@ -184,7 +184,7 @@ Notes:
 
 See `docs/development.md` for the full development and validation guide.
 
-## Playback And Media Integration
+## <img src="docs/assets/icons/ic-playback.svg" width="20" height="20" alt=""> Playback And Media Integration
 
 Monolith now initializes `just_audio_background` during startup and attaches a `MediaItem` tag whenever a playable track is loaded. This enables:
 
@@ -200,7 +200,7 @@ Platform requirements are committed in the repository:
 
 See `docs/media-playback.md` for implementation details and troubleshooting guidance.
 
-## Verification
+## <img src="docs/assets/icons/ic-verify.svg" width="20" height="20" alt=""> Verification
 
 Focused widget regression suite:
 
@@ -216,15 +216,15 @@ flutter test
 
 The current widget suite is used as the primary fast validation path for shell navigation, downloads behavior, and controller-backed UI flows.
 
-## Testing
+## <img src="docs/assets/icons/ic-verify.svg" width="20" height="20" alt=""> Testing
 
-## Documentation Map
+## <img src="docs/assets/icons/ic-docs.svg" width="20" height="20" alt=""> Documentation Map
 
 - `docs/architecture.md`: application structure and data flow.
 - `docs/development.md`: setup, commands, validation, and workflow notes.
 - `docs/media-playback.md`: background playback and system media integration.
 
-## Troubleshooting
+## <img src="docs/assets/icons/ic-troubleshoot.svg" width="20" height="20" alt=""> Troubleshooting
 
 ### Lock screen or Android media notification does not appear
 

@@ -44,15 +44,18 @@
 
   <text x="374" y="210" fill="#F4F8F9" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="700">Monolith</text>
   <text x="374" y="262" fill="#BCECE3" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="600">Offline-first Flutter music player with system-grade playback surfaces</text>
-  <text x="374" y="318" fill="#D4E5E8" font-family="Segoe UI, Arial, sans-serif" font-size="24">Local imports, playlist control, YouTube-source downloads, and platform-native media presentation from one shared codebase.</text>
+  <text x="374" y="308" fill="#D4E5E8" font-family="Segoe UI, Arial, sans-serif" font-size="22">Local imports, playlist control, YouTube-source downloads, and</text>
+  <text x="374" y="333" fill="#D4E5E8" font-family="Segoe UI, Arial, sans-serif" font-size="22">platform-native media presentation from one shared codebase.</text>
 
   <rect x="170" y="372" width="424" height="48" rx="24" fill="#112D31"/>
   <text x="200" y="403" fill="#8DF3E0" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">App icon included in repository branding</text>
 
-  <rect x="170" y="442" width="470" height="138" rx="26" fill="#0F1F25" stroke="#274651" stroke-width="1.5"/>
-  <text x="204" y="484" fill="#F4F8F9" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">What Monolith focuses on</text>
-  <text x="204" y="524" fill="#D3E1E6" font-family="Segoe UI, Arial, sans-serif" font-size="20">Library import, immersive playback, playlist management, offline media ownership, and system-facing transport controls.</text>
-  <text x="204" y="560" fill="#D3E1E6" font-family="Segoe UI, Arial, sans-serif" font-size="20">Download copy is framed in yt-dlp terms; the current embedded backend uses youtube_explode_dart.</text>
+  <rect x="170" y="442" width="470" height="178" rx="26" fill="#0F1F25" stroke="#274651" stroke-width="1.5"/>
+  <text x="204" y="480" fill="#F4F8F9" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">What Monolith focuses on</text>
+  <text x="204" y="512" fill="#D3E1E6" font-family="Segoe UI, Arial, sans-serif" font-size="17">Library, playlists, offline media ownership,</text>
+  <text x="204" y="533" fill="#D3E1E6" font-family="Segoe UI, Arial, sans-serif" font-size="17">and system-facing transport controls.</text>
+  <text x="204" y="562" fill="#D3E1E6" font-family="Segoe UI, Arial, sans-serif" font-size="17">Downloads framed in yt-dlp terms;</text>
+  <text x="204" y="583" fill="#D3E1E6" font-family="Segoe UI, Arial, sans-serif" font-size="17">embedded backend: youtube_explode_dart.</text>
 
   <rect x="792" y="166" width="420" height="410" rx="34" fill="#0F1823" stroke="#2A4556" stroke-width="2"/>
   <rect x="822" y="202" width="360" height="22" rx="11" fill="#17303C"/>
@@ -60,7 +63,8 @@
   <rect x="848" y="272" width="88" height="88" rx="20" fill="#1EBCAC" fill-opacity="0.2" stroke="#2CC7B8"/>
   <text x="873" y="333" fill="#F8F2EE" font-family="Georgia, Times New Roman, serif" font-size="64" font-weight="700">m</text>
   <text x="964" y="302" fill="#F4F8F9" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Now Playing</text>
-  <text x="964" y="334" fill="#B9CDD5" font-family="Segoe UI, Arial, sans-serif" font-size="18">Shared metadata for player, lock screen, and media deck.</text>
+  <text x="964" y="325" fill="#B9CDD5" font-family="Segoe UI, Arial, sans-serif" font-size="17">Metadata for player, lock</text>
+  <text x="964" y="345" fill="#B9CDD5" font-family="Segoe UI, Arial, sans-serif" font-size="17">screen, and media deck.</text>
   <rect x="964" y="352" width="146" height="14" rx="7" fill="#1A8B88"/>
   <rect x="1120" y="352" width="30" height="14" rx="7" fill="#395666"/>
   <circle cx="889" cy="452" r="34" fill="#152733"/>
@@ -78,7 +82,7 @@
   <text x="196" y="675" fill="#8DF3E0" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">DOWNLOAD MODEL</text>
   <text x="196" y="703" fill="#E4EEF1" font-family="Segoe UI, Arial, sans-serif" font-size="21">yt-dlp-oriented YouTube music acquisition workflow</text>
   <text x="646" y="675" fill="#8DF3E0" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">ACTIVE EMBEDDED BACKEND</text>
-  <text x="646" y="703" fill="#E4EEF1" font-family="Segoe UI, Arial, sans-serif" font-size="21">youtube_explode_dart in the current checked-in mobile build</text>
+  <text x="646" y="703" fill="#E4EEF1" font-family="Segoe UI, Arial, sans-serif" font-size="21">youtube_explode_dart — active mobile build</text>
   <text x="1040" y="675" fill="#8DF3E0" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">CURRENT IOS FOCUS</text>
   <text x="1040" y="703" fill="#E4EEF1" font-family="Segoe UI, Arial, sans-serif" font-size="21">Jailbroken iOS 16</text>
 </svg>

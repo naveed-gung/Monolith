@@ -1,50 +1,84 @@
-<svg width="1440" height="820" viewBox="0 0 1440 820" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="1440" height="840" viewBox="0 0 1440 840" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Monolith README hero</title>
+  <desc id="desc">Monolith brand hero showing the app icon, offline-first playback, yt-dlp-oriented download flow, and the current jailbroken iOS 16 focus.</desc>
   <defs>
-    <linearGradient id="bg" x1="132" y1="58" x2="1289" y2="742" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#041E20"/>
-      <stop offset="0.52" stop-color="#0C3B3B"/>
-      <stop offset="1" stop-color="#112A44"/>
+    <linearGradient id="bg" x1="88" y1="54" x2="1317" y2="770" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07181C"/>
+      <stop offset="0.5" stop-color="#0C2D30"/>
+      <stop offset="1" stop-color="#102A43"/>
     </linearGradient>
-    <linearGradient id="panel" x1="188" y1="126" x2="1226" y2="700" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#103338" stop-opacity="0.95"/>
-      <stop offset="1" stop-color="#0B182A" stop-opacity="0.95"/>
+    <linearGradient id="panel" x1="120" y1="108" x2="1260" y2="736" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0D2228" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#0E1A27" stop-opacity="0.96"/>
     </linearGradient>
-    <linearGradient id="accent" x1="224" y1="225" x2="963" y2="587" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#3BE0C1"/>
-      <stop offset="1" stop-color="#7FD6FF"/>
+    <linearGradient id="teal" x1="188" y1="174" x2="336" y2="322" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#27C5B2"/>
+      <stop offset="1" stop-color="#178D91"/>
     </linearGradient>
-    <filter id="shadow" x="114" y="62" width="1212" height="696" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <linearGradient id="rail" x1="160" y1="634" x2="1242" y2="744" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10282E"/>
+      <stop offset="1" stop-color="#102131"/>
+    </linearGradient>
+    <filter id="softShadow" x="88" y="82" width="1264" height="700" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
       <feFlood flood-opacity="0" result="BackgroundImageFix"/>
       <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-      <feOffset dy="24"/>
-      <feGaussianBlur stdDeviation="28"/>
-      <feColorMatrix type="matrix" values="0 0 0 0 0.0117647 0 0 0 0 0.105882 0 0 0 0 0.137255 0 0 0 0.34 0"/>
+      <feOffset dy="16"/>
+      <feGaussianBlur stdDeviation="16"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0117647 0 0 0 0 0.0862745 0 0 0 0 0.109804 0 0 0 0.38 0"/>
       <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
       <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
     </filter>
   </defs>
-  <rect width="1440" height="820" rx="40" fill="url(#bg)"/>
-  <circle cx="1231" cy="148" r="150" fill="#52E0C7" fill-opacity="0.08"/>
-  <circle cx="240" cy="696" r="198" fill="#69B9FF" fill-opacity="0.08"/>
-  <g filter="url(#shadow)">
-    <rect x="170" y="118" width="1100" height="584" rx="34" fill="url(#panel)"/>
-    <rect x="170.75" y="118.75" width="1098.5" height="582.5" rx="33.25" stroke="white" stroke-opacity="0.12" stroke-width="1.5"/>
+  <rect width="1440" height="840" rx="36" fill="url(#bg)"/>
+  <circle cx="1216" cy="144" r="164" fill="#2AC8B6" fill-opacity="0.09"/>
+  <circle cx="202" cy="696" r="176" fill="#6DC3FF" fill-opacity="0.08"/>
+  <g filter="url(#softShadow)">
+    <rect x="120" y="108" width="1200" height="640" rx="32" fill="url(#panel)"/>
+    <rect x="121" y="109" width="1198" height="638" rx="31" stroke="white" stroke-opacity="0.08" stroke-width="2"/>
   </g>
-  <rect x="224" y="174" width="128" height="128" rx="28" fill="#081A1F" stroke="#3BE0C1" stroke-opacity="0.45" stroke-width="2"/>
-  <path d="M257 266V208H290.5C315.629 208 332 218.65 332 237.75C332 256.932 315.629 266 290.5 266H257ZM280 246H290C302.15 246 308 242.084 308 237.75C308 233.331 302.15 228 290 228H280V246Z" fill="url(#accent)"/>
-  <path d="M231 336H1209" stroke="white" stroke-opacity="0.1" stroke-width="2"/>
-  <text x="394" y="220" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700" letter-spacing="0.8">Monolith</text>
-  <text x="394" y="273" fill="#C4F5EB" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="500">Offline-first music player with system-grade playback surfaces</text>
-  <text x="231" y="405" fill="#E9FFFB" font-family="Segoe UI, Arial, sans-serif" font-size="23" font-weight="700">What It Focuses On</text>
-  <text x="231" y="449" fill="#D7E8EE" font-family="Segoe UI, Arial, sans-serif" font-size="22">Library import, immersive playback, playlist control, and local music ownership.</text>
-  <text x="231" y="498" fill="#D7E8EE" font-family="Segoe UI, Arial, sans-serif" font-size="22">YouTube-source downloads aligned with a yt-dlp-style offline workflow.</text>
-  <text x="231" y="547" fill="#D7E8EE" font-family="Segoe UI, Arial, sans-serif" font-size="22">Background media metadata for Android notifications and iOS now-playing surfaces.</text>
-  <rect x="855" y="388" width="308" height="208" rx="24" fill="#081823" stroke="#8EDDFC" stroke-opacity="0.25" stroke-width="1.5"/>
-  <text x="889" y="439" fill="#88F0D8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="1.1">CURRENT IOS FOCUS</text>
-  <text x="889" y="487" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">Jailbroken</text>
-  <text x="889" y="530" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">iOS 16</text>
-  <text x="889" y="571" fill="#C9D7E0" font-family="Segoe UI, Arial, sans-serif" font-size="18">Public-safe builder standby remains in the repo,</text>
-  <text x="889" y="598" fill="#C9D7E0" font-family="Segoe UI, Arial, sans-serif" font-size="18">but near-term device work is centered here.</text>
-  <rect x="231" y="616" width="238" height="40" rx="20" fill="#0F2B31"/>
-  <text x="259" y="642" fill="#90F6DE" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">Flutter • just_audio • offline media</text>
+
+  <rect x="170" y="164" width="160" height="160" rx="34" fill="url(#teal)"/>
+  <circle cx="284" cy="210" r="54" fill="#A2FFF2" fill-opacity="0.08"/>
+  <circle cx="216" cy="286" r="42" fill="#072A2B" fill-opacity="0.12"/>
+  <text x="201" y="282" fill="#F8F2EE" font-family="Georgia, Times New Roman, serif" font-size="116" font-weight="700">m</text>
+
+  <text x="374" y="210" fill="#F4F8F9" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="700">Monolith</text>
+  <text x="374" y="262" fill="#BCECE3" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="600">Offline-first Flutter music player with system-grade playback surfaces</text>
+  <text x="374" y="318" fill="#D4E5E8" font-family="Segoe UI, Arial, sans-serif" font-size="24">Local imports, playlist control, YouTube-source downloads, and platform-native media presentation from one shared codebase.</text>
+
+  <rect x="170" y="372" width="424" height="48" rx="24" fill="#112D31"/>
+  <text x="200" y="403" fill="#8DF3E0" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">App icon included in repository branding</text>
+
+  <rect x="170" y="442" width="470" height="138" rx="26" fill="#0F1F25" stroke="#274651" stroke-width="1.5"/>
+  <text x="204" y="484" fill="#F4F8F9" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">What Monolith focuses on</text>
+  <text x="204" y="524" fill="#D3E1E6" font-family="Segoe UI, Arial, sans-serif" font-size="20">Library import, immersive playback, playlist management, offline media ownership, and system-facing transport controls.</text>
+  <text x="204" y="560" fill="#D3E1E6" font-family="Segoe UI, Arial, sans-serif" font-size="20">Download copy is framed in yt-dlp terms; the current embedded backend uses youtube_explode_dart.</text>
+
+  <rect x="792" y="166" width="420" height="410" rx="34" fill="#0F1823" stroke="#2A4556" stroke-width="2"/>
+  <rect x="822" y="202" width="360" height="22" rx="11" fill="#17303C"/>
+  <rect x="822" y="246" width="360" height="138" rx="24" fill="#102A31"/>
+  <rect x="848" y="272" width="88" height="88" rx="20" fill="#1EBCAC" fill-opacity="0.2" stroke="#2CC7B8"/>
+  <text x="873" y="333" fill="#F8F2EE" font-family="Georgia, Times New Roman, serif" font-size="64" font-weight="700">m</text>
+  <text x="964" y="302" fill="#F4F8F9" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Now Playing</text>
+  <text x="964" y="334" fill="#B9CDD5" font-family="Segoe UI, Arial, sans-serif" font-size="18">Shared metadata for player, lock screen, and media deck.</text>
+  <rect x="964" y="352" width="146" height="14" rx="7" fill="#1A8B88"/>
+  <rect x="1120" y="352" width="30" height="14" rx="7" fill="#395666"/>
+  <circle cx="889" cy="452" r="34" fill="#152733"/>
+  <path d="M878 438L905 452L878 466V438Z" fill="#F8F2EE"/>
+  <circle cx="1002" cy="452" r="22" fill="#152733"/>
+  <path d="M994 443L1006 452L994 461V443Z" fill="#D7E4EA"/>
+  <circle cx="1078" cy="452" r="22" fill="#152733"/>
+  <path d="M1086 443L1074 452L1086 461V443Z" fill="#D7E4EA"/>
+  <rect x="822" y="510" width="164" height="30" rx="15" fill="#112D31"/>
+  <text x="851" y="531" fill="#8DF3E0" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">Android media deck</text>
+  <rect x="998" y="510" width="146" height="30" rx="15" fill="#112D31"/>
+  <text x="1031" y="531" fill="#8DF3E0" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">iOS now playing</text>
+
+  <rect x="160" y="634" width="1120" height="86" rx="28" fill="url(#rail)" stroke="#29424D" stroke-width="1.5"/>
+  <text x="196" y="675" fill="#8DF3E0" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">DOWNLOAD MODEL</text>
+  <text x="196" y="703" fill="#E4EEF1" font-family="Segoe UI, Arial, sans-serif" font-size="21">yt-dlp-oriented YouTube music acquisition workflow</text>
+  <text x="646" y="675" fill="#8DF3E0" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">ACTIVE EMBEDDED BACKEND</text>
+  <text x="646" y="703" fill="#E4EEF1" font-family="Segoe UI, Arial, sans-serif" font-size="21">youtube_explode_dart in the current checked-in mobile build</text>
+  <text x="1040" y="675" fill="#8DF3E0" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">CURRENT IOS FOCUS</text>
+  <text x="1040" y="703" fill="#E4EEF1" font-family="Segoe UI, Arial, sans-serif" font-size="21">Jailbroken iOS 16</text>
 </svg>

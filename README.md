@@ -1,20 +1,26 @@
 # Monolith
 
-![Monolith app icon](branding/app_icon_source.png)
-
 ![Monolith hero graphic](docs/assets/readme-hero.svg)
 
-Monolith is a Flutter music player built around an offline-first mobile listening experience. The app combines device-library import, managed downloads, playlists, immersive playback UI, and shared Android/iOS presentation in a single codebase.
+Monolith is an offline-first Flutter music player built for local listening, managed downloads, playlist control, and system-grade playback surfaces across Android and iOS.
 
-The project is structured to keep platform UI parity high while still allowing each platform to expose the native behaviors users expect, including media-library access, background playback metadata, lock-screen controls, and Android notification transport controls.
+The project is structured to keep platform UI parity high while still allowing each platform to expose the native behaviors users expect, including media-library access, background playback metadata, lock-screen controls, Control Center integration, and Android media notification transport controls.
 
-Today the product direction is centered on local-first playback, YouTube-source music acquisition, and a yt-dlp-style download workflow for building an offline library. In the current codebase, the embedded downloader implementation is powered by `youtube_explode_dart` rather than shipping `yt-dlp` binaries directly.
+| Area | Details |
+| --- | --- |
+| App identity | Monolith uses the app icon from `branding/app_icon_source.png` and a system-themed visual language inspired by the Zephyr references. |
+| Playback surfaces | Android media deck, lock screen controls, headset media buttons, iOS lock screen, and iOS Control Center. |
+| Download model | Monolith is positioned around a yt-dlp-oriented YouTube music acquisition workflow; the current embedded mobile implementation uses `youtube_explode_dart` instead of bundling `yt-dlp` binaries directly. |
+| Current iOS focus | Jailbroken iOS 16. |
+| Core stack | Flutter, `just_audio`, `just_audio_background`, `audio_session`, `on_audio_query`, and controller-driven app state. |
 
-For iOS right now, the project focus is jailbroken iOS 16 while the broader public-safe Windows-to-iPhone workflow remains on standby.
+For iOS right now, the active device focus is jailbroken iOS 16 while the broader public-safe Windows-to-iPhone workflow remains on standby.
+
+## Overview
 
 ![Monolith product overview](docs/assets/product-overview.svg)
 
-## Product Overview
+## Product Surface
 
 Monolith currently centers around three primary surfaces:
 
@@ -23,6 +29,23 @@ Monolith currently centers around three primary surfaces:
 - Search: surface tracks and jump directly into playback.
 
 Playback is powered by `just_audio`, with `just_audio_background` handling system-facing media metadata and `audio_session` pinning the app to a music-friendly playback session so the current track can surface correctly on iOS lock screen, iOS Control Center, and Android's media notification deck.
+
+## Experience Pillars
+
+| Pillar | What it delivers |
+| --- | --- |
+| Offline listening | Downloaded and imported tracks remain available as a local-first library for playback without depending on a live stream session. |
+| Unified player | A single controller-driven playback layer keeps queue state, metadata, and transport behavior consistent across Library, Downloads, Search, and the full-screen Player. |
+| System integration | Android notification controls, headset media buttons, iOS lock screen, and iOS Control Center are treated as first-class playback surfaces. |
+| Library ownership | Imports, playlists, manifest-backed downloads, and local reconciliation are built around a permanent collection model rather than disposable streaming sessions. |
+
+## Download Pipeline
+
+Monolith downloads music from YouTube-source inputs for offline playback and local library management.
+
+- The product workflow is described in yt-dlp terms because the downloader surface is shaped around that class of acquisition flow.
+- The current checked-in mobile implementation uses `youtube_explode_dart` as the active backend rather than shipping `yt-dlp` binaries inside the app.
+- Downloaded tracks are persisted locally, reconciled into manifest-backed storage, and surfaced back through the Library and Player experiences.
 
 ## Core Capabilities
 
@@ -39,6 +62,8 @@ Playback is powered by `just_audio`, with `just_audio_background` handling syste
 ## Architecture Summary
 
 Monolith uses a controller-driven architecture with a thin app shell and feature-oriented presentation layers.
+
+![Monolith architecture summary](docs/assets/architecture-map.svg)
 
 - `lib/main.dart`: bootstraps Flutter bindings and initializes background media support.
 - `lib/src/app/`: application wiring, top-level state, and theming.
@@ -58,15 +83,15 @@ The main orchestration point is `MonolithController` in `lib/src/app/state/app_c
 
 More detail is available in `docs/architecture.md`.
 
-## Project Layout
+## Repository Layout
 
 ```text
 lib/
- main.dart
- src/
-  app/
-  core/
-  features/
+  main.dart
+  src/
+    app/
+    core/
+    features/
 android/
 ios/
 reference/
@@ -110,6 +135,8 @@ flutter run -d <device-id>
 
 ## Development Workflow
 
+![Monolith development workflow](docs/assets/development-workflow.svg)
+
 Typical local loop:
 
 ```sh
@@ -132,6 +159,21 @@ Notes:
 - The downloader is not intended for web builds.
 - The current downloader flow targets YouTube-source audio acquisition and is described in yt-dlp terms for product direction, while the in-app implementation currently uses `youtube_explode_dart`.
 - The repository keeps local plugin overrides in `third_party/` to avoid AGP and Kotlin drift.
+
+## Platform Focus
+
+### Android
+
+- Supports device-library access, downloads, media notifications, and lock-screen controls.
+- Release builds are shrunk and ABI-filtered to reduce package size.
+
+### iOS
+
+- Uses the shared Flutter UI.
+- The current device-side focus is jailbroken iOS 16.
+- Prompts at startup for Apple Music and media-library import when supported.
+- Requires macOS tooling for build and signing.
+- The public-safe GitHub standby flow is prepared, but real-world iOS iteration is currently centered on jailbroken iOS 16 hardware.
 
 ## Windows To iPhone Standby
 
@@ -162,7 +204,7 @@ Platform requirements are committed in the repository:
 
 See `docs/media-playback.md` for implementation details and troubleshooting guidance.
 
-## Testing
+## Verification
 
 Focused widget regression suite:
 
@@ -178,20 +220,7 @@ flutter test
 
 The current widget suite is used as the primary fast validation path for shell navigation, downloads behavior, and controller-backed UI flows.
 
-## Platform Notes
-
-### Android
-
-- Supports device-library access, downloads, media notifications, and lock-screen controls.
-- Release builds are shrunk and ABI-filtered to reduce package size.
-
-### iOS
-
-- Uses the shared Flutter UI.
-- The current device-side focus is jailbroken iOS 16.
-- Prompts at startup for Apple Music and media-library import when supported.
-- Requires macOS tooling for build and signing.
-- The public-safe GitHub standby flow is prepared, but real-world iOS iteration is currently centered on jailbroken iOS 16 hardware.
+## Testing
 
 ## Documentation Map
 

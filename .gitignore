@@ -1,0 +1,78 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+/dist/
+android/build/
+**/.gradle/
+**/build/reports/
+
+# Local environment and secret material
+.env
+.env.*
+!.env.example
+*.p12
+*.mobileprovision
+*.cer
+*.pem
+*.key
+*.jks
+*.keystore
+
+# iOS build artifacts
+*.ipa
+*.xcarchive
+*.xcresult
+DerivedData/
+
+# MobAI / ios-builder local configuration overrides
+builder.local.json
+builder.override.json
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Example and plugin local build metadata
+third_party/**/example/android/.gradle/
+third_party/on_audio_query_android/android/.gradle/
+
+# Local Flutter engine cache used by Android builds on this machine only
+third_party/flutter-engine-maven/

@@ -195,7 +195,9 @@ class _PageWithMiniPlayer extends StatelessWidget {
           Positioned(
             left: AppSpacing.lg,
             right: AppSpacing.lg,
-            bottom: _kNavBarHeight + _kMiniPlayerGap,
+            bottom: _kNavBarHeight +
+                MediaQuery.of(context).padding.bottom +
+                _kMiniPlayerGap,
             child: _MiniPlayer(controller: controller),
           ),
       ],

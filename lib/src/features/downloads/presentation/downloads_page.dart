@@ -5,46 +5,37 @@ import '../../../app/state/app_controller.dart';
 import '../../../app/state/app_scope.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
+import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_icons.dart';
-import '../../../core/widgets/glass_panel.dart';
-import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
 
-enum _DownloadsLibraryFilter { all, downloaded, imported }
+// ── Formatters ─────────────────────────────────────────────────────────────
 
-enum _DownloadsSortOrder { titleAsc, titleDesc }
-
-String _formatDurationLabel(Duration duration) {
-  final minutes = duration.inMinutes;
-  final seconds =
-      duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-  return '$minutes:$seconds';
+String _fmtDuration(Duration d) {
+  final m = d.inMinutes;
+  final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return '$m:$s';
 }
 
-String _formatEtaLabel(Duration duration) {
-  if (duration.inMinutes >= 1) return _formatDurationLabel(duration);
-  return '${duration.inSeconds}s';
-}
+String _fmtEta(Duration d) =>
+    d.inMinutes >= 1 ? _fmtDuration(d) : '${d.inSeconds}s';
 
-String _formatBytesLabel(int bytes) {
-  const units = ['B', 'KB', 'MB', 'GB'];
-  var value = bytes.toDouble();
-  var unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex++;
+String _fmtBytes(int b) {
+  const u = ['B', 'KB', 'MB', 'GB'];
+  var v = b.toDouble();
+  var i = 0;
+  while (v >= 1024 && i < u.length - 1) {
+    v /= 1024;
+    i++;
   }
-  final precision = value >= 100
-      ? 0
-      : value >= 10
-      ? 1
-      : 2;
-  return '${value.toStringAsFixed(precision)} ${units[unitIndex]}';
+  final p = v >= 100 ? 0 : v >= 10 ? 1 : 2;
+  return '${v.toStringAsFixed(p)} ${u[i]}';
 }
+
+// ── Page ────────────────────────────────────────────────────────────────────
 
 class DownloadsPage extends StatefulWidget {
   const DownloadsPage({super.key, this.embedded = false});
-
   final bool embedded;
 
   @override
@@ -52,383 +43,414 @@ class DownloadsPage extends StatefulWidget {
 }
 
 class _DownloadsPageState extends State<DownloadsPage> {
-  late final TextEditingController _urlController;
-  late final TextEditingController _nameController;
-  late final TextEditingController _downloadsFilterController;
+  final _urlC = TextEditingController();
+  final _nameC = TextEditingController();
+  final _filterC = TextEditingController();
 
   DownloadPreview? _preview;
-  bool _loadingPreview = false;
+  bool _inspecting = false;
   bool _submitting = false;
-  String? _errorMessage;
-  _DownloadsLibraryFilter _downloadsFilter = _DownloadsLibraryFilter.all;
-  _DownloadsSortOrder _sortOrder = _DownloadsSortOrder.titleAsc;
-
-  bool get _hasUrl => _urlController.text.trim().isNotEmpty;
-  bool get _hasCustomName => _nameController.text.trim().isNotEmpty;
-
-  @override
-  void initState() {
-    super.initState();
-    _urlController = TextEditingController();
-    _nameController = TextEditingController();
-    _downloadsFilterController = TextEditingController();
-  }
+  String? _error;
+  bool _showAdder = false;
 
   @override
   void dispose() {
-    _urlController.dispose();
-    _nameController.dispose();
-    _downloadsFilterController.dispose();
+    _urlC.dispose();
+    _nameC.dispose();
+    _filterC.dispose();
     super.dispose();
   }
 
-  List<Track> _visibleOfflineTracks(MonolithController controller) {
-    final query =
-        _downloadsFilterController.text.trim().toLowerCase();
-    final filtered = controller.offlineTracks
-        .where((track) {
-          final matchesSource = switch (_downloadsFilter) {
-            _DownloadsLibraryFilter.all => true,
-            _DownloadsLibraryFilter.downloaded =>
-              track.source == TrackSource.downloaded,
-            _DownloadsLibraryFilter.imported =>
-              track.source == TrackSource.imported,
-          };
-          if (!matchesSource) return false;
-          if (query.isEmpty) return true;
-          final haystack =
-              '${track.title} ${track.artist} ${track.album}'
-                  .toLowerCase();
-          return haystack.contains(query);
-        })
-        .toList(growable: false);
-
-    int compareTracks(Track left, Track right) {
-      final titleCompare = left.title
-          .toLowerCase()
-          .compareTo(right.title.toLowerCase());
-      if (titleCompare != 0) {
-        return _sortOrder == _DownloadsSortOrder.titleAsc
-            ? titleCompare
-            : -titleCompare;
-      }
-      final artistCompare = left.artist
-          .toLowerCase()
-          .compareTo(right.artist.toLowerCase());
-      return _sortOrder == _DownloadsSortOrder.titleAsc
-          ? artistCompare
-          : -artistCompare;
-    }
-
-    filtered.sort(compareTracks);
-    return filtered;
+  List<Track> _filtered(MonolithController controller) {
+    final q = _filterC.text.trim().toLowerCase();
+    if (q.isEmpty) return controller.offlineTracks;
+    return controller.offlineTracks.where((t) {
+      return '${t.title} ${t.artist} ${t.album}'.toLowerCase().contains(q);
+    }).toList(growable: false);
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.watch(context);
     final scheme = Theme.of(context).colorScheme;
-    final offlineTracks = _visibleOfflineTracks(controller);
+    final textTheme = Theme.of(context).textTheme;
+    final filtered = _filtered(controller);
+    final activeTasks = controller.downloadTasks
+        .where((t) => t.isActive || t.status == DownloadTaskStatus.paused)
+        .toList();
+    final recentTasks = controller.downloadTasks
+        .where((t) => !t.isActive && t.status != DownloadTaskStatus.paused)
+        .take(5)
+        .toList();
 
-    final content = ListView(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.screenInset,
-        widget.embedded ? AppSpacing.xl : AppSpacing.md,
-        AppSpacing.screenInset,
-        AppSpacing.xxl,
-      ),
-      children: [
-        SectionHeader(
-          title: 'Your downloads',
-          actionLabel: '${offlineTracks.length} saved',
-        ),
-        const SizedBox(height: AppSpacing.md),
-        GlassPanel(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                key: const Key('downloads-filter-field'),
-                controller: _downloadsFilterController,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Filter downloads',
-                  hintText: 'Title, artist, or album',
+    final body = CustomScrollView(
+      slivers: [
+        // ── Header ────────────────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenInset,
+              AppSpacing.xl,
+              AppSpacing.screenInset,
+              0,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Downloads',
+                        style: textTheme.displaySmall?.copyWith(
+                          fontWeight: AppType.display,
+                          letterSpacing: AppType.trackTight,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '${controller.offlineTracks.length} saved offline',
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                // Add new download button
+                FilledButton.icon(
+                  onPressed: () => setState(() => _showAdder = !_showAdder),
+                  icon: PhosphorIcon(
+                    _showAdder ? AppIcons.close : AppIcons.add,
+                    size: 18,
+                  ),
+                  label: Text(_showAdder ? 'Cancel' : 'Add'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // ── Adder panel (inline, not a sheet) ─────────────────────────
+        if (_showAdder)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenInset,
+                AppSpacing.lg,
+                AppSpacing.screenInset,
+                0,
               ),
-              const SizedBox(height: AppSpacing.md),
-              Wrap(
-                spacing: AppSpacing.sm + AppSpacing.xs,
-                runSpacing: AppSpacing.sm + AppSpacing.xs,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              child: _AdderCard(
+                urlController: _urlC,
+                nameController: _nameC,
+                preview: _preview,
+                inspecting: _inspecting,
+                submitting: _submitting,
+                error: _error,
+                downloaderError: controller.downloaderError,
+                onInspect: () => _inspect(controller),
+                onDownload: () => _download(controller),
+                onClearPreview: _clearPreview,
+                onUrlChanged: _onUrlChanged,
+              ),
+            ),
+          ),
+
+        // ── Active jobs ────────────────────────────────────────────────
+        if (activeTasks.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenInset,
+                AppSpacing.xxl,
+                AppSpacing.screenInset,
+                AppSpacing.md,
+              ),
+              child: Row(
                 children: [
-                  ChoiceChip(
-                    key: const Key('downloads-filter-all'),
-                    label: const Text('All'),
-                    selected:
-                        _downloadsFilter == _DownloadsLibraryFilter.all,
-                    showCheckmark: false,
-                    onSelected: (_) => setState(() {
-                      _downloadsFilter = _DownloadsLibraryFilter.all;
-                    }),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(right: AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                  ChoiceChip(
-                    key: const Key('downloads-filter-downloaded'),
-                    label: const Text('Downloaded'),
-                    selected: _downloadsFilter ==
-                        _DownloadsLibraryFilter.downloaded,
-                    showCheckmark: false,
-                    onSelected: (_) => setState(() {
-                      _downloadsFilter =
-                          _DownloadsLibraryFilter.downloaded;
-                    }),
-                  ),
-                  ChoiceChip(
-                    key: const Key('downloads-filter-imported'),
-                    label: const Text('Imported'),
-                    selected: _downloadsFilter ==
-                        _DownloadsLibraryFilter.imported,
-                    showCheckmark: false,
-                    onSelected: (_) => setState(() {
-                      _downloadsFilter = _DownloadsLibraryFilter.imported;
-                    }),
-                  ),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(minWidth: 170),
-                    child: DropdownButtonFormField<_DownloadsSortOrder>(
-                      key: const Key('downloads-sort-field'),
-                      initialValue: _sortOrder,
-                      decoration:
-                          const InputDecoration(labelText: 'Sort'),
-                      items: const [
-                        DropdownMenuItem(
-                          value: _DownloadsSortOrder.titleAsc,
-                          child: Text('Title A to Z'),
-                        ),
-                        DropdownMenuItem(
-                          value: _DownloadsSortOrder.titleDesc,
-                          child: Text('Title Z to A'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _sortOrder = value);
-                      },
+                  Text(
+                    'Active',
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: AppType.label,
+                      letterSpacing: AppType.trackSnug,
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        if (offlineTracks.isEmpty)
-          GlassPanel(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Text(
-              controller.offlineTracks.isEmpty
-                  ? 'No saved downloads yet. Start one below and it will show up here.'
-                  : 'No downloads match the current filter.',
-              style: Theme.of(context).textTheme.bodyLarge,
             ),
-          )
-        else
-          for (final track in offlineTracks) ...[
-            _OfflineTrackTile(track: track),
-            const SizedBox(height: AppSpacing.md),
-          ],
-        const SizedBox(height: AppSpacing.xl),
-
-        // ── Downloader ─────────────────────────────────────────────────
-        GlassPanel(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Audio downloader',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                controller.downloaderError ??
-                    'Paste a supported link, inspect the metadata, edit the filename, then download audio with cover art.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              TextField(
-                controller: _urlController,
-                keyboardType: TextInputType.url,
-                onChanged: _handleUrlChanged,
-                decoration: const InputDecoration(
-                  labelText: 'Media link',
-                  hintText: 'https://www.youtube.com/watch?v=...',
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              FilledButton.icon(
-                onPressed: !_hasUrl ||
-                        _loadingPreview ||
-                        controller.downloaderError != null
-                    ? null
-                    : () => _inspectLink(controller),
-                icon: _loadingPreview
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : PhosphorIcon(AppIcons.inspect, size: 18),
-                label: Text(
-                  _loadingPreview ? 'Inspecting…' : 'Inspect link',
-                ),
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  _errorMessage!,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: scheme.error),
-                ),
-              ],
-            ],
           ),
-        ),
-        if (_preview != null) ...[
-          const SizedBox(height: AppSpacing.lg),
-          GlassPanel(
-            padding: const EdgeInsets.all(AppSpacing.xl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: SectionHeader(title: 'Detected details'),
-                    ),
-                    IconButton(
-                      onPressed: _clearPreview,
-                      icon: PhosphorIcon(AppIcons.close),
-                      tooltip: 'Clear detected details',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                _PreviewTile(preview: _preview!),
-                const SizedBox(height: AppSpacing.lg),
-                TextField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'File name',
-                    hintText: 'Edit the output name before downloading',
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.screenInset,
+            ),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: _ActiveTaskCard(
+                    task: activeTasks[i],
+                    onPause: activeTasks[i].canPause
+                        ? () => controller
+                            .pauseDownload(activeTasks[i].processId)
+                        : null,
+                    onResume: activeTasks[i].canResume
+                        ? () => controller
+                            .resumeDownload(activeTasks[i].processId)
+                        : null,
+                    onCancel: () =>
+                        controller.cancelDownload(activeTasks[i].processId),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                FilledButton.icon(
-                  onPressed: _submitting || !_hasUrl || !_hasCustomName
-                      ? null
-                      : () => _startDownload(controller),
-                  icon: _submitting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : PhosphorIcon(AppIcons.downloadFill, size: 18),
-                  label: Text(
-                    _submitting ? 'Starting…' : 'Download audio',
-                  ),
-                ),
-              ],
+                childCount: activeTasks.length,
+              ),
             ),
           ),
         ],
-        const SizedBox(height: AppSpacing.xl),
 
-        // ── Activity ───────────────────────────────────────────────────
-        SectionHeader(
-          title: 'Download activity',
-          actionLabel: controller.downloadTasks.isEmpty
-              ? null
-              : '${controller.downloadTasks.length} jobs',
+        // ── Offline library ────────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenInset,
+              AppSpacing.xxl,
+              AppSpacing.screenInset,
+              AppSpacing.md,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Saved offline',
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: AppType.label,
+                      letterSpacing: AppType.trackSnug,
+                    ),
+                  ),
+                ),
+                // Inline filter
+                SizedBox(
+                  width: 160,
+                  height: 34,
+                  child: TextField(
+                    controller: _filterC,
+                    onChanged: (_) => setState(() {}),
+                    style: textTheme.bodySmall,
+                    decoration: InputDecoration(
+                      hintText: 'Filter…',
+                      hintStyle: textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      prefixIcon: PhosphorIcon(
+                        AppIcons.navSearch(false),
+                        size: 14,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 0,
+                        horizontal: AppSpacing.sm,
+                      ),
+                      isDense: true,
+                      filled: true,
+                      fillColor: scheme.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: scheme.outlineVariant.withValues(alpha: 0.4),
+                          width: 0.5,
+                        ),
+                        borderRadius: AppRadii.all(AppRadii.pill),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: scheme.outlineVariant.withValues(alpha: 0.4),
+                          width: 0.5,
+                        ),
+                        borderRadius: AppRadii.all(AppRadii.pill),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: scheme.primary),
+                        borderRadius: AppRadii.all(AppRadii.pill),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        if (controller.downloadTasks.isEmpty)
-          GlassPanel(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Text(
-              'No download jobs yet.',
-              style: Theme.of(context).textTheme.bodyLarge,
+
+        if (filtered.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.screenInset,
+                vertical: AppSpacing.xxxl,
+              ),
+              child: Column(
+                children: [
+                  PhosphorIcon(
+                    AppIcons.downloadFill,
+                    size: 40,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    controller.offlineTracks.isEmpty
+                        ? 'Nothing saved yet'
+                        : 'No matches',
+                    style: textTheme.titleMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    controller.offlineTracks.isEmpty
+                        ? 'Tap Add to download audio from any supported URL'
+                        : 'Try a different search term',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
           )
         else
-          for (final task in controller.downloadTasks) ...[
-            _DownloadTaskTile(
-              task: task,
-              onPause: task.canPause
-                  ? () => controller.pauseDownload(task.processId)
-                  : null,
-              onResume: task.canResume
-                  ? () => controller.resumeDownload(task.processId)
-                  : null,
-              onRetry: task.canRetry
-                  ? () => controller.retryDownload(task.processId)
-                  : null,
-              onCancel:
-                  task.isActive || task.canPause
-                      ? () => controller.cancelDownload(task.processId)
-                      : null,
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.screenInset,
             ),
-            const SizedBox(height: AppSpacing.md),
-          ],
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) {
+                  final track = filtered[i];
+                  final isLast = i == filtered.length - 1;
+                  return Column(
+                    children: [
+                      _OfflineTrackRow(
+                        track: track,
+                        onTap: () =>
+                            controller.selectTrack(track, openPlayer: true),
+                      ),
+                      if (!isLast)
+                        Divider(
+                          height: 1,
+                          indent: 72,
+                          color: scheme.outlineVariant.withValues(alpha: 0.35),
+                        ),
+                    ],
+                  );
+                },
+                childCount: filtered.length,
+              ),
+            ),
+          ),
+
+        // ── Recent completed ────────────────────────────────────────────
+        if (recentTasks.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenInset,
+                AppSpacing.xxl,
+                AppSpacing.screenInset,
+                AppSpacing.md,
+              ),
+              child: Text(
+                'Recent activity',
+                style: textTheme.titleSmall?.copyWith(
+                  fontWeight: AppType.label,
+                  letterSpacing: AppType.trackSnug,
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenInset,
+              0,
+              AppSpacing.screenInset,
+              0,
+            ),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, i) {
+                  final task = recentTasks[i];
+                  return _RecentTaskRow(
+                    task: task,
+                    onRetry: task.canRetry
+                        ? () => controller.retryDownload(task.processId)
+                        : null,
+                  );
+                },
+                childCount: recentTasks.length,
+              ),
+            ),
+          ),
+        ],
+
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 180),
+        ),
       ],
     );
 
-    if (widget.embedded) return content;
-
+    if (widget.embedded) return body;
     return Scaffold(
       appBar: AppBar(title: const Text('Downloads')),
-      body: content,
+      body: body,
     );
   }
 
-  Future<void> _inspectLink(MonolithController controller) async {
+  Future<void> _inspect(MonolithController controller) async {
     setState(() {
-      _loadingPreview = true;
-      _errorMessage = null;
+      _inspecting = true;
+      _error = null;
     });
     try {
-      final preview =
-          await controller.inspectDownload(_urlController.text);
+      final p = await controller.inspectDownload(_urlC.text);
       setState(() {
-        _preview = preview;
-        _nameController.text = preview.suggestedFileName;
+        _preview = p;
+        _nameC.text = p.suggestedFileName;
       });
-    } catch (error) {
-      setState(() => _errorMessage = error.toString());
+    } catch (e) {
+      setState(() => _error = e.toString().replaceFirst('Bad state: ', ''));
     } finally {
-      if (mounted) setState(() => _loadingPreview = false);
+      if (mounted) setState(() => _inspecting = false);
     }
   }
 
-  Future<void> _startDownload(MonolithController controller) async {
+  Future<void> _download(MonolithController controller) async {
     if (_preview == null) return;
     setState(() {
       _submitting = true;
-      _errorMessage = null;
+      _error = null;
     });
     try {
       await controller.startAudioDownload(
         preview: _preview!,
-        fileName: _nameController.text,
+        fileName: _nameC.text,
       );
-    } catch (error) {
-      setState(() => _errorMessage = error.toString());
+      setState(() => _showAdder = false);
+      _clearPreview();
+    } catch (e) {
+      setState(() => _error = e.toString().replaceFirst('Bad state: ', ''));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -437,140 +459,217 @@ class _DownloadsPageState extends State<DownloadsPage> {
   void _clearPreview() {
     setState(() {
       _preview = null;
-      _errorMessage = null;
-      _nameController.clear();
+      _error = null;
+      _nameC.clear();
     });
   }
 
-  void _handleUrlChanged(String value) {
-    final normalized = value.trim();
-    final matchesCurrentPreview =
-        _preview != null && _preview!.url == normalized;
+  void _onUrlChanged(String v) {
+    final url = v.trim();
     setState(() {
-      _errorMessage = null;
-      if (!matchesCurrentPreview) {
+      _error = null;
+      if (_preview != null && _preview!.url != url) {
         _preview = null;
-        _nameController.clear();
+        _nameC.clear();
       }
     });
   }
 }
 
-class _OfflineTrackTile extends StatelessWidget {
-  const _OfflineTrackTile({required this.track});
+// ── Adder card ──────────────────────────────────────────────────────────────
 
-  final Track track;
+class _AdderCard extends StatelessWidget {
+  const _AdderCard({
+    required this.urlController,
+    required this.nameController,
+    required this.preview,
+    required this.inspecting,
+    required this.submitting,
+    required this.error,
+    required this.downloaderError,
+    required this.onInspect,
+    required this.onDownload,
+    required this.onClearPreview,
+    required this.onUrlChanged,
+  });
+
+  final TextEditingController urlController;
+  final TextEditingController nameController;
+  final DownloadPreview? preview;
+  final bool inspecting;
+  final bool submitting;
+  final String? error;
+  final String? downloaderError;
+  final VoidCallback onInspect;
+  final VoidCallback onDownload;
+  final VoidCallback onClearPreview;
+  final ValueChanged<String> onUrlChanged;
 
   @override
   Widget build(BuildContext context) {
-    final controller = AppScope.read(context);
     final scheme = Theme.of(context).colorScheme;
-    final sourceLabel =
-        track.source == TrackSource.imported ? 'Imported' : 'Downloaded';
+    final textTheme = Theme.of(context).textTheme;
+    final hasUrl = urlController.text.trim().isNotEmpty;
+    final hasName = nameController.text.trim().isNotEmpty;
 
-    return GlassPanel(
-      key: Key('downloaded-track-${track.id}'),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => controller.selectTrack(track, openPlayer: true),
-          borderRadius: AppRadii.all(AppRadii.lg),
-          child: Row(
+    return AppCard(
+      elevated: true,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              SizedBox(
-                width: 58,
-                height: 58,
-                child: TrackArtwork(
-                  track: track,
-                  borderRadius: AppRadii.all(AppRadii.sm),
-                ),
+              PhosphorIcon(
+                AppIcons.downloadFill,
+                size: 20,
+                color: scheme.primary,
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      track.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      track.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [
-                        _DetailChip(label: 'Source', value: sourceLabel),
-                        _DetailChip(label: 'Album', value: track.album),
-                      ],
-                    ),
-                  ],
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Download audio',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: AppType.title,
                 ),
-              ),
-              IconButton(
-                onPressed: track.canPlay
-                    ? () => controller.selectTrack(track, openPlayer: true)
-                    : null,
-                icon: PhosphorIcon(AppIcons.play, size: 22),
-                tooltip: 'Play track',
               ),
             ],
           ),
-        ),
+          if (downloaderError != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: scheme.errorContainer,
+                borderRadius: AppRadii.all(AppRadii.sm),
+              ),
+              child: Text(
+                downloaderError!,
+                style: textTheme.bodySmall?.copyWith(
+                  color: scheme.onErrorContainer,
+                ),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: AppSpacing.lg),
+            TextField(
+              controller: urlController,
+              keyboardType: TextInputType.url,
+              onChanged: onUrlChanged,
+              decoration: const InputDecoration(
+                labelText: 'Media URL',
+                hintText: 'https://youtube.com/watch?v=…',
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            if (preview == null)
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: hasUrl && !inspecting ? onInspect : null,
+                  icon: inspecting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : PhosphorIcon(AppIcons.inspect, size: 18),
+                  label: Text(inspecting ? 'Inspecting…' : 'Inspect link'),
+                ),
+              )
+            else ...[
+              _PreviewRow(preview: preview!),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Save as',
+                  hintText: 'filename (no extension)',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onClearPreview,
+                      child: const Text('Clear'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed:
+                          hasUrl && hasName && !submitting ? onDownload : null,
+                      icon: submitting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : PhosphorIcon(AppIcons.downloadFill, size: 18),
+                      label: Text(submitting ? 'Starting…' : 'Download'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (error != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: scheme.errorContainer,
+                  borderRadius: AppRadii.all(AppRadii.sm),
+                ),
+                child: Text(
+                  error!,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: scheme.onErrorContainer,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ],
       ),
     );
   }
 }
 
-class _PreviewTile extends StatelessWidget {
-  const _PreviewTile({required this.preview});
-
+class _PreviewRow extends StatelessWidget {
+  const _PreviewRow({required this.preview});
   final DownloadPreview preview;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Row(
       children: [
         ClipRRect(
           borderRadius: AppRadii.all(AppRadii.sm),
           child: SizedBox(
-            width: 72,
-            height: 72,
+            width: 56,
+            height: 56,
             child: preview.thumbnailUrl == null
-                ? DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerHigh,
-                    ),
-                    child: PhosphorIcon(
-                      AppIcons.musicNote,
-                      color: scheme.primary,
-                    ),
+                ? Container(
+                    color: scheme.surfaceContainerHigh,
+                    child: PhosphorIcon(AppIcons.musicNote, color: scheme.primary),
                   )
                 : Image.network(
                     preview.thumbnailUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHigh,
-                      ),
-                      child: PhosphorIcon(
-                        AppIcons.musicNote,
-                        color: scheme.primary,
-                      ),
+                    errorBuilder: (_, _, _) => Container(
+                      color: scheme.surfaceContainerHigh,
+                      child: PhosphorIcon(AppIcons.musicNote, color: scheme.primary),
                     ),
                   ),
           ),
@@ -582,35 +681,21 @@ class _PreviewTile extends StatelessWidget {
             children: [
               Text(
                 preview.title,
-                style: Theme.of(context).textTheme.titleMedium,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodyMedium?.copyWith(fontWeight: AppType.label),
               ),
-              const SizedBox(height: AppSpacing.xs),
               Text(
-                preview.uploader ?? 'Unknown uploader',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                [
+                  if (preview.uploader != null) preview.uploader!,
+                  if (preview.duration != null) _fmtDuration(preview.duration!),
+                  if (preview.estimatedSizeBytes != null)
+                    _fmtBytes(preview.estimatedSizeBytes!),
+                ].join(' · '),
+                style: textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),
               ),
-              if (preview.duration != null) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    _DetailChip(
-                      label: 'Time',
-                      value: _formatDurationLabel(preview.duration!),
-                    ),
-                    if (preview.estimatedSizeBytes != null)
-                      _DetailChip(
-                        label: 'Size',
-                        value: _formatBytesLabel(
-                          preview.estimatedSizeBytes!,
-                        ),
-                      ),
-                  ],
-                ),
-              ],
             ],
           ),
         ),
@@ -619,27 +704,31 @@ class _PreviewTile extends StatelessWidget {
   }
 }
 
-class _DownloadTaskTile extends StatelessWidget {
-  const _DownloadTaskTile({
+// ── Active task card ────────────────────────────────────────────────────────
+
+class _ActiveTaskCard extends StatelessWidget {
+  const _ActiveTaskCard({
     required this.task,
     this.onPause,
     this.onResume,
-    this.onRetry,
     this.onCancel,
   });
 
   final DownloadTaskInfo task;
   final VoidCallback? onPause;
   final VoidCallback? onResume;
-  final VoidCallback? onRetry;
   final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final pct = task.progress;
+    final isPaused = task.status == DownloadTaskStatus.paused;
 
-    return GlassPanel(
-      padding: const EdgeInsets.all(AppSpacing.md),
+    return AppCard(
+      elevated: true,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -653,144 +742,97 @@ class _DownloadTaskTile extends StatelessWidget {
                       task.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
+                      style: textTheme.bodyLarge?.copyWith(
+                        fontWeight: AppType.body,
+                      ),
                     ),
-                    const SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: 2),
                     Text(
                       task.fileName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
               ),
-              Wrap(
-                spacing: 2,
+              const SizedBox(width: AppSpacing.sm),
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   if (onPause != null)
-                    _TaskActionButton(
-                      onPressed: onPause!,
+                    _SmallAction(
                       icon: AppIcons.pause,
-                      tooltip: 'Pause download',
+                      onPressed: onPause!,
+                      tooltip: 'Pause',
                     ),
                   if (onResume != null)
-                    _TaskActionButton(
-                      onPressed: onResume!,
+                    _SmallAction(
                       icon: AppIcons.play,
-                      tooltip: 'Resume download',
-                    ),
-                  if (onRetry != null)
-                    _TaskActionButton(
-                      onPressed: onRetry!,
-                      icon: AppIcons.refresh,
-                      tooltip: 'Retry download',
+                      onPressed: onResume!,
+                      tooltip: 'Resume',
                     ),
                   if (onCancel != null)
-                    _TaskActionButton(
-                      onPressed: onCancel!,
+                    _SmallAction(
                       icon: AppIcons.close,
-                      tooltip: 'Cancel download',
+                      onPressed: onCancel!,
+                      tooltip: 'Cancel',
                     ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          LinearProgressIndicator(
-            value: task.status == DownloadTaskStatus.completed
-                ? 1
-                : task.status == DownloadTaskStatus.paused
-                ? task.progress
-                : task.progress == 0
-                ? null
-                : task.progress,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            task.statusLabel,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: _statusColor(context, task.status),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              if (task.mediaDuration != null)
-                _DetailChip(
-                  label: 'Time',
-                  value: _formatDurationLabel(task.mediaDuration!),
-                ),
-              if (task.totalBytes != null)
-                _DetailChip(
-                  label: 'Size',
-                  value: _formatBytesLabel(task.totalBytes!),
-                ),
-              if (task.downloadedBytes != null &&
-                  (task.status == DownloadTaskStatus.downloading ||
-                      task.status == DownloadTaskStatus.paused))
-                _DetailChip(
-                  label: 'Done',
-                  value: _formatBytesLabel(task.downloadedBytes!),
-                ),
-              if (task.downloadSpeedBytesPerSecond != null &&
-                  task.status == DownloadTaskStatus.downloading)
-                _DetailChip(
-                  label: 'Speed',
-                  value:
-                      '${_formatBytesLabel(task.downloadSpeedBytesPerSecond!)}/s',
-                ),
-              if (task.eta > Duration.zero)
-                _DetailChip(
-                  label: 'ETA',
-                  value: _formatEtaLabel(task.eta),
-                ),
-            ],
-          ),
-          if (task.errorMessage != null) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              task.errorMessage!,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: scheme.error),
-            ),
-          ],
-          if (task.latestDetailLine != null &&
-              (task.status == DownloadTaskStatus.paused ||
-                  task.status == DownloadTaskStatus.cancelled ||
-                  task.status == DownloadTaskStatus.failed)) ...[
-            const SizedBox(height: AppSpacing.sm),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest
-                    .withValues(alpha: 0.55),
-                borderRadius: AppRadii.all(AppRadii.sm),
-                border: Border.all(
-                  color: scheme.outlineVariant.withValues(alpha: 0.4),
-                ),
+          const SizedBox(height: AppSpacing.md),
+          ClipRRect(
+            borderRadius: AppRadii.all(AppRadii.pill),
+            child: LinearProgressIndicator(
+              value: pct == 0 && !isPaused ? null : pct,
+              minHeight: 5,
+              backgroundColor: scheme.outlineVariant.withValues(alpha: 0.3),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isPaused ? scheme.onSurfaceVariant : scheme.primary,
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm + AppSpacing.xs,
-                  vertical: AppSpacing.sm,
-                ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              _StatusDot(status: task.status),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
                 child: Text(
-                  task.latestDetailLine!,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    height: 1.35,
+                  task.statusLabel,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: _statusColor(scheme, task.status),
+                    fontWeight: AppType.label,
                   ),
                 ),
               ),
+              if (task.totalBytes != null)
+                Text(
+                  '${pct > 0 ? '${(pct * 100).round()}% · ' : ''}${_fmtBytes(task.totalBytes!)}',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              if (task.eta > Duration.zero) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  _fmtEta(task.eta),
+                  style: textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          if (task.errorMessage != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              task.errorMessage!,
+              style: textTheme.bodySmall?.copyWith(color: scheme.error),
             ),
           ],
         ],
@@ -798,77 +840,208 @@ class _DownloadTaskTile extends StatelessWidget {
     );
   }
 
-  static Color _statusColor(
-    BuildContext context,
-    DownloadTaskStatus status,
-  ) {
-    final scheme = Theme.of(context).colorScheme;
-    switch (status) {
-      case DownloadTaskStatus.completed:
-        return scheme.primary;
-      case DownloadTaskStatus.paused:
-        return scheme.tertiary;
-      case DownloadTaskStatus.failed:
-        return scheme.error;
-      case DownloadTaskStatus.cancelled:
-        return scheme.onSurfaceVariant;
-      case DownloadTaskStatus.ready:
-      case DownloadTaskStatus.downloading:
-        return scheme.primary;
-    }
-  }
+  static Color _statusColor(ColorScheme s, DownloadTaskStatus st) =>
+      switch (st) {
+        DownloadTaskStatus.completed => s.primary,
+        DownloadTaskStatus.failed => s.error,
+        DownloadTaskStatus.paused => s.onSurfaceVariant,
+        DownloadTaskStatus.cancelled => s.onSurfaceVariant,
+        _ => s.primary,
+      };
 }
 
-class _DetailChip extends StatelessWidget {
-  const _DetailChip({required this.label, required this.value});
-
-  final String label;
-  final String value;
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({required this.status});
+  final DownloadTaskStatus status;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final color = switch (status) {
+      DownloadTaskStatus.completed => scheme.primary,
+      DownloadTaskStatus.failed => scheme.error,
+      DownloadTaskStatus.paused || DownloadTaskStatus.cancelled =>
+        scheme.onSurfaceVariant,
+      _ => scheme.primary,
+    };
+    return Container(
+      width: 7,
+      height: 7,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh.withValues(alpha: 0.72),
-        borderRadius: AppRadii.all(AppRadii.pill),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.42),
-        ),
+// ── Recent task row ─────────────────────────────────────────────────────────
+
+class _RecentTaskRow extends StatelessWidget {
+  const _RecentTaskRow({required this.task, this.onRetry});
+  final DownloadTaskInfo task;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isOk = task.status == DownloadTaskStatus.completed;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isOk
+                  ? scheme.primaryContainer
+                  : scheme.errorContainer,
+              borderRadius: AppRadii.all(AppRadii.sm),
+            ),
+            child: Center(
+              child: PhosphorIcon(
+                isOk ? AppIcons.downloadFill : AppIcons.close,
+                size: 18,
+                color: isOk
+                    ? scheme.onPrimaryContainer
+                    : scheme.onErrorContainer,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodyMedium?.copyWith(fontWeight: AppType.body),
+                ),
+                Text(
+                  task.statusLabel,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (onRetry != null)
+            IconButton(
+              onPressed: onRetry,
+              icon: PhosphorIcon(AppIcons.refresh, size: 18),
+              color: scheme.onSurfaceVariant,
+              tooltip: 'Retry',
+              padding: const EdgeInsets.all(AppSpacing.xs),
+            ),
+        ],
       ),
+    );
+  }
+}
+
+// ── Offline track row ───────────────────────────────────────────────────────
+
+class _OfflineTrackRow extends StatelessWidget {
+  const _OfflineTrackRow({required this.track, required this.onTap});
+  final Track track;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isImported = track.source == TrackSource.imported;
+
+    return InkWell(
+      key: Key('downloaded-track-${track.id}'),
+      onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.xs,
-        ),
-        child: Text(
-          '$label $value',
-          style: Theme.of(context).textTheme.labelSmall,
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 52,
+              height: 52,
+              child: TrackArtwork(
+                track: track,
+                borderRadius: AppRadii.all(AppRadii.sm),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    track.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodyLarge?.copyWith(fontWeight: AppType.body),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    track.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: 3,
+              ),
+              decoration: BoxDecoration(
+                color: isImported
+                    ? scheme.secondaryContainer
+                    : scheme.primaryContainer,
+                borderRadius: AppRadii.all(AppRadii.pill),
+              ),
+              child: Text(
+                isImported ? 'Imported' : 'Downloaded',
+                style: textTheme.labelSmall?.copyWith(
+                  color: isImported
+                      ? scheme.onSecondaryContainer
+                      : scheme.onPrimaryContainer,
+                  fontWeight: AppType.label,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _TaskActionButton extends StatelessWidget {
-  const _TaskActionButton({
-    required this.onPressed,
+// ── Small action button ─────────────────────────────────────────────────────
+
+class _SmallAction extends StatelessWidget {
+  const _SmallAction({
     required this.icon,
+    required this.onPressed,
     required this.tooltip,
   });
-
-  final VoidCallback onPressed;
   final PhosphorIconData icon;
+  final VoidCallback onPressed;
   final String tooltip;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      visualDensity: VisualDensity.compact,
       onPressed: onPressed,
       icon: PhosphorIcon(icon, size: 18),
       tooltip: tooltip,
+      padding: const EdgeInsets.all(AppSpacing.xs),
+      visualDensity: VisualDensity.compact,
     );
   }
 }

@@ -31,6 +31,20 @@ class SettingsPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: scheme.surface,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: PhosphorIcon(
+            PhosphorIcons.caretLeft(),
+            size: 22,
+            color: scheme.onSurface,
+          ),
+          tooltip: 'Back',
+        ),
+      ),
       body: CustomScrollView(
         slivers: [
           // ── Large title ─────────────────────────────────────────────
@@ -38,7 +52,7 @@ class SettingsPage extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.screenInset,
-                AppSpacing.xl + AppSpacing.xl,
+                AppSpacing.md,
                 AppSpacing.screenInset,
                 AppSpacing.xxl,
               ),
@@ -252,6 +266,7 @@ class _DeveloperCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    final brightness = Theme.of(context).brightness;
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -267,6 +282,7 @@ class _DeveloperCard extends StatelessWidget {
           color: scheme.outlineVariant.withValues(alpha: 0.4),
           width: 0.5,
         ),
+        boxShadow: AppElevation.card(brightness),
       ),
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Row(
@@ -386,6 +402,7 @@ class _SettingsGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     return Container(
       decoration: BoxDecoration(
         color: scheme.surfaceContainerLow,
@@ -394,6 +411,7 @@ class _SettingsGroup extends StatelessWidget {
           color: scheme.outlineVariant.withValues(alpha: 0.5),
           width: 0.5,
         ),
+        boxShadow: AppElevation.card(brightness),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: children),

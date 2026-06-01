@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:audio_session/audio_session.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/data/demo_catalog.dart';
 import '../../core/models/music_models.dart';
@@ -16,6 +18,14 @@ import '../../core/services/media_downloader_models.dart';
 import '../../core/services/manual_audio_import_service.dart';
 
 class MonolithController extends ChangeNotifier {
+  // SharedPreferences keys
+  static const _kTheme = 'pref_theme';
+  static const _kAccent = 'pref_accent';
+  static const _kWifi = 'pref_wifi_only';
+  static const _kNormalize = 'pref_normalize';
+  static const _kTransitions = 'pref_transitions';
+  static const _kCanvas = 'pref_canvas';
+
   MonolithController({
     LocalMediaService? localMediaService,
     DownloadStore? downloadStore,
@@ -38,6 +48,7 @@ class MonolithController extends ChangeNotifier {
   final AudioPlayer _audioPlayer;
   final MediaDownloader _youtubeDL;
   final ManualAudioImportService _manualAudioImportService;
+  SharedPreferences? _prefs;
 
   late final StreamSubscription<PlayerState> _playerStateSubscription;
   late final StreamSubscription<Duration> _playerPositionSubscription;
@@ -376,45 +387,75 @@ class MonolithController extends ChangeNotifier {
   void setThemePreference(ThemePreference preference) {
     if (_themePreference == preference) return;
     _themePreference = preference;
+    _prefs?.setString(_kTheme, preference.name);
     notifyListeners();
   }
 
   void setAccentPreset(AccentPreset preset) {
     if (_accentPreset == preset) return;
     _accentPreset = preset;
+    _prefs?.setString(_kAccent, preset.name);
     notifyListeners();
   }
 
   void setDownloadsOnWifi(bool value) {
-    if (_downloadsOnWifi == value) {
-      return;
-    }
+    if (_downloadsOnWifi == value) return;
     _downloadsOnWifi = value;
+    _prefs?.setBool(_kWifi, value);
     notifyListeners();
   }
 
   void setNormalizeAudio(bool value) {
-    if (_normalizeAudio == value) {
-      return;
-    }
+    if (_normalizeAudio == value) return;
     _normalizeAudio = value;
+    _prefs?.setBool(_kNormalize, value);
+    unawaited(_applyAudioVolume());
     notifyListeners();
   }
 
   void setSmoothTransitions(bool value) {
-    if (_smoothTransitions == value) {
-      return;
-    }
+    if (_smoothTransitions == value) return;
     _smoothTransitions = value;
+    _prefs?.setBool(_kTransitions, value);
     notifyListeners();
   }
 
   void setImmersiveCanvas(bool value) {
-    if (_immersiveCanvas == value) {
+    if (_immersiveCanvas == value) return;
+    _immersiveCanvas = value;
+    _prefs?.setBool(_kCanvas, value);
+    notifyListeners();
+  }
+
+  // ── Audio helpers ──────────────────────────────────────────────────────
+
+  Future<void> _applyAudioVolume() async {
+    // Normalize: mild gain reduction (~−1.5 dB) to tame hot masters.
+    await _audioPlayer.setVolume(_normalizeAudio ? 0.84 : 1.0);
+  }
+
+  Future<void> _fadeVolume({required double to, int ms = 220}) async {
+    if (!_smoothTransitions) {
+      await _audioPlayer.setVolume(to);
       return;
     }
-    _immersiveCanvas = value;
-    notifyListeners();
+    const steps = 12;
+    final from = _audioPlayer.volume;
+    final diff = (to - from) / steps;
+    final stepMs = ms ~/ steps;
+    for (var i = 1; i <= steps; i++) {
+      await Future.delayed(Duration(milliseconds: stepMs));
+      await _audioPlayer.setVolume((from + diff * i).clamp(0.0, 1.0));
+    }
+  }
+
+  Future<void> _checkConnectivity() async {
+    if (!_downloadsOnWifi) return;
+    final results = await Connectivity().checkConnectivity();
+    if (results.any((r) => r == ConnectivityResult.wifi)) return;
+    throw StateError(
+      'Downloads are set to Wi-Fi only. Connect to Wi-Fi and try again.',
+    );
   }
 
   Future<void> setAppleMusicImportEnabled(
@@ -678,6 +719,7 @@ class MonolithController extends ChangeNotifier {
     required DownloadPreview preview,
     required String fileName,
   }) async {
+    await _checkConnectivity();
     final sanitizedName = _sanitizeFileName(
       fileName.trim().isEmpty ? preview.suggestedFileName : fileName.trim(),
     );
@@ -952,9 +994,28 @@ class MonolithController extends ChangeNotifier {
   }
 
   Future<void> _bootstrap() async {
+    await _loadPrefs();
     await _configureAudioSession();
     await _initializeDownloader();
     await refreshLibrary();
+  }
+
+  Future<void> _loadPrefs() async {
+    _prefs = await SharedPreferences.getInstance();
+    final p = _prefs!;
+    _themePreference = ThemePreference.values.firstWhere(
+      (e) => e.name == (p.getString(_kTheme) ?? ''),
+      orElse: () => ThemePreference.system,
+    );
+    _accentPreset = AccentPreset.values.firstWhere(
+      (e) => e.name == (p.getString(_kAccent) ?? ''),
+      orElse: () => AccentSwatch.fallback,
+    );
+    _downloadsOnWifi = p.getBool(_kWifi) ?? true;
+    _normalizeAudio = p.getBool(_kNormalize) ?? true;
+    _smoothTransitions = p.getBool(_kTransitions) ?? true;
+    _immersiveCanvas = p.getBool(_kCanvas) ?? true;
+    notifyListeners();
   }
 
   Future<void> _configureAudioSession() async {
@@ -1323,6 +1384,9 @@ class MonolithController extends ChangeNotifier {
     }
 
     try {
+      // Smooth fade-out before loading new source
+      if (_isPlaying) await _fadeVolume(to: 0);
+
       await _audioPlayer.setAudioSource(
         AudioSource.uri(
           Uri.file(track.filePath!),
@@ -1330,9 +1394,14 @@ class MonolithController extends ChangeNotifier {
         ),
       );
       _currentTrackDuration = _audioPlayer.duration ?? track.duration;
+
+      final targetVolume = _normalizeAudio ? 0.84 : 1.0;
       if (autoplay) {
+        await _audioPlayer.setVolume(0);
         await _audioPlayer.play();
+        await _fadeVolume(to: targetVolume);
       } else {
+        await _audioPlayer.setVolume(targetVolume);
         await _audioPlayer.pause();
       }
     } catch (error) {

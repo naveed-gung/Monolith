@@ -465,6 +465,8 @@ class _TracksSilver extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final tracks = controller.tracks;
+    final highlights = controller.highlightedTracks;
+    final gridRows = (highlights.length / 2).ceil();
 
     if (controller.isLibraryLoading) {
       return const SliverToBoxAdapter(
@@ -475,9 +477,14 @@ class _TracksSilver extends StatelessWidget {
       );
     }
 
+    // Build as flat list: [header] + [N track rows] + [grid header] + [M grid rows]
+    // Total = 1 + tracks.length + 1 + gridRows
+    final totalCount = 1 + tracks.length + 1 + gridRows;
+
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
+          // 0: tracks section header
           if (index == 0) {
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -487,76 +494,69 @@ class _TracksSilver extends StatelessWidget {
               ),
             );
           }
+          // 1..tracks.length: track rows
+          if (index <= tracks.length) {
+            final track = tracks[index - 1];
+            final isLast = index == tracks.length;
+            return Column(
+              children: [
+                _TrackRow(
+                  track: track,
+                  isActive: controller.currentTrack.id == track.id,
+                  onTap: () => controller.selectTrack(track, openPlayer: true),
+                  onMenu: () => onMenu(track),
+                ),
+                if (!isLast)
+                  Divider(
+                    height: 1,
+                    indent: 72,
+                    color: scheme.outlineVariant.withValues(alpha: 0.35),
+                  ),
+              ],
+            );
+          }
+          // tracks.length + 1: grid section header
           if (index == tracks.length + 1) {
             return Padding(
               padding: const EdgeInsets.only(
                 top: AppSpacing.xxl,
-                bottom: AppSpacing.md,
+                bottom: AppSpacing.lg,
               ),
               child: SectionHeader(title: 'Recent additions'),
             );
           }
-          if (index > tracks.length + 1) {
-            final gridIndex = index - tracks.length - 2;
-            final highlights = controller.highlightedTracks;
-            if (gridIndex >= highlights.length) return null;
-            // render grid rows manually (2 per row)
-            if (gridIndex % 2 != 0) return null;
-            final a = highlights[gridIndex];
-            final b = gridIndex + 1 < highlights.length
-                ? highlights[gridIndex + 1]
-                : null;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _AlbumCard(
-                      track: a,
-                      onTap: () =>
-                          controller.selectTrack(a, openPlayer: true),
-                    ),
+          // tracks.length + 2 .. totalCount - 1: grid rows (2 albums per row)
+          final row = index - tracks.length - 2;
+          final aIdx = row * 2;
+          if (aIdx >= highlights.length) return const SizedBox.shrink();
+          final a = highlights[aIdx];
+          final b = aIdx + 1 < highlights.length ? highlights[aIdx + 1] : null;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _AlbumCard(
+                    track: a,
+                    onTap: () => controller.selectTrack(a, openPlayer: true),
                   ),
-                  if (b != null) ...[
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: _AlbumCard(
-                        track: b,
-                        onTap: () =>
-                            controller.selectTrack(b, openPlayer: true),
-                      ),
-                    ),
-                  ] else
-                    const Expanded(child: SizedBox()),
-                ],
-              ),
-            );
-          }
-
-          final track = tracks[index - 1];
-          final isLast = index == tracks.length;
-          return Column(
-            children: [
-              _TrackRow(
-                track: track,
-                isActive: controller.currentTrack.id == track.id,
-                onTap: () =>
-                    controller.selectTrack(track, openPlayer: true),
-                onMenu: () => onMenu(track),
-              ),
-              if (!isLast)
-                Divider(
-                  height: 1,
-                  indent: 72,
-                  color:
-                      scheme.outlineVariant.withValues(alpha: 0.35),
                 ),
-            ],
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: b != null
+                      ? _AlbumCard(
+                          track: b,
+                          onTap: () =>
+                              controller.selectTrack(b, openPlayer: true),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
           );
         },
-        childCount: tracks.length +
-            2 +
-            (controller.highlightedTracks.length / 2).ceil(),
+        childCount: totalCount,
       ),
     );
   }

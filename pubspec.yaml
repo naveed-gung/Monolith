@@ -47,6 +47,8 @@ dependencies:
   url_launcher: ^6.3.2
   youtube_explode_dart: ^2.5.3
   phosphor_flutter: ^2.1.0
+  shared_preferences: ^2.5.5
+  connectivity_plus: ^7.1.1
 
 dev_dependencies:
   flutter_test:

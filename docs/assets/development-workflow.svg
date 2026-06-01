@@ -1,0 +1,52 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#091920"/>
+      <stop offset="1" stop-color="#0F2C37"/>
+    </linearGradient>
+    <linearGradient id="step1" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1CB59C"/>
+      <stop offset="1" stop-color="#148090"/>
+    </linearGradient>
+    <linearGradient id="step2" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#214C66"/>
+      <stop offset="1" stop-color="#153043"/>
+    </linearGradient>
+    <linearGradient id="step3" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#B86D31"/>
+      <stop offset="1" stop-color="#8B4D21"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" rx="36" fill="url(#bg)"/>
+  <text x="86" y="96" fill="#F4F7F8" font-size="40" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Development Validation Loop</text>
+  <text x="86" y="132" fill="#92B0B6" font-size="18" font-family="Segoe UI, Arial, sans-serif">Fast feedback first, broader platform validation second.</text>
+
+  <rect x="86" y="208" width="264" height="220" rx="28" fill="url(#step1)"/>
+  <text x="120" y="270" fill="#F8FCFC" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">1. Sync</text>
+  <text x="120" y="316" fill="#DFF7F1" font-size="18" font-family="Segoe UI, Arial, sans-serif">Refresh dependencies and keep local</text>
+  <text x="120" y="344" fill="#DFF7F1" font-size="18" font-family="Segoe UI, Arial, sans-serif">plugin overrides aligned.</text>
+  <rect x="120" y="370" width="188" height="40" rx="20" fill="#F8FCFC" fill-opacity="0.16"/>
+  <text x="148" y="396" fill="#F8FCFC" font-size="16" font-family="Consolas, monospace">flutter pub get</text>
+
+  <rect x="508" y="208" width="264" height="220" rx="28" fill="url(#step2)" stroke="#55809A" stroke-opacity="0.45"/>
+  <text x="542" y="270" fill="#F8FCFC" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">2. Verify</text>
+  <text x="542" y="316" fill="#C9D7E2" font-size="18" font-family="Segoe UI, Arial, sans-serif">Use the focused widget suite as the</text>
+  <text x="542" y="344" fill="#C9D7E2" font-size="18" font-family="Segoe UI, Arial, sans-serif">default regression checkpoint.</text>
+  <rect x="542" y="370" width="198" height="40" rx="20" fill="#F8FCFC" fill-opacity="0.12"/>
+  <text x="558" y="396" fill="#F8FCFC" font-size="16" font-family="Consolas, monospace">flutter test test/widget_test.dart</text>
+
+  <rect x="930" y="208" width="264" height="220" rx="28" fill="url(#step3)"/>
+  <text x="964" y="270" fill="#FFF6EC" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">3. Package</text>
+  <text x="964" y="316" fill="#F5DDC9" font-size="18" font-family="Segoe UI, Arial, sans-serif">Build the touched platform when</text>
+  <text x="964" y="344" fill="#F5DDC9" font-size="18" font-family="Segoe UI, Arial, sans-serif">manifests, plugins, or packaging changed.</text>
+  <rect x="964" y="370" width="168" height="40" rx="20" fill="#FFF6EC" fill-opacity="0.12"/>
+  <text x="990" y="396" fill="#FFF6EC" font-size="16" font-family="Consolas, monospace">flutter build apk</text>
+
+  <path d="M350 318H492" stroke="#54D7C5" stroke-width="5" stroke-linecap="round"/>
+  <path d="M772 318H914" stroke="#E4A26E" stroke-width="5" stroke-linecap="round"/>
+  <path d="M478 306L498 318L478 330" fill="none" stroke="#54D7C5" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M900 306L920 318L900 330" fill="none" stroke="#E4A26E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="180" y="492" width="920" height="80" rx="22" fill="#112D37" stroke="#2A6670" stroke-opacity="0.45"/>
+  <text x="216" y="540" fill="#F4F7F8" font-size="20" font-family="Segoe UI, Arial, sans-serif">Windows can validate shared Flutter logic and Android packaging. iOS playback changes still need a final run on macOS or a real iPhone build.</text>
+</svg>

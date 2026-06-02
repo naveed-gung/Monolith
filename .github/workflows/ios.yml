@@ -1,18 +1,11 @@
 name: iOS Build & Release
 
+# Tags only — one run per release. Triggering on branches AND tags meant a
+# commit + its tag pushed together fired two runs; tags-only gives exactly one.
 on:
   push:
     tags:
       - 'v*'
-    branches:
-      - '**'
-    paths:
-      - 'lib/**'
-      - 'ios/**'
-      - 'pubspec.yaml'
-      - 'pubspec.lock'
-      - '.github/workflows/ios.yml'
-      - '.github/patches/**'
   workflow_dispatch:
     inputs:
       tag:

@@ -10,6 +10,7 @@ import '../../../app/state/app_scope.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
 import '../../../core/widgets/app_icons.dart';
+import '../../storage/presentation/storage_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -250,6 +251,17 @@ class SettingsPage extends StatelessWidget {
                     subtitle: 'Jump to the active playback controls',
                     onTap: controller.openPlayer,
                   ),
+                  _Divider(),
+                  _ActionRow(
+                    icon: AppIcons.fileAudio,
+                    title: 'Music files',
+                    subtitle: 'Browse & share your downloaded tracks',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const StoragePage(),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -270,7 +282,7 @@ class SettingsPage extends StatelessWidget {
                   _InfoRow(
                     icon: AppIcons.musicNote,
                     title: 'Version',
-                    trailing: '1.0.1',
+                    trailing: '1.0.2',
                   ),
                   _Divider(),
                   const _CheckUpdateButton(),
@@ -741,7 +753,7 @@ class _CheckUpdateButton extends StatefulWidget {
 }
 
 class _CheckUpdateButtonState extends State<_CheckUpdateButton> {
-  static const _currentVersion = '1.0.1';
+  static const _currentVersion = '1.0.2';
   static const _apiUrl =
       'https://api.github.com/repos/naveed-gung/Monolith/releases/latest';
   static const _releasesUrl =

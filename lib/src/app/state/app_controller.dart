@@ -701,6 +701,11 @@ class MonolithController extends ChangeNotifier {
     return '${track.title} is already in $normalizedName.';
   }
 
+  Future<String> getDownloadDirectoryPath() async {
+    final dir = await _downloadStore.getDownloadDirectory();
+    return dir.path;
+  }
+
   void createEmptyPlaylist(String name) {
     final n = name.trim();
     if (n.isEmpty) return;

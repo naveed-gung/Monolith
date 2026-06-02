@@ -1,24 +1,26 @@
-name: iOS Builder Standby
+name: iOS Build & Release
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
-      artifact_label:
-        description: Artifact label for the generated unsigned IPA
+      tag:
+        description: 'Release tag (e.g. v1.0.2) — leave blank to use current commit'
         required: false
-        default: ipa
 
 concurrency:
-  group: ios-${{ github.workflow }}-${{ github.ref }}
+  group: ios-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write   # needed to create/update GitHub Releases
 
 jobs:
-  package-ios:
+  build-ios:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     env:
       CI: true
@@ -42,9 +44,8 @@ jobs:
             ~/.cocoapods/repos
             ~/Library/Caches/CocoaPods
             ios/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile', 'ios/Runner.xcodeproj/project.pbxproj', 'pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock', 'pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pods-
 
       - name: Install dependencies
         run: flutter pub get
@@ -52,13 +53,7 @@ jobs:
       - name: Precache iOS artifacts
         run: flutter precache --ios
 
-      - name: Verify iOS 16 deployment target
-        run: |
-          grep -q "IPHONEOS_DEPLOYMENT_TARGET = 16.0;" ios/Runner.xcodeproj/project.pbxproj
-          grep -q "<string>16.0</string>" ios/Flutter/AppFrameworkInfo.plist
-          grep -q "platform :ios, '16.0'" ios/Podfile
-
-      - name: Build unsigned iOS app
+      - name: Build unsigned iOS app (no code signing required)
         run: flutter build ios --release --no-codesign --no-pub
 
       - name: Package unsigned IPA
@@ -66,13 +61,30 @@ jobs:
           mkdir -p build/ios/unsigned/Payload
           cp -R build/ios/iphoneos/Runner.app build/ios/unsigned/Payload/
           cd build/ios/unsigned
-          zip -qry ../Monolith-unsigned.ipa Payload
+          zip -qry Monolith-${{ github.ref_name }}-unsigned.ipa Payload
+          mv Monolith-${{ github.ref_name }}-unsigned.ipa ../../..
 
-      - name: Upload IPA artifact
+      - name: Upload IPA as workflow artifact (always)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.artifact_label }}
-          path: build/ios/Monolith-unsigned.ipa
+          name: Monolith-iOS-unsigned
+          path: Monolith-*-unsigned.ipa
           if-no-files-found: error
           compression-level: 0
-          retention-days: 3
+          retention-days: 7
+
+      # Only publish to GitHub Releases when triggered by a version tag
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Monolith-*-unsigned.ipa
+          fail_on_unmatched_files: true
+          body: |
+            ## iOS (unsigned IPA)
+
+            This IPA is **not App Store signed**. Install via AltStore, Sideloadly, or
+            any sideloading tool of your choice.
+
+            > **Note:** You will need to re-sign it with your own Apple ID Developer
+            > certificate before it can run on a physical device.

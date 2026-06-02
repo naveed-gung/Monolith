@@ -97,19 +97,46 @@ jobs:
             sed -i '' 's/static const /static final /g' "$PKG/phosphor_icons_${style}.dart"
           done
 
-      # Build via Flutter's own toolchain rather than a hand-rolled xcodebuild
-      # invocation. `flutter build ios` runs `pod install` and generates the
-      # correct xcodebuild command that compiles AND exposes every plugin pod
-      # module (audio_service, just_audio, etc.) to the Runner target. The raw
-      # xcodebuild approach failed because plugin framework modules weren't on
-      # Runner's module search path → "Module 'audio_service' not found".
+      # Hybrid build: let Flutter do the CONFIGURATION only (pub get, Swift
+      # Package Manager integration, and the correct `pod install` that exposes
+      # every plugin pod module — this is what fixes "Module 'audio_service'
+      # not found"), then drive `xcodebuild` directly so signing is genuinely
+      # disabled. Plain `flutter build ios --no-codesign` compiles fine here
+      # but still aborts at Flutter's own "requires a Development Team" gate;
+      # raw xcodebuild on the Flutter-configured workspace skips that gate.
+      - name: Configure iOS project (Flutter)
+        run: flutter build ios --config-only --release --no-codesign
+
       - name: Build unsigned iOS app
-        run: flutter build ios --release --no-codesign
+        run: |
+          set -eo pipefail
+          LOG="$RUNNER_TEMP/xcodebuild.log"
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            build 2>&1 | tee "$LOG"
+          if ! grep -q "BUILD SUCCEEDED" "$LOG"; then
+            echo "=== errors ==="
+            grep -E "error:|The following build commands failed|Module .* not found" "$LOG" | head -40 || true
+            echo "=== last 30 lines ==="
+            tail -30 "$LOG"
+            exit 1
+          fi
 
       - name: Package unsigned IPA
         run: |
           set -eo pipefail
-          APP="build/ios/iphoneos/Runner.app"
+          APP=$(find "$RUNNER_TEMP/DerivedData" -name "Runner.app" -path "*/Release-iphoneos/*" | head -1)
           echo "Packaging: $APP"
           mkdir -p Payload
           cp -R "$APP" Payload/

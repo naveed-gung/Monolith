@@ -49,14 +49,29 @@ class _StoragePageState extends State<StoragePage> {
     if (path == null) return;
 
     if (Platform.isAndroid) {
-      // Try content URI for the external storage equivalent location.
-      // On Android 10+ app-private dirs aren't accessible in the system
-      // file manager; fall back to showing the path with copy option.
-      final uri = Uri.parse('content://com.android.externalstorage.documents/root/primary');
-      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!ok && mounted) _showCopyPath(path);
+      // External app storage lives under /storage/emulated/0/Android/data/<pkg>/files.
+      // The DocumentsProvider for primary external storage maps paths like:
+      //   primary:Android/data/<pkg>/files/downloads
+      // which becomes the content URI below. Files by Google and Samsung My Files
+      // both handle this URI and navigate to the exact folder.
+      const extRoot = '/storage/emulated/0/';
+      if (path.startsWith(extRoot)) {
+        // Uri(pathSegments:) encodes '/' within each segment as %2F, keeping ':'
+        // as-is — exactly the format the DocumentsProvider expects for doc IDs.
+        final ok = await launchUrl(
+          Uri(
+            scheme: 'content',
+            host: 'com.android.externalstorage.documents',
+            pathSegments: ['document', 'primary:${path.substring(extRoot.length)}'],
+          ),
+          mode: LaunchMode.externalApplication,
+        );
+        if (ok) return;
+      }
+      // Path is in internal storage (pre-migration installs) — file manager
+      // cannot access it; show the path so the user can copy it manually.
+      if (mounted) _showCopyPath(path);
     } else if (Platform.isIOS) {
-      // On iOS share the directory — the share sheet includes "Save to Files"
       await Share.shareXFiles([XFile(path)]);
     }
   }

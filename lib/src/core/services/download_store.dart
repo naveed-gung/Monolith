@@ -8,6 +8,19 @@ import '../models/music_models.dart';
 
 class DownloadStore {
   Future<Directory> getDownloadDirectory() async {
+    // On Android, use the app's external files directory so the folder is
+    // visible in the system Files app (Files by Google, Samsung My Files, etc.)
+    // without needing special permissions. Falls back to internal docs on iOS.
+    if (Platform.isAndroid) {
+      final extDir = await getExternalStorageDirectory();
+      if (extDir != null) {
+        final dir = Directory(
+          '${extDir.path}${Platform.pathSeparator}downloads',
+        );
+        if (!await dir.exists()) await dir.create(recursive: true);
+        return dir;
+      }
+    }
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final downloadDirectory = Directory(
       '${documentsDirectory.path}${Platform.pathSeparator}downloads',

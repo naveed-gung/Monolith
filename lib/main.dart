@@ -6,7 +6,7 @@ import 'src/app/monolith_app.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.example.monolith.playback',
+    androidNotificationChannelId: 'dev.naveed_gung.monolith.playback',
     androidNotificationChannelName: 'Monolith playback',
     androidNotificationOngoing: true,
   );

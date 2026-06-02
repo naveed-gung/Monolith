@@ -1,4 +1,4 @@
-package com.example.monolith
+package dev.naveed_gung.monolith
 
 import io.flutter.embedding.android.FlutterActivity
 

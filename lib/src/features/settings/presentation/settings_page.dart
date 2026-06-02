@@ -270,7 +270,7 @@ class SettingsPage extends StatelessWidget {
                   _InfoRow(
                     icon: AppIcons.musicNote,
                     title: 'Version',
-                    trailing: '1.0.0',
+                    trailing: '1.0.1',
                   ),
                   _Divider(),
                   const _CheckUpdateButton(),
@@ -741,7 +741,7 @@ class _CheckUpdateButton extends StatefulWidget {
 }
 
 class _CheckUpdateButtonState extends State<_CheckUpdateButton> {
-  static const _currentVersion = '1.0.0';
+  static const _currentVersion = '1.0.1';
   static const _apiUrl =
       'https://api.github.com/repos/naveed-gung/Monolith/releases/latest';
   static const _releasesUrl =

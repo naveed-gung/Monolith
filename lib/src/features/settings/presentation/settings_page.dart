@@ -140,6 +140,10 @@ class SettingsPage extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSpacing.md),
                         SegmentedButton<ThemePreference>(
+                          // No selected check-mark: it competes with each
+                          // segment's own icon and squeezes the label onto a
+                          // second line (the "m" in "System" dropping down).
+                          showSelectedIcon: false,
                           segments: [
                             ButtonSegment(
                               value: ThemePreference.system,

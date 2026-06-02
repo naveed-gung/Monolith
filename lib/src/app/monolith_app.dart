@@ -55,6 +55,17 @@ class _MonolithAppState extends State<MonolithApp> {
       return;
     }
 
+    // Wait until prefs + the first library scan have run so the persisted
+    // "seen" flag is accurate, then only prompt on the very first visit.
+    await _controller.whenReady;
+    if (!mounted || !_controller.shouldShowImportPrompt) {
+      return;
+    }
+    await _controller.markImportPromptSeen();
+    if (!mounted) {
+      return;
+    }
+
     final shouldImport = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -81,9 +92,12 @@ class _MonolithAppState extends State<MonolithApp> {
       return;
     }
 
+    // First-visit request: retry=false so iOS shows the system permission
+    // dialog. (retry=true skips straight to Settings, which is only useful
+    // after a prior denial.)
     await _controller.setAppleMusicImportEnabled(
       true,
-      retryPermissionRequest: true,
+      retryPermissionRequest: false,
     );
   }
 

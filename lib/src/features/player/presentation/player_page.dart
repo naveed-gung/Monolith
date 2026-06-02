@@ -31,6 +31,20 @@ class PlayerPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = AppScope.watch(context);
 
+    if (controller.currentTrack == null) {
+      return Center(
+        child: Padding(
+          padding: padding,
+          child: Text(
+            'Nothing playing',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+        ),
+      );
+    }
+
     return ListView(
       padding: padding,
       physics: const BouncingScrollPhysics(),
@@ -75,7 +89,7 @@ class _ArtworkSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final track = controller.currentTrack;
+    final track = controller.currentTrack!;
     final maxSize = math.min(
       MediaQuery.sizeOf(context).width - AppSpacing.screenInset * 2,
       360.0,
@@ -152,7 +166,7 @@ class _TrackInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final track = controller.currentTrack;
+    final track = controller.currentTrack!;
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -302,7 +316,7 @@ class _TransportControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final track = controller.currentTrack;
+    final track = controller.currentTrack!;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),

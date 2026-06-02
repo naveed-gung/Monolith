@@ -8,7 +8,6 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../core/data/demo_catalog.dart';
 import '../../core/models/music_models.dart';
 import '../theme/design_tokens.dart';
 import '../../core/services/download_store.dart';
@@ -25,6 +24,7 @@ class MonolithController extends ChangeNotifier {
   static const _kNormalize = 'pref_normalize';
   static const _kTransitions = 'pref_transitions';
   static const _kCanvas = 'pref_canvas';
+  static const _kSeenImportPrompt = 'pref_seen_import_prompt';
 
   MonolithController({
     LocalMediaService? localMediaService,
@@ -41,8 +41,14 @@ class MonolithController extends ChangeNotifier {
     _bindAudioPlayer();
     _bindDownloader();
     _bindConnectivity();
-    unawaited(_bootstrap());
+    _ready = _bootstrap();
   }
+
+  /// Completes once preferences are loaded and the initial library scan has
+  /// run. Used by the startup Apple Music import prompt so it only decides
+  /// after the persisted "seen" flag is available.
+  late final Future<void> _ready;
+  Future<void> get whenReady => _ready;
 
   final LocalMediaService _localMediaService;
   final DownloadStore _downloadStore;
@@ -71,7 +77,7 @@ class MonolithController extends ChangeNotifier {
   bool _shuffleEnabled = false;
   String _searchQuery = '';
 
-  List<Track> _tracks = DemoCatalog.fallbackTracks;
+  List<Track> _tracks = const [];
   List<Track> _deviceTracks = const [];
   List<Track> _downloadedTracks = const [];
   List<DownloadTaskInfo> _downloadTasks = const [];
@@ -98,6 +104,7 @@ class MonolithController extends ChangeNotifier {
   bool _isPlayerOpen = false;
   bool _iosAppleMusicImportEnabled =
       defaultTargetPlatform != TargetPlatform.iOS;
+  bool _hasSeenImportPrompt = false;
   final Set<String> _pauseRequestedProcessIds = <String>{};
   final Map<String, String> _fatalDownloadErrors = <String, String>{};
   final Map<String, Set<String>> _playlistTrackIds = {'Favorites': <String>{}};
@@ -109,11 +116,14 @@ class MonolithController extends ChangeNotifier {
   ThemePreference get themePreference => _themePreference;
   AccentPreset get accentPreset => _accentPreset;
   RepeatMode get repeatMode => _repeatMode;
-  Track get currentTrack => tracks[_selectedTrackIndex];
+  Track? get currentTrack => _tracks.isEmpty
+      ? null
+      : _tracks[_selectedTrackIndex.clamp(0, _tracks.length - 1)];
+  bool get hasCurrentTrack => _tracks.isNotEmpty;
   bool get isPlaying => _isPlaying;
   bool get shuffleEnabled => _shuffleEnabled;
   Duration get currentTrackDuration =>
-      _currentTrackDuration ?? currentTrack.duration;
+      _currentTrackDuration ?? currentTrack?.duration ?? Duration.zero;
   double get playbackProgress {
     final totalMilliseconds = currentTrackDuration.inMilliseconds;
     if (totalMilliseconds == 0) {
@@ -133,6 +143,17 @@ class MonolithController extends ChangeNotifier {
   bool get supportsAppleMusicImportPrompt =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
   bool get isAppleMusicImportEnabled => _iosAppleMusicImportEnabled;
+
+  /// Whether the one-time "Import from Apple Music" prompt should still be
+  /// shown on iOS. False once dismissed/acted on (persisted) or off-platform.
+  bool get shouldShowImportPrompt =>
+      supportsAppleMusicImportPrompt && !_hasSeenImportPrompt;
+
+  Future<void> markImportPromptSeen() async {
+    if (_hasSeenImportPrompt) return;
+    _hasSeenImportPrompt = true;
+    await _prefs?.setBool(_kSeenImportPrompt, true);
+  }
   bool get isLibraryLoading => _isLibraryLoading;
   bool get hasLibraryPermission => _hasLibraryPermission;
   String? get libraryError => _libraryError;
@@ -177,7 +198,7 @@ class MonolithController extends ChangeNotifier {
   }
 
   String get queueLabel {
-    switch (currentTrack.source) {
+    switch (currentTrack?.source) {
       case TrackSource.mock:
         return 'Placeholder';
       case TrackSource.device:
@@ -186,6 +207,8 @@ class MonolithController extends ChangeNotifier {
         return 'Downloaded';
       case TrackSource.imported:
         return 'Imported';
+      case null:
+        return '';
     }
   }
 
@@ -306,7 +329,7 @@ class MonolithController extends ChangeNotifier {
   }
 
   void openPlayer() {
-    if (_isPlayerOpen) {
+    if (_isPlayerOpen || currentTrack == null) {
       return;
     }
 
@@ -324,7 +347,7 @@ class MonolithController extends ChangeNotifier {
   }
 
   Future<void> togglePlayback() async {
-    if (!currentTrack.canPlay) {
+    if (currentTrack?.canPlay != true) {
       return;
     }
 
@@ -366,7 +389,7 @@ class MonolithController extends ChangeNotifier {
 
   Future<void> setPlaybackProgress(double value) async {
     final totalDuration = currentTrackDuration;
-    if (!currentTrack.canPlay || totalDuration == Duration.zero) {
+    if (currentTrack?.canPlay != true || totalDuration == Duration.zero) {
       return;
     }
 
@@ -493,7 +516,7 @@ class MonolithController extends ChangeNotifier {
     _isLibraryLoading = true;
     notifyListeners();
 
-    final previousTrackId = tracks.isEmpty ? null : currentTrack.id;
+    final previousTrackId = currentTrack?.id;
     try {
       final shouldLoadDeviceLibrary =
           !supportsAppleMusicImportPrompt ||
@@ -535,7 +558,7 @@ class MonolithController extends ChangeNotifier {
         return null;
       }
 
-      final previousTrackId = tracks.isEmpty ? null : currentTrack.id;
+      final previousTrackId = currentTrack?.id;
       final importedTracks = <Track>[];
       var failedCount = 0;
 
@@ -668,9 +691,9 @@ class MonolithController extends ChangeNotifier {
       return 'Device tracks cannot be deleted from Monolith yet.';
     }
 
-    final previousTrackId = currentTrack.id == track.id
+    final previousTrackId = currentTrack?.id == track.id
         ? null
-        : currentTrack.id;
+        : currentTrack?.id;
     _downloadedTracks = _downloadedTracks
         .where((existing) => existing.id != track.id)
         .toList(growable: false);
@@ -1056,6 +1079,7 @@ class MonolithController extends ChangeNotifier {
     _normalizeAudio = p.getBool(_kNormalize) ?? true;
     _smoothTransitions = p.getBool(_kTransitions) ?? true;
     _immersiveCanvas = p.getBool(_kCanvas) ?? true;
+    _hasSeenImportPrompt = p.getBool(_kSeenImportPrompt) ?? false;
     notifyListeners();
   }
 
@@ -1110,7 +1134,8 @@ class MonolithController extends ChangeNotifier {
     _playerDurationSubscription = _audioPlayer.durationStream.listen((
       duration,
     ) {
-      _currentTrackDuration = duration ?? currentTrack.duration;
+      _currentTrackDuration =
+          duration ?? currentTrack?.duration ?? Duration.zero;
       if (duration != null && duration > Duration.zero) {
         _persistResolvedCurrentTrackDuration(duration);
       }
@@ -1389,9 +1414,9 @@ class MonolithController extends ChangeNotifier {
     }
 
     final removedIds = matchingTracks.map((track) => track.id).toSet();
-    final preferredTrackId = removedIds.contains(currentTrack.id)
-        ? null
-        : currentTrack.id;
+    final currentId = currentTrack?.id;
+    final preferredTrackId =
+        currentId == null || removedIds.contains(currentId) ? null : currentId;
 
     _downloadedTracks = _downloadedTracks
         .where((track) => !removedIds.contains(track.id))
@@ -1422,7 +1447,7 @@ class MonolithController extends ChangeNotifier {
 
     _selectedTrackIndex = index;
     _currentPosition = Duration.zero;
-    _currentTrackDuration = currentTrack.duration;
+    _currentTrackDuration = currentTrack?.duration ?? Duration.zero;
     if (openPlayer) {
       _isPlayerOpen = true;
     }
@@ -1433,6 +1458,15 @@ class MonolithController extends ChangeNotifier {
 
   Future<void> _syncSelectedTrack({required bool autoplay}) async {
     final track = currentTrack;
+
+    if (track == null) {
+      _isPlaying = false;
+      _currentPosition = Duration.zero;
+      _currentTrackDuration = Duration.zero;
+      await _audioPlayer.stop();
+      notifyListeners();
+      return;
+    }
 
     if (!track.canPlay) {
       _isPlaying = false;
@@ -1523,7 +1557,7 @@ class MonolithController extends ChangeNotifier {
 
   void _persistResolvedCurrentTrackDuration(Duration duration) {
     final track = currentTrack;
-    if (track.duration == duration) {
+    if (track == null || track.duration == duration) {
       return;
     }
 
@@ -1572,7 +1606,7 @@ class MonolithController extends ChangeNotifier {
             ? _tracks[_selectedTrackIndex.clamp(0, _tracks.length - 1)].id
             : null);
 
-    _tracks = nextTracks.isEmpty ? DemoCatalog.fallbackTracks : nextTracks;
+    _tracks = nextTracks;
     final preferredIndex = oldTrackId == null
         ? -1
         : _tracks.indexWhere((track) => track.id == oldTrackId);

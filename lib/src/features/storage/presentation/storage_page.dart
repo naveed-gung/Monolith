@@ -44,6 +44,16 @@ class _StoragePageState extends State<StoragePage> {
     );
   }
 
+  // On iOS the real path is an opaque /var/mobile/Containers/… container path
+  // that's meaningless to the user. With file sharing enabled the folder shows
+  // up in the Files app, so we present that location instead.
+  String get _displayPath {
+    final path = _directoryPath;
+    if (path == null) return '';
+    if (Platform.isIOS) return 'On My iPhone › Monolith › Music';
+    return path;
+  }
+
   Future<void> _openDirectory() async {
     final path = _directoryPath;
     if (path == null) return;
@@ -72,7 +82,22 @@ class _StoragePageState extends State<StoragePage> {
       // cannot access it; show the path so the user can copy it manually.
       if (mounted) _showCopyPath(path);
     } else if (Platform.isIOS) {
-      await Share.shareXFiles([XFile(path)]);
+      // `shareddocuments://` opens the Files app directly at this folder when
+      // the app exposes its Documents directory (UIFileSharingEnabled +
+      // LSSupportsOpeningDocumentsInPlace). Fall back to a hint if it can't.
+      final opened = await launchUrl(
+        Uri.parse('shareddocuments://$path'),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Open the Files app and go to On My iPhone › Monolith › Music.',
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -186,7 +211,7 @@ class _StoragePageState extends State<StoragePage> {
                                 Text('Download folder',
                                   style: textTheme.bodyLarge?.copyWith(fontWeight: AppType.body)),
                                 if (_directoryPath != null)
-                                  Text(_directoryPath!,
+                                  Text(_displayPath,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: textTheme.bodySmall?.copyWith(
@@ -209,7 +234,8 @@ class _StoragePageState extends State<StoragePage> {
                         Expanded(
                           child: InkWell(
                             onTap: _directoryPath != null
-                                ? () => Clipboard.setData(ClipboardData(text: _directoryPath!))
+                                ? () => Clipboard.setData(
+                                    ClipboardData(text: _displayPath))
                                 : null,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(

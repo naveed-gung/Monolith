@@ -88,21 +88,29 @@ class _MusicShellState extends State<MusicShell>
         final wideLayout = constraints.maxWidth > 880;
         final currentPage = _buildPage(controller);
 
+        final miniTrack = controller.currentTrack;
+
         return Scaffold(
           extendBody: true,
+          // Keep the body (and its bottom-anchored mini player + nav bar) put
+          // when the keyboard opens. Without this the body shrinks above the
+          // keyboard and the mini player jumps up with it. All text inputs sit
+          // in the upper portion of each screen, so they stay visible.
+          resizeToAvoidBottomInset: false,
           body: Stack(
             children: [
               const Positioned.fill(child: Atmosphere()),
               currentPage,
-              // Mini player — above page content, below player overlay
-              if (!controller.isPlayerOpen)
+              // Mini player — above page content, below player overlay.
+              // Hidden when nothing is loaded.
+              if (!controller.isPlayerOpen && miniTrack != null)
                 Positioned(
                   left: AppSpacing.lg,
                   right: AppSpacing.lg,
                   bottom: _kNavBarHeight +
                       MediaQuery.of(context).viewPadding.bottom +
                       _kMiniPlayerGap,
-                  child: _MiniPlayer(controller: controller),
+                  child: _MiniPlayer(controller: controller, track: miniTrack),
                 ),
               // Player overlay
               Positioned.fill(
@@ -332,12 +340,12 @@ class _NavItem extends StatelessWidget {
 // ── Mini player ────────────────────────────────────────────────────────────
 
 class _MiniPlayer extends StatelessWidget {
-  const _MiniPlayer({required this.controller});
+  const _MiniPlayer({required this.controller, required this.track});
   final MonolithController controller;
+  final Track track;
 
   @override
   Widget build(BuildContext context) {
-    final track = controller.currentTrack;
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 

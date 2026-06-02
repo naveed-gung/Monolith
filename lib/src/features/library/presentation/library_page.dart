@@ -409,18 +409,19 @@ class _LibraryPageState extends State<LibraryPage> {
             ),
           ),
 
-        // ── Now playing hero ──────────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.screenInset,
-              AppSpacing.xl,
-              AppSpacing.screenInset,
-              0,
+        // ── Now playing hero (only when something is loaded) ──────────
+        if (controller.currentTrack != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenInset,
+                AppSpacing.xl,
+                AppSpacing.screenInset,
+                0,
+              ),
+              child: _NowPlayingHero(controller: controller),
             ),
-            child: _NowPlayingHero(controller: controller),
           ),
-        ),
 
         // ── Category selector ─────────────────────────────────────────
         SliverToBoxAdapter(
@@ -466,7 +467,7 @@ class _NowPlayingHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final track = controller.currentTrack;
+    final track = controller.currentTrack!;
     final canPlay = track.canPlay;
 
     return AppCard(
@@ -713,7 +714,7 @@ class _DrillTrackList extends StatelessWidget {
             children: [
               _TrackRow(
                 track: track,
-                isActive: controller.currentTrack.id == track.id,
+                isActive: controller.currentTrack?.id == track.id,
                 onTap: () => controller.selectTrack(track, openPlayer: true),
                 onMenu: () => onMenu(track, playlistContext: playlistContext),
               ),
@@ -785,7 +786,7 @@ class _TracksSilver extends StatelessWidget {
               children: [
                 _TrackRow(
                   track: track,
-                  isActive: controller.currentTrack.id == track.id,
+                  isActive: controller.currentTrack?.id == track.id,
                   onTap: () => controller.selectTrack(track, openPlayer: true),
                   onMenu: () => onMenu(track),
                 ),

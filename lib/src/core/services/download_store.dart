@@ -7,30 +7,37 @@ import 'package:path_provider/path_provider.dart';
 import '../models/music_models.dart';
 
 class DownloadStore {
-  Future<Directory> getDownloadDirectory() async {
-    // On Android, use the app's external files directory so the folder is
-    // visible in the system Files app (Files by Google, Samsung My Files, etc.)
-    // without needing special permissions. Falls back to internal docs on iOS.
+  static const _sep = '/';
+
+  /// Monolith's own top-level folder. On iOS this lives in the app's Documents
+  /// directory, which — with UIFileSharingEnabled + LSSupportsOpeningDocuments
+  /// InPlace set in Info.plist — shows up in the Files app under
+  /// "On My iPhone › Monolith". On Android it lives in the app's external files
+  /// directory so the system Files app can browse it without extra permissions.
+  Future<Directory> _rootDirectory() async {
     if (Platform.isAndroid) {
       final extDir = await getExternalStorageDirectory();
       if (extDir != null) {
-        final dir = Directory(
-          '${extDir.path}${Platform.pathSeparator}downloads',
-        );
-        if (!await dir.exists()) await dir.create(recursive: true);
-        return dir;
+        return _ensureDir('${extDir.path}${_sep}Monolith');
       }
     }
     final documentsDirectory = await getApplicationDocumentsDirectory();
-    final downloadDirectory = Directory(
-      '${documentsDirectory.path}${Platform.pathSeparator}downloads',
-    );
+    return _ensureDir('${documentsDirectory.path}${_sep}Monolith');
+  }
 
-    if (!await downloadDirectory.exists()) {
-      await downloadDirectory.create(recursive: true);
+  /// The "Music" subfolder where downloaded tracks land. This is the folder the
+  /// user sees as their library on disk.
+  Future<Directory> getDownloadDirectory() async {
+    final root = await _rootDirectory();
+    return _ensureDir('${root.path}${_sep}Music');
+  }
+
+  Future<Directory> _ensureDir(String path) async {
+    final dir = Directory(path);
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
     }
-
-    return downloadDirectory;
+    return dir;
   }
 
   Future<List<Track>> loadTracks() async {
@@ -156,24 +163,17 @@ class DownloadStore {
     }
   }
 
+  // Manifest lives at the Monolith root (not inside Music) so it persists
+  // regardless of how the music subfolders are organised.
   Future<File> _manifestFile() async {
-    final downloadDirectory = await getDownloadDirectory();
-    return File(
-      '${downloadDirectory.path}${Platform.pathSeparator}manifest.json',
-    );
+    final root = await _rootDirectory();
+    return File('${root.path}${_sep}manifest.json');
   }
 
+  // Imported audio goes into a dedicated subfolder of Music.
   Future<Directory> _importDirectory() async {
     final downloadDirectory = await getDownloadDirectory();
-    final importDirectory = Directory(
-      '${downloadDirectory.path}${Platform.pathSeparator}imports',
-    );
-
-    if (!await importDirectory.exists()) {
-      await importDirectory.create(recursive: true);
-    }
-
-    return importDirectory;
+    return _ensureDir('${downloadDirectory.path}${_sep}Imports');
   }
 
   Future<File> _nextAvailableFile(

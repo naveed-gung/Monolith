@@ -64,12 +64,22 @@ jobs:
       #                                  can't be used in const declarations
       - name: Patch phosphor_flutter for Flutter 3.44 final-class change
         run: |
+          set -euo pipefail
           PKG="$HOME/.pub-cache/hosted/pub.dev/phosphor_flutter-2.1.0/lib/src"
+          if [ ! -d "$PKG" ]; then
+            echo "ERROR: phosphor_flutter not found at $PKG"
+            ls "$HOME/.pub-cache/hosted/pub.dev/" | grep phosphor || echo "(no phosphor entries)"
+            exit 1
+          fi
           cp .github/patches/phosphor_icon_data_flutter344.dart "$PKG/phosphor_icon_data.dart"
           cp .github/patches/phosphor_icon_flutter344.dart      "$PKG/phosphor_icon.dart"
           for style in regular thin light bold fill duotone; do
             sed -i '' 's/static const /static final /g' "$PKG/phosphor_icons_${style}.dart"
           done
+          echo "=== Patch verification ==="
+          head -3 "$PKG/phosphor_icon_data.dart"
+          echo "static final count in icons_regular: $(grep -c 'static final' "$PKG/phosphor_icons_regular.dart")"
+          echo "static const remaining in icons_regular: $(grep -c 'static const' "$PKG/phosphor_icons_regular.dart" || echo 0)"
 
       - name: Install CocoaPods dependencies
         run: |
@@ -90,8 +100,12 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             PROVISIONING_PROFILE_SPECIFIER="" \
             DEVELOPMENT_TEAM="" \
+            VERBOSE_SCRIPT_LOGGING=YES \
             build 2>&1 | tee xcodebuild.log
-          grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" xcodebuild.log | tail -20
+          echo "=== FIRST 50 error/warning lines ==="
+          grep -E "error:|warning:|flutter|Failed" xcodebuild.log | head -50 || true
+          echo "=== LAST 30 lines of build log ==="
+          tail -30 xcodebuild.log
           grep -q "BUILD SUCCEEDED" xcodebuild.log
 
       - name: Package unsigned IPA

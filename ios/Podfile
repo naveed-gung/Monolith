@@ -44,6 +44,11 @@ post_install do |installer|
       config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
       config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
       config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ''
+      # Xcode 16.4: GCC_OPTIMIZATION_LEVEL is no longer silently ignored for
+      # Swift targets — it now forwards -O0 to swiftc which rejects it.
+      # Set SWIFT_OPTIMIZATION_LEVEL explicitly so Swift never sees a GCC flag.
+      config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] =
+        config.name.include?('Release') ? '-O' : '-Onone'
     end
   end
 end

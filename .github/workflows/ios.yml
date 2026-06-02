@@ -53,16 +53,38 @@ jobs:
       - name: Precache iOS artifacts
         run: flutter precache --ios
 
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install
+
       - name: Build unsigned iOS app (no code signing required)
-        run: flutter build ios --release --no-codesign --no-pub
+        run: |
+          set -eo pipefail
+          xcodebuild \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            DEVELOPMENT_TEAM="" \
+            build 2>&1 | tee xcodebuild.log
+          grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" xcodebuild.log | tail -20
+          grep -q "BUILD SUCCEEDED" xcodebuild.log
 
       - name: Package unsigned IPA
         run: |
-          mkdir -p build/ios/unsigned/Payload
-          cp -R build/ios/iphoneos/Runner.app build/ios/unsigned/Payload/
-          cd build/ios/unsigned
-          zip -qry Monolith-${{ github.ref_name }}-unsigned.ipa Payload
-          mv Monolith-${{ github.ref_name }}-unsigned.ipa ../../..
+          set -eo pipefail
+          APP=$(find "$RUNNER_TEMP/DerivedData" -name "Runner.app" -path "*/Release-iphoneos/*" | head -1)
+          echo "Packaging: $APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry "Monolith-${{ github.ref_name }}-unsigned.ipa" Payload
+          rm -rf Payload
 
       - name: Upload IPA as workflow artifact (always)
         uses: actions/upload-artifact@v4

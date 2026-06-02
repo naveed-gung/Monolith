@@ -48,6 +48,7 @@ class _StreamMediaDownloader implements MediaDownloader {
       <yt.YoutubeApiClient>[
         yt.YoutubeApiClient.ios,
         yt.YoutubeApiClient.androidVr,
+        yt.YoutubeApiClient.android,
       ];
 
   final yt.YoutubeExplode _youtube = yt.YoutubeExplode();

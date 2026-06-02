@@ -59,8 +59,7 @@ jobs:
           path: |
             ~/.cocoapods/repos
             ~/Library/Caches/CocoaPods
-            ios/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock', 'pubspec.lock') }}
+          key: ${{ runner.os }}-pods-${{ hashFiles('pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pods-
 
       - name: Cache DerivedData
@@ -119,7 +118,7 @@ jobs:
           done
 
       - name: Install CocoaPods dependencies
-        run: cd ios && pod install --no-repo-update 2>/dev/null || pod install
+        run: cd ios && pod install
 
       - name: Build unsigned iOS app
         run: |

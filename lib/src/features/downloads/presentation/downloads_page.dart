@@ -447,10 +447,28 @@ class _DownloadsPageState extends State<DownloadsPage> {
         _nameC.text = p.suggestedFileName;
       });
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Bad state: ', ''));
+      setState(() => _error = _friendlyError(e));
     } finally {
       if (mounted) setState(() => _inspecting = false);
     }
+  }
+
+  static String _friendlyError(Object e) {
+    final msg = e.toString();
+    if (msg.contains('SocketException') ||
+        msg.contains('Failed host lookup') ||
+        msg.contains('ClientException')) {
+      return 'Could not reach YouTube — check your internet connection and try again.';
+    }
+    if (msg.contains('VideoUnplayableException') ||
+        msg.contains('VideoRequiresPayment') ||
+        msg.contains('VideoUnavailable')) {
+      return 'This video is unavailable or age-restricted.';
+    }
+    if (msg.contains('No downloadable audio stream')) {
+      return 'No audio stream found for this video. Try a different link.';
+    }
+    return msg.replaceFirst('Bad state: ', '');
   }
 
   Future<void> _download(MonolithController controller) async {

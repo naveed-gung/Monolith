@@ -310,6 +310,12 @@ class SettingsPage extends StatelessWidget {
                     trailing: '1.0.2',
                   ),
                   _Divider(),
+                  _InfoRow(
+                    icon: AppIcons.compass,
+                    title: 'Bundle ID',
+                    trailing: DeveloperIdentity.bundleId,
+                  ),
+                  _Divider(),
                   const _CheckUpdateButton(),
                 ],
               ),

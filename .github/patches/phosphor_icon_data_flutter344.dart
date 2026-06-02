@@ -26,9 +26,10 @@ extension type PhosphorIconData._(IconData _) implements IconData {
 // PhosphorFlatIconData is behaviourally identical to PhosphorIconData.
 typedef PhosphorFlatIconData = PhosphorIconData;
 
-// PhosphorDuotoneIconData: secondary layer is dropped (unused in this app).
-// Duotone rendering in PhosphorIcon is also patched out — see phosphor_icon.dart.
-extension type PhosphorDuotoneIconData._(IconData _) implements IconData {
+// PhosphorDuotoneIconData: implements PhosphorIconData (not just IconData) so
+// phosphor_icons_base.dart functions typed as PhosphorIconData can return
+// PhosphorDuotoneIconData values. Secondary layer dropped (unused in this app).
+extension type PhosphorDuotoneIconData._(IconData _) implements PhosphorIconData {
   PhosphorDuotoneIconData(int codePoint, [PhosphorIconData? secondary])
       : this._(IconData(
           codePoint,

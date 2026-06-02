@@ -4,6 +4,15 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - '**'
+    paths:
+      - 'lib/**'
+      - 'ios/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/ios.yml'
+      - '.github/patches/**'
   workflow_dispatch:
     inputs:
       tag:
@@ -15,12 +24,12 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write   # needed to create/update GitHub Releases
+  contents: write
 
 jobs:
   build-ios:
     runs-on: macos-15
-    timeout-minutes: 40
+    timeout-minutes: 15
 
     env:
       CI: true
@@ -37,6 +46,13 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
       - name: Cache CocoaPods
         uses: actions/cache@v4
         with:
@@ -47,66 +63,84 @@ jobs:
           key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock', 'pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pods-
 
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/DerivedData
+          key: ${{ runner.os }}-derived-${{ hashFiles('ios/Podfile.lock', 'pubspec.lock', 'ios/Runner.xcodeproj/project.pbxproj') }}
+          restore-keys: ${{ runner.os }}-derived-
+
+      - name: Cache Flutter build artifacts
+        uses: actions/cache@v4
+        with:
+          path: build/ios
+          key: ${{ runner.os }}-flutter-ios-${{ hashFiles('pubspec.lock', 'lib/**/*.dart') }}
+          restore-keys: ${{ runner.os }}-flutter-ios-
+
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Precache iOS artifacts
-        run: flutter precache --ios
-
       # phosphor_flutter 2.1.0 uses 'extends IconData' which became illegal in
-      # Flutter 3.44 (IconData is now a final class). No compatible release exists.
-      # Three-part patch applied to the pub-cache in-place:
-      #   1. phosphor_icon_data.dart  — replace class hierarchy with extension types
-      #   2. phosphor_icon.dart       — remove duotone 'is' check (ext-type erasure
-      #                                  would make it always-true at runtime)
-      #   3. All generated icon files — change 'static const' to 'static final'
-      #                                  because non-const ext-type constructors
-      #                                  can't be used in const declarations
-      - name: Patch phosphor_flutter for Flutter 3.44 final-class change
+      # Flutter 3.44 (IconData is now a final class). Three-part patch:
+      #   1. phosphor_icon_data.dart  — extension types replacing class hierarchy.
+      #      PhosphorDuotoneIconData implements PhosphorIconData (not just IconData)
+      #      so phosphor_icons_base.dart return types (PhosphorIconData) are satisfied.
+      #   2. phosphor_icon.dart       — duotone 'is' check removed (ext-type erasure
+      #                                  makes it always-true at runtime)
+      #   3. Generated icon files     — 'static const' → 'static final' because
+      #                                  non-const ext-type constructors can't be const
+      - name: Patch phosphor_flutter for Flutter 3.44
         run: |
           set -euo pipefail
-          PKG="$HOME/.pub-cache/hosted/pub.dev/phosphor_flutter-2.1.0/lib/src"
+          ROOT="$HOME/.pub-cache/hosted/pub.dev/phosphor_flutter-2.1.0"
+          PKG="$ROOT/lib/src"
           if [ ! -d "$PKG" ]; then
             echo "ERROR: phosphor_flutter not found at $PKG"
             ls "$HOME/.pub-cache/hosted/pub.dev/" | grep phosphor || echo "(no phosphor entries)"
             exit 1
           fi
+          # The package ships with sdk: ">=2.12.0 <4.0.0" (or similar pre-2.17 minimum).
+          # Dart uses the package's minimum SDK as its language version, which disables
+          # extension types (inline-class, needs >=3.3) and super-parameters (needs >=2.17).
+          # Bumping the minimum to 3.3.0 unlocks both.
+          sed -i '' '/sdk:/s/>=[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/>=3.3.0/' "$ROOT/pubspec.yaml"
           cp .github/patches/phosphor_icon_data_flutter344.dart "$PKG/phosphor_icon_data.dart"
           cp .github/patches/phosphor_icon_flutter344.dart      "$PKG/phosphor_icon.dart"
           for style in regular thin light bold fill duotone; do
             sed -i '' 's/static const /static final /g' "$PKG/phosphor_icons_${style}.dart"
           done
-          echo "=== Patch verification ==="
-          head -3 "$PKG/phosphor_icon_data.dart"
-          echo "static final count in icons_regular: $(grep -c 'static final' "$PKG/phosphor_icons_regular.dart")"
-          echo "static const remaining in icons_regular: $(grep -c 'static const' "$PKG/phosphor_icons_regular.dart" || echo 0)"
 
       - name: Install CocoaPods dependencies
-        run: |
-          cd ios
-          pod install
+        run: cd ios && pod install --no-repo-update 2>/dev/null || pod install
 
-      - name: Build unsigned iOS app (no code signing required)
+      - name: Build unsigned iOS app
         run: |
           set -eo pipefail
+          LOG="$RUNNER_TEMP/xcodebuild.log"
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -parallelizeTargets \
+            -jobs "$(sysctl -n hw.logicalcpu)" \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             PROVISIONING_PROFILE_SPECIFIER="" \
             DEVELOPMENT_TEAM="" \
-            VERBOSE_SCRIPT_LOGGING=YES \
-            build 2>&1 | tee xcodebuild.log
-          echo "=== FIRST 50 error/warning lines ==="
-          grep -E "error:|warning:|flutter|Failed" xcodebuild.log | head -50 || true
-          echo "=== LAST 30 lines of build log ==="
-          tail -30 xcodebuild.log
-          grep -q "BUILD SUCCEEDED" xcodebuild.log
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            DEBUG_INFORMATION_FORMAT=dwarf \
+            build 2>&1 | tee "$LOG"
+          if ! grep -q "BUILD SUCCEEDED" "$LOG"; then
+            echo "=== errors ==="
+            grep -E "error:|Build input file cannot be found|PhaseScriptExecution" "$LOG" | head -40 || true
+            echo "=== last 30 lines ==="
+            tail -30 "$LOG"
+            exit 1
+          fi
 
       - name: Package unsigned IPA
         run: |
@@ -118,7 +152,7 @@ jobs:
           zip -qry "Monolith-${{ github.ref_name }}-unsigned.ipa" Payload
           rm -rf Payload
 
-      - name: Upload IPA as workflow artifact (always)
+      - name: Upload IPA as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: Monolith-iOS-unsigned
@@ -127,7 +161,6 @@ jobs:
           compression-level: 0
           retention-days: 7
 
-      # Only publish to GitHub Releases when triggered by a version tag
       - name: Publish to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2

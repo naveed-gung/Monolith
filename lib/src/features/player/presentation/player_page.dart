@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../app/state/app_controller.dart';

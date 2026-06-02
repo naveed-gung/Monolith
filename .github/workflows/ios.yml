@@ -99,13 +99,21 @@ jobs:
             ls "$HOME/.pub-cache/hosted/pub.dev/" | grep phosphor || echo "(no phosphor entries)"
             exit 1
           fi
-          # The package ships with sdk: ">=2.12.0 <4.0.0" (or similar pre-2.17 minimum).
-          # Dart uses the package's minimum SDK as its language version, which disables
-          # extension types (inline-class, needs >=3.3) and super-parameters (needs >=2.17).
-          # Bumping the minimum to 3.3.0 unlocks both.
-          sed -i '' '/sdk:/s/>=[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/>=3.3.0/' "$ROOT/pubspec.yaml"
+          # Patch 1: replace the two core source files with Flutter-3.44-compatible versions.
+          # Both patch files already carry '// @dart=3.3' so extension types are enabled
+          # for those files regardless of the package's pubspec.yaml SDK minimum.
           cp .github/patches/phosphor_icon_data_flutter344.dart "$PKG/phosphor_icon_data.dart"
           cp .github/patches/phosphor_icon_flutter344.dart      "$PKG/phosphor_icon.dart"
+          # Patch 2: every remaining source file (barrel + icon files + base file) needs
+          # '// @dart=3.3' so the Dart compiler enables extension types for those files too.
+          # Without this, the package's pre-3.3 pubspec.yaml SDK minimum keeps them at
+          # language version 2.12, which disables extension types and causes cascading
+          # "Can't create typedef from non-function type" errors at every icon call site.
+          while IFS= read -r f; do
+            head -1 "$f" | grep -q '^// @dart=' && continue
+            { printf '// @dart=3.3\n'; cat "$f"; } > "${f}.tmp" && mv "${f}.tmp" "$f"
+          done < <(find "$ROOT/lib" -name "*.dart")
+          # Patch 3: extension type constructors cannot be 'const'; change to 'final'.
           for style in regular thin light bold fill duotone; do
             sed -i '' 's/static const /static final /g' "$PKG/phosphor_icons_${style}.dart"
           done

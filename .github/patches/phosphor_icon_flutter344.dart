@@ -1,3 +1,4 @@
+// @dart=3.3
 library phosphor_flutter;
 
 import 'package:flutter/material.dart';

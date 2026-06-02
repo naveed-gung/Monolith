@@ -32,8 +32,6 @@ String _fmtBytes(int b) {
   return '${v.toStringAsFixed(p)} ${u[i]}';
 }
 
-enum _SortOrder { aToZ, zToA, newest, oldest }
-
 // ── Page ────────────────────────────────────────────────────────────────────
 
 class DownloadsPage extends StatefulWidget {
@@ -54,7 +52,6 @@ class _DownloadsPageState extends State<DownloadsPage> {
   bool _submitting = false;
   String? _error;
   bool _showAdder = false;
-  _SortOrder _sortOrder = _SortOrder.aToZ;
 
   @override
   void dispose() {
@@ -66,22 +63,12 @@ class _DownloadsPageState extends State<DownloadsPage> {
 
   List<Track> _filtered(MonolithController controller) {
     final q = _filterC.text.trim().toLowerCase();
-    var list = q.isEmpty
+    final list = q.isEmpty
         ? List<Track>.of(controller.offlineTracks)
         : controller.offlineTracks
             .where((t) =>
                 '${t.title} ${t.artist} ${t.album}'.toLowerCase().contains(q))
             .toList(growable: false);
-    switch (_sortOrder) {
-      case _SortOrder.aToZ:
-        list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-      case _SortOrder.zToA:
-        list.sort((a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
-      case _SortOrder.newest:
-        list = list.reversed.toList();
-      case _SortOrder.oldest:
-        break;
-    }
     return list;
   }
 
@@ -273,35 +260,16 @@ class _DownloadsPageState extends State<DownloadsPage> {
                     ),
                   ),
                 ),
-                // Sort
-                PopupMenuButton<_SortOrder>(
-                  tooltip: 'Sort',
-                  padding: EdgeInsets.zero,
-                  icon: PhosphorIcon(
-                    PhosphorIcons.arrowsDownUp(),
-                    size: 18,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  initialValue: _sortOrder,
-                  onSelected: (o) => setState(() => _sortOrder = o),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: _SortOrder.aToZ,   child: Text('A → Z')),
-                    PopupMenuItem(value: _SortOrder.zToA,   child: Text('Z → A')),
-                    PopupMenuItem(value: _SortOrder.newest,  child: Text('Newest first')),
-                    PopupMenuItem(value: _SortOrder.oldest,  child: Text('Oldest first')),
-                  ],
-                ),
-                const SizedBox(width: AppSpacing.xs),
-                // Inline filter
                 SizedBox(
                   width: 160,
                   height: 34,
                   child: TextField(
+                    key: const Key('downloads-search-field'),
                     controller: _filterC,
                     onChanged: (_) => setState(() {}),
                     style: textTheme.bodySmall,
                     decoration: InputDecoration(
-                      hintText: 'Search for music',
+                      hintText: 'Search',
                       hintStyle: textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),

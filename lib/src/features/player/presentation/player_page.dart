@@ -330,6 +330,7 @@ class _TransportControls extends StatelessWidget {
           ),
           // Play / pause (large)
           GestureDetector(
+            key: const Key('player-play-toggle'),
             onTap: track.canPlay ? controller.togglePlayback : null,
             child: AnimatedContainer(
               duration: AppMotion.durFast,

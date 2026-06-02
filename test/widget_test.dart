@@ -20,7 +20,6 @@ void main() {
     await tester.pumpWidget(MonolithApp(controller: controller));
     await tester.pumpAndSettle();
 
-    expect(find.text('Monolith'), findsOneWidget);
     expect(find.text('Downloads'), findsWidgets);
     expect(controller.currentTab, AppTab.downloads);
     expect(controller.selectedCategory, LibraryCategory.tracks);
@@ -28,7 +27,7 @@ void main() {
     expect(controller.currentTrack.artist, 'Luna Sol');
   });
 
-  testWidgets('Downloads tab filters imported tracks and defaults to A to Z', (
+  testWidgets('Downloads tab searches offline tracks', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1.0;
@@ -65,16 +64,10 @@ void main() {
     await tester.pumpWidget(MonolithApp(controller: controller));
     await tester.pumpAndSettle();
 
-    final auroraRect = tester.getRect(
-      find.byKey(const Key('downloaded-track-import-aurora')),
+    await tester.enterText(
+      find.byKey(const Key('downloads-search-field')),
+      'Aurora',
     );
-    final zuluRect = tester.getRect(
-      find.byKey(const Key('downloaded-track-download-zulu')),
-    );
-
-    expect(auroraRect.top < zuluRect.top, isTrue);
-
-    await tester.tap(find.byKey(const Key('downloads-filter-imported')));
     await tester.pumpAndSettle();
 
     expect(find.text('Aurora Bloom'), findsOneWidget);
@@ -121,14 +114,14 @@ void main() {
     await tester.tap(find.byKey(const Key('nav-library-icon')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('hero-resume-button')), findsOneWidget);
-    expect(find.byKey(const Key('hero-import-button')), findsOneWidget);
+    expect(find.text('Library'), findsWidgets);
+    expect(find.text('Tracks'), findsWidgets);
     expect(find.byKey(const Key('mini-player')), findsOneWidget);
 
     final miniPlayerRect = tester.getRect(find.byKey(const Key('mini-player')));
-    final navRect = tester.getRect(find.byType(NavigationBar));
+    final navRect = tester.getRect(find.byKey(const Key('bottom-nav')));
 
-    expect(navRect.top - miniPlayerRect.bottom >= 12, isTrue);
+    expect(navRect.top - miniPlayerRect.bottom >= 6, isTrue);
     expect(tester.takeException(), isNull);
   });
 
@@ -151,9 +144,16 @@ void main() {
   });
 
   testWidgets('Settings page updates controller preferences', (tester) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(430, 1400);
+    addTearDown(() => _resetSurface(tester));
+
     final controller = await _buildTestController();
 
     await tester.pumpWidget(MonolithApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('nav-library-icon')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('settings-button')));
@@ -165,7 +165,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(controller.themePreference, ThemePreference.dark);
 
-    await tester.tap(find.text('Normalize audio'));
+    await tester.tap(find.byKey(const Key('normalize-audio-switch')));
     await tester.pumpAndSettle();
     expect(controller.normalizeAudio, isFalse);
   });

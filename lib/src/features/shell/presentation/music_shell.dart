@@ -220,6 +220,7 @@ class _BottomNav extends StatelessWidget {
     final selected = AppTab.values.indexOf(controller.currentTab);
 
     return ClipRect(
+      key: const Key('bottom-nav'),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
         child: DecoratedBox(
@@ -300,6 +301,7 @@ class _NavItem extends StatelessWidget {
                   duration: AppMotion.durFast,
                   curve: AppMotion.standard,
                   child: PhosphorIcon(
+                    key: Key('nav-${tab.name}-icon'),
                     icon,
                     size: 26,
                     color: isSelected
@@ -492,7 +494,7 @@ class _MiniButton extends StatelessWidget {
 
 // ── Player overlay (full sheet) ────────────────────────────────────────────
 
-class _PlayerOverlay extends StatelessWidget {
+class _PlayerOverlay extends StatefulWidget {
   const _PlayerOverlay({
     super.key,
     required this.controller,
@@ -505,62 +507,137 @@ class _PlayerOverlay extends StatelessWidget {
   final Animation<double> artworkAnimation;
 
   @override
+  State<_PlayerOverlay> createState() => _PlayerOverlayState();
+}
+
+class _PlayerOverlayState extends State<_PlayerOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _settleController;
+  Animation<double>? _settleAnimation;
+  double _dragOffset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _settleController = AnimationController(
+      vsync: this,
+      duration: AppMotion.durMedium,
+    )..addListener(() {
+        final animation = _settleAnimation;
+        if (animation == null || !mounted) return;
+        setState(() => _dragOffset = animation.value);
+      });
+  }
+
+  @override
+  void dispose() {
+    _settleController.dispose();
+    super.dispose();
+  }
+
+  void _handleDragUpdate(DragUpdateDetails details) {
+    _settleController.stop();
+    final dy = details.primaryDelta ?? details.delta.dy;
+    if (dy == 0) return;
+    setState(() {
+      _dragOffset = (_dragOffset + dy).clamp(0.0, 420.0);
+    });
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final shouldClose = velocity > 650 || _dragOffset > 120;
+
+    if (shouldClose) {
+      // Slide the sheet off screen along the drag direction, then close.
+      final screenH = MediaQuery.sizeOf(context).height;
+      _settleController.duration = const Duration(milliseconds: 220);
+      _settleAnimation = Tween<double>(
+        begin: _dragOffset,
+        end: screenH,
+      ).animate(
+        CurvedAnimation(parent: _settleController, curve: Curves.easeIn),
+      );
+      _settleController
+        ..reset()
+        ..forward().whenComplete(() {
+          _settleController.duration = AppMotion.durMedium;
+          if (mounted) widget.controller.closePlayer();
+        });
+      return;
+    }
+
+    // Spring back to resting position.
+    _settleController.duration = AppMotion.durMedium;
+    _settleAnimation = Tween<double>(
+      begin: _dragOffset,
+      end: 0,
+    ).animate(
+      CurvedAnimation(parent: _settleController, curve: AppMotion.emphasized),
+    );
+    _settleController
+      ..reset()
+      ..forward();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final brightness = Theme.of(context).brightness;
 
-    return Container(
-      color: (brightness == Brightness.dark
-              ? AppSurfaces.dark.canvas
-              : AppSurfaces.light.canvas)
-          .withValues(alpha: 0.97),
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Drag handle — swipe down to close
-            GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onVerticalDragEnd: (details) {
-                if ((details.primaryVelocity ?? 0) > 450) {
-                  controller.closePlayer();
-                }
-              },
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenInset,
-                  AppSpacing.lg,
-                  AppSpacing.screenInset,
-                  AppSpacing.md,
-                ),
-                child: Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: scheme.outlineVariant,
-                      borderRadius: AppRadii.all(AppRadii.pill),
+    return Transform.translate(
+      offset: Offset(0, _dragOffset),
+      child: Container(
+        key: const Key('player-overlay-sheet'),
+        color: (brightness == Brightness.dark
+                ? AppSurfaces.dark.canvas
+                : AppSurfaces.light.canvas)
+            .withValues(alpha: 0.97),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Drag handle — follows your finger, then settles or closes.
+              GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onVerticalDragUpdate: _handleDragUpdate,
+                onVerticalDragEnd: _handleDragEnd,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.screenInset,
+                    AppSpacing.lg,
+                    AppSpacing.screenInset,
+                    AppSpacing.md,
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: scheme.outlineVariant,
+                        borderRadius: AppRadii.all(AppRadii.pill),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            // Player content
-            Expanded(
-              child: PlayerPage(
-                animation: animation,
-                artworkAnimation: artworkAnimation,
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenInset,
-                  AppSpacing.sm,
-                  AppSpacing.screenInset,
-                  AppSpacing.xl,
+              // Player content
+              Expanded(
+                child: PlayerPage(
+                  key: const Key('player-deck'),
+                  animation: widget.animation,
+                  artworkAnimation: widget.artworkAnimation,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.screenInset,
+                    AppSpacing.sm,
+                    AppSpacing.screenInset,
+                    AppSpacing.xl,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
-

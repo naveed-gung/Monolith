@@ -74,7 +74,7 @@ class DownloadStore {
     );
 
     if (hasSourcePath) {
-      return File(sourcePath!).copy(destination.path);
+      return File(sourcePath).copy(destination.path);
     }
 
     await destination.writeAsBytes(bytes!, flush: true);

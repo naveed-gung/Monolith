@@ -83,6 +83,7 @@ class MonolithController extends ChangeNotifier {
   bool _hasAttemptedYoutubeDlRefresh = false;
 
   Duration _currentPosition = Duration.zero;
+  Duration _lastPositionNotification = Duration.zero;
   Duration? _currentTrackDuration;
   bool _completionHandled = false;
 
@@ -487,26 +488,31 @@ class MonolithController extends ChangeNotifier {
     notifyListeners();
 
     final previousTrackId = tracks.isEmpty ? null : currentTrack.id;
-    final shouldLoadDeviceLibrary =
-        !supportsAppleMusicImportPrompt ||
-        _iosAppleMusicImportEnabled ||
-        retryPermissionRequest;
+    try {
+      final shouldLoadDeviceLibrary =
+          !supportsAppleMusicImportPrompt ||
+          _iosAppleMusicImportEnabled ||
+          retryPermissionRequest;
 
-    _downloadedTracks = await _downloadStore.loadTracks();
-    final mediaSnapshot = await _localMediaService.loadTracks(
-      retryRequest: retryPermissionRequest,
-      requestPermission: shouldLoadDeviceLibrary,
-    );
+      _downloadedTracks = await _downloadStore.loadTracks();
+      final mediaSnapshot = await _localMediaService.loadTracks(
+        retryRequest: retryPermissionRequest,
+        requestPermission: shouldLoadDeviceLibrary,
+      );
 
-    _hasLibraryPermission =
-        shouldLoadDeviceLibrary && mediaSnapshot.permissionGranted;
-    _libraryError = shouldLoadDeviceLibrary ? mediaSnapshot.error : null;
-    _deviceTracks = mediaSnapshot.tracks;
-    _rebuildTracks(preferredTrackId: previousTrackId);
+      _hasLibraryPermission =
+          shouldLoadDeviceLibrary && mediaSnapshot.permissionGranted;
+      _libraryError = shouldLoadDeviceLibrary ? mediaSnapshot.error : null;
+      _deviceTracks = mediaSnapshot.tracks;
+      _rebuildTracks(preferredTrackId: previousTrackId);
 
-    _isLibraryLoading = false;
-    await _syncSelectedTrack(autoplay: false);
-    notifyListeners();
+      await _syncSelectedTrack(autoplay: false);
+    } catch (error) {
+      _libraryError = 'Unable to refresh your library: $error';
+    } finally {
+      _isLibraryLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<String?> importAudioFiles() async {
@@ -1068,6 +1074,13 @@ class MonolithController extends ChangeNotifier {
       position,
     ) {
       _currentPosition = position;
+      final delta =
+          (position - _lastPositionNotification).inMilliseconds.abs();
+      if (delta < 250 &&
+          position.inSeconds == _lastPositionNotification.inSeconds) {
+        return;
+      }
+      _lastPositionNotification = position;
       notifyListeners();
     });
 

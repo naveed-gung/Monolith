@@ -211,6 +211,7 @@ class SettingsPage extends StatelessWidget {
                     subtitle: 'Balance levels between tracks',
                     value: controller.normalizeAudio,
                     onChanged: controller.setNormalizeAudio,
+                    switchKey: const Key('normalize-audio-switch'),
                   ),
                   _Divider(),
                   _ToggleRow(
@@ -506,11 +507,13 @@ class _ToggleRow extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
+    this.switchKey,
   });
   final String title;
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
+  final Key? switchKey;
 
   @override
   Widget build(BuildContext context) {
@@ -543,6 +546,7 @@ class _ToggleRow extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.md),
           Switch(
+            key: switchKey,
             value: value,
             onChanged: onChanged,
           ),

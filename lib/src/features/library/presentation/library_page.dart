@@ -349,6 +349,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   ),
                 ),
                 IconButton(
+                  key: const Key('settings-button'),
                   onPressed: widget.onOpenSettings,
                   icon: PhosphorIcon(AppIcons.settings, size: 22),
                   color: scheme.onSurfaceVariant,

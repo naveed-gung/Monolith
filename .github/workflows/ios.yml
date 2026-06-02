@@ -104,8 +104,13 @@ jobs:
       # disabled. Plain `flutter build ios --no-codesign` compiles fine here
       # but still aborts at Flutter's own "requires a Development Team" gate;
       # raw xcodebuild on the Flutter-configured workspace skips that gate.
+      # --no-tree-shake-icons is REQUIRED: the phosphor_flutter patch turns the
+      # icon constructors from `static const` into `static final` (extension-type
+      # constructors can't be const), and Flutter's icon tree-shaker rejects
+      # non-const IconData. This flag writes TREE_SHAKE_ICONS=false into
+      # Generated.xcconfig, which the xcodebuild Run Script honours.
       - name: Configure iOS project (Flutter)
-        run: flutter build ios --config-only --release --no-codesign
+        run: flutter build ios --config-only --release --no-codesign --no-tree-shake-icons
 
       - name: Build unsigned iOS app
         run: |

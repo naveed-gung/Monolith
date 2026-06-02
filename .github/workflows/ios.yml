@@ -53,13 +53,23 @@ jobs:
       - name: Precache iOS artifacts
         run: flutter precache --ios
 
-      # phosphor_flutter 2.1.0 extends IconData which became final in Flutter 3.44.
-      # No compatible release exists yet. Copy the pre-written patch from the repo
-      # into the pub-cache to replace extends with implements (same public API).
+      # phosphor_flutter 2.1.0 uses 'extends IconData' which became illegal in
+      # Flutter 3.44 (IconData is now a final class). No compatible release exists.
+      # Three-part patch applied to the pub-cache in-place:
+      #   1. phosphor_icon_data.dart  — replace class hierarchy with extension types
+      #   2. phosphor_icon.dart       — remove duotone 'is' check (ext-type erasure
+      #                                  would make it always-true at runtime)
+      #   3. All generated icon files — change 'static const' to 'static final'
+      #                                  because non-const ext-type constructors
+      #                                  can't be used in const declarations
       - name: Patch phosphor_flutter for Flutter 3.44 final-class change
         run: |
-          cp .github/patches/phosphor_icon_data_flutter344.dart \
-            "$HOME/.pub-cache/hosted/pub.dev/phosphor_flutter-2.1.0/lib/src/phosphor_icon_data.dart"
+          PKG="$HOME/.pub-cache/hosted/pub.dev/phosphor_flutter-2.1.0/lib/src"
+          cp .github/patches/phosphor_icon_data_flutter344.dart "$PKG/phosphor_icon_data.dart"
+          cp .github/patches/phosphor_icon_flutter344.dart      "$PKG/phosphor_icon.dart"
+          for style in regular thin light bold fill duotone; do
+            sed -i '' 's/static const /static final /g' "$PKG/phosphor_icons_${style}.dart"
+          done
 
       - name: Install CocoaPods dependencies
         run: |

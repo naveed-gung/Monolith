@@ -2,51 +2,38 @@ library phosphor_flutter;
 
 import 'package:flutter/widgets.dart';
 
-// Flutter 3.44 made IconData a final class, so the original `extends IconData`
-// pattern no longer compiles. This patch replaces it with `implements IconData`,
-// keeping the identical public API and constructor signatures.
+// Flutter 3.44 made IconData a 'final class'. Regular classes can no longer
+// extend or implement it. Extension types (Dart 3.3+) CAN implement final
+// classes — that is their primary design purpose.
+//
+// Dart 3.10 limitation: const extension type constructors cannot compute the
+// representation from formal parameters (e.g. 'Phosphor$style' is not a
+// constant expression in the this._() delegation). Constructors here are
+// intentionally NON-CONST. All 'static const' declarations in the generated
+// icon list files are patched to 'static final' by the CI workflow step that
+// runs sed on phosphor_icons_{regular,thin,light,bold,fill,duotone}.dart.
 
-class PhosphorIconData implements IconData {
-  const PhosphorIconData(this.codePoint, String style)
-      : fontFamily = 'Phosphor$style',
-        fontPackage = 'phosphor_flutter',
-        matchTextDirection = true;
-
-  @override
-  final int codePoint;
-  @override
-  final String? fontFamily;
-  @override
-  final String? fontPackage;
-  @override
-  final bool matchTextDirection;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is PhosphorIconData &&
-          codePoint == other.codePoint &&
-          fontFamily == other.fontFamily &&
-          fontPackage == other.fontPackage &&
-          matchTextDirection == other.matchTextDirection;
-
-  @override
-  int get hashCode =>
-      Object.hash(codePoint, fontFamily, fontPackage, matchTextDirection);
-
-  @override
-  String toString() =>
-      'PhosphorIconData(U+${codePoint.toRadixString(16).toUpperCase()})';
+extension type PhosphorIconData._(IconData _) implements IconData {
+  PhosphorIconData(int codePoint, String style)
+      : this._(IconData(
+          codePoint,
+          fontFamily: 'Phosphor$style',
+          fontPackage: 'phosphor_flutter',
+          matchTextDirection: true,
+        ));
 }
 
-class PhosphorFlatIconData extends PhosphorIconData {
-  const PhosphorFlatIconData(int codePoint, String style)
-      : super(codePoint, style);
-}
+// PhosphorFlatIconData is behaviourally identical to PhosphorIconData.
+typedef PhosphorFlatIconData = PhosphorIconData;
 
-class PhosphorDuotoneIconData extends PhosphorIconData {
-  const PhosphorDuotoneIconData(int codePoint, this.secondary)
-      : super(codePoint, 'Duotone');
-
-  final PhosphorIconData secondary;
+// PhosphorDuotoneIconData: secondary layer is dropped (unused in this app).
+// Duotone rendering in PhosphorIcon is also patched out — see phosphor_icon.dart.
+extension type PhosphorDuotoneIconData._(IconData _) implements IconData {
+  PhosphorDuotoneIconData(int codePoint, [PhosphorIconData? secondary])
+      : this._(IconData(
+          codePoint,
+          fontFamily: 'PhosphorDuotone',
+          fontPackage: 'phosphor_flutter',
+          matchTextDirection: true,
+        ));
 }

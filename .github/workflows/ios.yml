@@ -54,28 +54,12 @@ jobs:
         run: flutter precache --ios
 
       # phosphor_flutter 2.1.0 extends IconData which became final in Flutter 3.44.
-      # No compatible release exists yet; patch the pub-cache file in-place using
-      # an extension type (Dart 3.3+) that implements IconData without extending it.
+      # No compatible release exists yet. Copy the pre-written patch from the repo
+      # into the pub-cache to replace extends with implements (same public API).
       - name: Patch phosphor_flutter for Flutter 3.44 final-class change
         run: |
-          PKG="$HOME/.pub-cache/hosted/pub.dev/phosphor_flutter-2.1.0/lib/src/phosphor_icon_data.dart"
-          cat > "$PKG" << 'DART'
-          import 'package:flutter/widgets.dart';
-
-          extension type const PhosphorIconData._(IconData _) implements IconData {
-            const PhosphorIconData(
-              int codePoint, {
-              String? fontFamily,
-              String? fontPackage,
-              bool matchTextDirection = false,
-            }) : this._(IconData(
-                    codePoint,
-                    fontFamily: fontFamily,
-                    fontPackage: fontPackage,
-                    matchTextDirection: matchTextDirection,
-                  ));
-          }
-          DART
+          cp .github/patches/phosphor_icon_data_flutter344.dart \
+            "$HOME/.pub-cache/hosted/pub.dev/phosphor_flutter-2.1.0/lib/src/phosphor_icon_data.dart"
 
       - name: Install CocoaPods dependencies
         run: |

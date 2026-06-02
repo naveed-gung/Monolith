@@ -3,25 +3,25 @@
   <desc id="desc">A layered Monolith architecture diagram showing the application layer above controller state and core services, with feature presentation at the bottom, using icon-based cards and rounded containers.</desc>
   <defs>
     <linearGradient id="bg" x1="90" y1="40" x2="1185" y2="860" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#07161B"/>
-      <stop offset="0.55" stop-color="#0D252C"/>
-      <stop offset="1" stop-color="#102B38"/>
+      <stop stop-color="#0A0A0C"/>
+      <stop offset="0.55" stop-color="#101014"/>
+      <stop offset="1" stop-color="#121216"/>
     </linearGradient>
     <linearGradient id="appCard" x1="112" y1="170" x2="1168" y2="314" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1EB9A4"/>
-      <stop offset="1" stop-color="#147D90"/>
+      <stop stop-color="#FF4D5E"/>
+      <stop offset="1" stop-color="#C23A48"/>
     </linearGradient>
     <linearGradient id="stateCard" x1="112" y1="344" x2="612" y2="584" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1B5569"/>
-      <stop offset="1" stop-color="#102E42"/>
+      <stop stop-color="#222229"/>
+      <stop offset="1" stop-color="#141418"/>
     </linearGradient>
     <linearGradient id="serviceCard" x1="668" y1="344" x2="1168" y2="584" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#151F26"/>
-      <stop offset="1" stop-color="#0B141A"/>
+      <stop stop-color="#1A1A1F"/>
+      <stop offset="1" stop-color="#0E0E12"/>
     </linearGradient>
     <linearGradient id="featureCard" x1="112" y1="628" x2="1168" y2="820" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#A8622E"/>
-      <stop offset="1" stop-color="#82461E"/>
+      <stop stop-color="#2C2C33"/>
+      <stop offset="1" stop-color="#1A1A1F"/>
     </linearGradient>
     <filter id="shadow" x="80" y="154" width="1120" height="692" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
       <feFlood flood-opacity="0" result="BackgroundImageFix"/>
@@ -34,15 +34,15 @@
     </filter>
   </defs>
   <rect width="1280" height="900" rx="36" fill="url(#bg)"/>
-  <circle cx="1110" cy="126" r="148" fill="#31C7B4" fill-opacity="0.08"/>
-  <circle cx="166" cy="748" r="172" fill="#6FC3FF" fill-opacity="0.07"/>
+  <circle cx="1110" cy="126" r="148" fill="#FF4D5E" fill-opacity="0.08"/>
+  <circle cx="166" cy="748" r="172" fill="#FF4D5E" fill-opacity="0.07"/>
   <text x="88" y="96" fill="#F4F7F8" font-size="42" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Monolith Architecture Map</text>
   <text x="88" y="136" fill="#9AB6BC" font-size="18" font-family="Segoe UI, Arial, sans-serif">Controller-first orchestration with shared services, platform integration, and feature-scoped presentation.</text>
 
   <g filter="url(#shadow)">
     <rect x="112" y="170" width="1056" height="124" rx="30" fill="url(#appCard)"/>
-    <rect x="112" y="344" width="500" height="222" rx="30" fill="url(#stateCard)" stroke="#5C8F9B" stroke-opacity="0.42" stroke-width="2"/>
-    <rect x="668" y="344" width="500" height="222" rx="30" fill="url(#serviceCard)" stroke="#506773" stroke-opacity="0.42" stroke-width="2"/>
+    <rect x="112" y="344" width="500" height="222" rx="30" fill="url(#stateCard)" stroke="#33333B" stroke-opacity="0.42" stroke-width="2"/>
+    <rect x="668" y="344" width="500" height="222" rx="30" fill="url(#serviceCard)" stroke="#33333B" stroke-opacity="0.42" stroke-width="2"/>
     <rect x="112" y="628" width="1056" height="192" rx="30" fill="url(#featureCard)"/>
   </g>
 
@@ -102,12 +102,12 @@
   <g>
     <rect x="144" y="658" width="68" height="68" rx="18" fill="#FFF7EF" fill-opacity="0.14"/>
     <rect x="159" y="676" width="38" height="28" rx="8" fill="#FFF5EB"/>
-    <rect x="164" y="682" width="10" height="16" rx="3" fill="#A8622E"/>
-    <rect x="178" y="682" width="14" height="6" rx="2" fill="#A8622E"/>
-    <rect x="178" y="692" width="14" height="6" rx="2" fill="#A8622E"/>
+    <rect x="164" y="682" width="10" height="16" rx="3" fill="#2C2C33"/>
+    <rect x="178" y="682" width="14" height="6" rx="2" fill="#2C2C33"/>
+    <rect x="178" y="692" width="14" height="6" rx="2" fill="#2C2C33"/>
     <text x="232" y="683" fill="#FFF5EB" font-size="31" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Feature Presentation</text>
-    <text x="232" y="714" fill="#F6DDC9" font-size="18" font-family="Segoe UI, Arial, sans-serif">Mostly declarative: renders shell and feature surfaces while reading</text>
-    <text x="232" y="736" fill="#F6DDC9" font-size="18" font-family="Segoe UI, Arial, sans-serif">controller state and dispatching user actions.</text>
+    <text x="232" y="714" fill="#C7C7CF" font-size="18" font-family="Segoe UI, Arial, sans-serif">Mostly declarative: renders shell and feature surfaces while reading</text>
+    <text x="232" y="736" fill="#C7C7CF" font-size="18" font-family="Segoe UI, Arial, sans-serif">controller state and dispatching user actions.</text>
     <rect x="232" y="750" width="86" height="34" rx="17" fill="#FFF5EB" fill-opacity="0.14"/>
     <text x="256" y="772" fill="#FFF5EB" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Shell</text>
     <rect x="328" y="750" width="94" height="34" rx="17" fill="#FFF5EB" fill-opacity="0.14"/>
@@ -122,8 +122,8 @@
     <text x="765" y="772" fill="#FFF5EB" font-size="14" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Settings</text>
   </g>
 
-  <path d="M640 294V332" stroke="#5AD6C5" stroke-width="4" stroke-linecap="round"/>
-  <path d="M640 566V628" stroke="#E3A36F" stroke-width="4" stroke-linecap="round"/>
-  <path d="M628 316L640 334L652 316" fill="none" stroke="#5AD6C5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M628 606L640 624L652 606" fill="none" stroke="#E3A36F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M640 294V332" stroke="#FF4D5E" stroke-width="4" stroke-linecap="round"/>
+  <path d="M640 566V628" stroke="#FF4D5E" stroke-width="4" stroke-linecap="round"/>
+  <path d="M628 316L640 334L652 316" fill="none" stroke="#FF4D5E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M628 606L640 624L652 606" fill="none" stroke="#FF4D5E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

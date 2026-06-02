@@ -1,101 +1,78 @@
-<svg width="1280" height="760" viewBox="0 0 1280 760" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+<svg width="1280" height="760" viewBox="0 0 1280 760" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
   <title id="title">Media playback pipeline</title>
-  <desc id="desc">An icon-based pipeline diagram showing track activation, playback session handling, and publication to Android and iOS system playback surfaces.</desc>
+  <desc id="desc">From track activation through the playback session to Android and iOS system playback surfaces.</desc>
   <defs>
-    <linearGradient id="bg" x1="88" y1="36" x2="1186" y2="722" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#08181E"/>
-      <stop offset="0.5" stop-color="#0F2830"/>
-      <stop offset="1" stop-color="#12313D"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0A0A0C"/>
+      <stop offset="1" stop-color="#121214"/>
     </linearGradient>
-    <linearGradient id="stageA" x1="90" y1="202" x2="388" y2="562" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1DB7A0"/>
-      <stop offset="1" stop-color="#157C8D"/>
-    </linearGradient>
-    <linearGradient id="stageB" x1="492" y1="202" x2="790" y2="562" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#173E57"/>
-      <stop offset="1" stop-color="#10293B"/>
-    </linearGradient>
-    <linearGradient id="stageC" x1="894" y1="202" x2="1192" y2="562" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#B87338"/>
-      <stop offset="1" stop-color="#8D5224"/>
-    </linearGradient>
-    <filter id="shadow" x="58" y="182" width="1166" height="540" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-      <feOffset dy="14"/>
-      <feGaussianBlur stdDeviation="14"/>
-      <feColorMatrix type="matrix" values="0 0 0 0 0.0117647 0 0 0 0 0.0745098 0 0 0 0 0.101961 0 0 0 0.34 0"/>
-      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
-      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    <filter id="shadow" x="40" y="170" width="1200" height="430" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000000" flood-opacity="0.45"/>
     </filter>
   </defs>
+
   <rect width="1280" height="760" rx="36" fill="url(#bg)"/>
-  <circle cx="1114" cy="108" r="146" fill="#2FC7B5" fill-opacity="0.08"/>
-  <circle cx="156" cy="640" r="172" fill="#70C5FF" fill-opacity="0.06"/>
-  <text x="86" y="98" fill="#F4F7F8" font-size="40" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Media Playback Pipeline</text>
-  <text x="86" y="136" fill="#97B2B8" font-size="18" font-family="Segoe UI, Arial, sans-serif">From track selection to Android and iOS system playback surfaces.</text>
+  <circle cx="1120" cy="110" r="150" fill="#FF4D5E" fill-opacity="0.06"/>
+  <circle cx="150" cy="650" r="170" fill="#FF4D5E" fill-opacity="0.05"/>
+
+  <text x="86" y="98" fill="#F5F5F7" font-size="38" font-weight="800" letter-spacing="-0.5">Media playback pipeline</text>
+  <text x="86" y="134" fill="#A2A2AC" font-size="18">From track selection to Android and iOS system playback surfaces.</text>
 
   <g filter="url(#shadow)">
-    <rect x="86" y="206" width="300" height="360" rx="30" fill="url(#stageA)"/>
-    <rect x="490" y="206" width="300" height="360" rx="30" fill="url(#stageB)" stroke="#5C859A" stroke-opacity="0.42" stroke-width="2"/>
-    <rect x="894" y="206" width="300" height="360" rx="30" fill="url(#stageC)"/>
+    <rect x="86" y="196" width="336" height="372" rx="28" fill="#1B1B1F" stroke="#2C2C33" stroke-width="1.5"/>
+    <rect x="472" y="196" width="336" height="372" rx="28" fill="#1B1B1F" stroke="#2C2C33" stroke-width="1.5"/>
+    <rect x="858" y="196" width="336" height="372" rx="28" fill="#16161A" stroke="#2C2C33" stroke-width="1.5"/>
   </g>
 
-  <g>
-    <circle cx="158" cy="276" r="34" fill="#F8FCFC" fill-opacity="0.18"/>
-    <path d="M153 258V301.5C153 306.194 156.806 310 161.5 310C166.194 310 170 306.194 170 301.5C170 296.806 166.194 293 161.5 293C159.372 293 157.427 293.784 156 295.078V267.5L181 261V287.5C181 292.194 184.806 296 189.5 296C194.194 296 198 292.194 198 287.5C198 282.806 194.194 279 189.5 279C187.372 279 185.427 279.784 184 281.078V250L153 258Z" fill="#F8FCFC"/>
-    <text x="208" y="270" fill="#F8FCFC" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Track Activation</text>
-    <text x="120" y="316" fill="#DDF6F1" font-size="16" font-family="Segoe UI, Arial, sans-serif">Controller selects a track,</text>
-    <text x="120" y="336" fill="#DDF6F1" font-size="16" font-family="Segoe UI, Arial, sans-serif">resolves artwork, and loads</text>
-    <text x="120" y="356" fill="#DDF6F1" font-size="16" font-family="Segoe UI, Arial, sans-serif">a tagged local source.</text>
-    <rect x="120" y="392" width="226" height="42" rx="21" fill="#F8FCFC" fill-opacity="0.16"/>
-    <text x="155" y="419" fill="#F8FCFC" font-size="15" font-family="Segoe UI, Arial, sans-serif" font-weight="600">AudioSource.uri(Uri.file(...))</text>
-    <rect x="120" y="448" width="188" height="42" rx="21" fill="#F8FCFC" fill-opacity="0.16"/>
-    <text x="152" y="475" fill="#F8FCFC" font-size="15" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Tagged MediaItem</text>
-  </g>
+  <!-- Stage A -->
+  <rect x="118" y="232" width="56" height="56" rx="15" fill="#FF4D5E" fill-opacity="0.16"/>
+  <path d="M138 248v36c0 5 -4 8 -8 8s-8 -3 -8 -8s4 -8 8 -8c2 0 3 0 5 1v-22l18 -4v18" stroke="#FF4D5E" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="118" y="328" fill="#F5F5F7" font-size="24" font-weight="700">Track activation</text>
+  <text x="118" y="364" fill="#A2A2AC" font-size="16">Controller selects a track,</text>
+  <text x="118" y="386" fill="#A2A2AC" font-size="16">resolves artwork, and loads</text>
+  <text x="118" y="408" fill="#A2A2AC" font-size="16">a tagged local source.</text>
+  <rect x="118" y="436" width="272" height="40" rx="12" fill="#0A0A0C" stroke="#2C2C33"/>
+  <text x="136" y="461" fill="#FF8A95" font-size="13" font-family="'SF Mono', Consolas, 'Roboto Mono', monospace">AudioSource.uri(file)</text>
+  <rect x="118" y="488" width="272" height="40" rx="12" fill="#0A0A0C" stroke="#2C2C33"/>
+  <text x="136" y="513" fill="#FF8A95" font-size="13" font-family="'SF Mono', Consolas, 'Roboto Mono', monospace">Tagged MediaItem</text>
 
-  <g>
-    <circle cx="562" cy="276" r="34" fill="#F8FCFC" fill-opacity="0.12"/>
-    <rect x="546" y="258" width="8" height="36" rx="4" fill="#F8FCFC"/>
-    <rect x="558" y="250" width="8" height="52" rx="4" fill="#F8FCFC"/>
-    <rect x="570" y="264" width="8" height="24" rx="4" fill="#F8FCFC"/>
-    <rect x="582" y="254" width="8" height="44" rx="4" fill="#F8FCFC"/>
-    <text x="612" y="270" fill="#F8FCFC" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Playback Session</text>
-    <text x="524" y="316" fill="#CBD9E1" font-size="16" font-family="Segoe UI, Arial, sans-serif">`just_audio` renders the file.</text>
-    <text x="524" y="336" fill="#CBD9E1" font-size="16" font-family="Segoe UI, Arial, sans-serif">`just_audio_background` publishes</text>
-    <text x="524" y="356" fill="#CBD9E1" font-size="16" font-family="Segoe UI, Arial, sans-serif">metadata; `audio_session` pins music.</text>
-    <rect x="524" y="392" width="150" height="42" rx="21" fill="#F8FCFC" fill-opacity="0.12"/>
-    <text x="561" y="419" fill="#F8FCFC" font-size="15" font-family="Segoe UI, Arial, sans-serif" font-weight="600">AudioPlayer</text>
-    <rect x="524" y="448" width="214" height="42" rx="21" fill="#F8FCFC" fill-opacity="0.12"/>
-    <text x="553" y="475" fill="#F8FCFC" font-size="15" font-family="Segoe UI, Arial, sans-serif" font-weight="600">JustAudioBackground</text>
-    <rect x="524" y="504" width="174" height="42" rx="21" fill="#F8FCFC" fill-opacity="0.12"/>
-    <text x="554" y="531" fill="#F8FCFC" font-size="15" font-family="Segoe UI, Arial, sans-serif" font-weight="600">AudioSession.music()</text>
-  </g>
+  <!-- Stage B -->
+  <rect x="504" y="232" width="56" height="56" rx="15" fill="#FF4D5E" fill-opacity="0.16"/>
+  <rect x="520" y="252" width="6" height="20" rx="3" fill="#FF4D5E"/>
+  <rect x="530" y="246" width="6" height="32" rx="3" fill="#FF4D5E"/>
+  <rect x="540" y="256" width="6" height="14" rx="3" fill="#FF4D5E"/>
+  <text x="504" y="328" fill="#F5F5F7" font-size="24" font-weight="700">Playback session</text>
+  <text x="504" y="364" fill="#A2A2AC" font-size="16">just_audio renders the file;</text>
+  <text x="504" y="386" fill="#A2A2AC" font-size="16">background publishes metadata;</text>
+  <text x="504" y="408" fill="#A2A2AC" font-size="16">audio_session pins music mode.</text>
+  <rect x="504" y="436" width="272" height="40" rx="12" fill="#0A0A0C" stroke="#2C2C33"/>
+  <text x="522" y="461" fill="#FF8A95" font-size="13" font-family="'SF Mono', Consolas, 'Roboto Mono', monospace">AudioPlayer</text>
+  <rect x="504" y="488" width="272" height="40" rx="12" fill="#0A0A0C" stroke="#2C2C33"/>
+  <text x="522" y="513" fill="#FF8A95" font-size="13" font-family="'SF Mono', Consolas, 'Roboto Mono', monospace">JustAudioBackground</text>
 
-  <g>
-    <circle cx="966" cy="276" r="34" fill="#FFF6EC" fill-opacity="0.16"/>
-    <rect x="948" y="256" width="36" height="44" rx="8" fill="#FFF6EC"/>
-    <rect x="953" y="262" width="26" height="28" rx="4" fill="#9B5A2A"/>
-    <circle cx="966" cy="294" r="2.5" fill="#9B5A2A"/>
-    <text x="1016" y="270" fill="#FFF6EC" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">System Surfaces</text>
-    <text x="928" y="316" fill="#F4DDC9" font-size="16" font-family="Segoe UI, Arial, sans-serif">Android exposes notification</text>
-    <text x="928" y="336" fill="#F4DDC9" font-size="16" font-family="Segoe UI, Arial, sans-serif">deck. iOS publishes to Lock</text>
-    <text x="928" y="356" fill="#F4DDC9" font-size="16" font-family="Segoe UI, Arial, sans-serif">Screen and Control Center.</text>
-    <rect x="928" y="392" width="152" height="42" rx="21" fill="#FFF6EC" fill-opacity="0.14"/>
-    <text x="955" y="419" fill="#FFF6EC" font-size="15" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Android deck</text>
-    <rect x="928" y="448" width="150" height="42" rx="21" fill="#FFF6EC" fill-opacity="0.14"/>
-    <text x="957" y="475" fill="#FFF6EC" font-size="15" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Lock Screen</text>
-    <rect x="1088" y="448" width="82" height="42" rx="21" fill="#FFF6EC" fill-opacity="0.14"/>
-    <text x="1112" y="475" fill="#FFF6EC" font-size="15" font-family="Segoe UI, Arial, sans-serif" font-weight="600">iOS</text>
-  </g>
+  <!-- Stage C -->
+  <rect x="890" y="232" width="56" height="56" rx="15" fill="#FF4D5E" fill-opacity="0.16"/>
+  <rect x="906" y="248" width="24" height="40" rx="5" stroke="#FF4D5E" stroke-width="3" fill="none"/>
+  <circle cx="918" cy="280" r="2.5" fill="#FF4D5E"/>
+  <text x="890" y="328" fill="#F5F5F7" font-size="24" font-weight="700">System surfaces</text>
+  <text x="890" y="364" fill="#A2A2AC" font-size="16">Android exposes a notification</text>
+  <text x="890" y="386" fill="#A2A2AC" font-size="16">deck; iOS publishes to Lock</text>
+  <text x="890" y="408" fill="#A2A2AC" font-size="16">Screen and Control Center.</text>
+  <rect x="890" y="436" width="150" height="40" rx="12" fill="#FFFFFF" fill-opacity="0.06"/>
+  <text x="908" y="461" fill="#F5F5F7" font-size="14">Android deck</text>
+  <rect x="890" y="488" width="150" height="40" rx="12" fill="#FFFFFF" fill-opacity="0.06"/>
+  <text x="908" y="513" fill="#F5F5F7" font-size="14">Lock screen</text>
 
-  <path d="M386 388H474" stroke="#58D8C7" stroke-width="5" stroke-linecap="round"/>
-  <path d="M790 388H878" stroke="#E4A06B" stroke-width="5" stroke-linecap="round"/>
-  <path d="M458 376L478 388L458 400" fill="none" stroke="#58D8C7" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M862 376L882 388L862 400" fill="none" stroke="#E4A06B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- connectors -->
+  <path d="M422 382h44" stroke="#FF4D5E" stroke-width="4" stroke-linecap="round"/>
+  <path d="M452 372l14 10l-14 10" stroke="#FF4D5E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M808 382h44" stroke="#FF4D5E" stroke-width="4" stroke-linecap="round"/>
+  <path d="M838 372l14 10l-14 10" stroke="#FF4D5E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 
-  <rect x="146" y="618" width="988" height="96" rx="22" fill="#102A34" stroke="#2D6872" stroke-opacity="0.45"/>
-  <text x="184" y="648" fill="#8DEEE0" font-size="15" font-family="Segoe UI, Arial, sans-serif" font-weight="700">PLATFORM NOTE</text>
-  <text x="184" y="671" fill="#F4F7F8" font-size="18" font-family="Segoe UI, Arial, sans-serif">iOS does not expose an Android-style notification shade media card.</text>
-  <text x="184" y="693" fill="#F4F7F8" font-size="18" font-family="Segoe UI, Arial, sans-serif">The equivalent surfaces are Lock Screen and Control Center.</text>
+  <!-- footer -->
+  <rect x="86" y="614" width="1108" height="104" rx="22" fill="#16161A" stroke="#2C2C33" stroke-width="1.5"/>
+  <rect x="86" y="614" width="6" height="104" rx="3" fill="#FF4D5E"/>
+  <text x="122" y="650" fill="#6C6C76" font-size="13" font-weight="700" letter-spacing="1.5">PLATFORM NOTE</text>
+  <text x="122" y="678" fill="#F5F5F7" font-size="17">iOS does not expose an Android-style notification-shade media card.</text>
+  <text x="122" y="702" fill="#A2A2AC" font-size="17">The equivalent surfaces are the Lock Screen and Control Center.</text>
 </svg>

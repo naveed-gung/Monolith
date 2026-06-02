@@ -1,77 +1,77 @@
-<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <title id="title">Monolith product surface</title>
+  <desc id="desc">Three product surfaces — Library, Downloads, and Playback — sitting on one shared Flutter shell.</desc>
   <defs>
-    <linearGradient id="bg" x1="120" y1="60" x2="1160" y2="660" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#071A21"/>
-      <stop offset="1" stop-color="#0D2F38"/>
-    </linearGradient>
-    <linearGradient id="cardA" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#1AAE9A"/>
-      <stop offset="1" stop-color="#116E84"/>
-    </linearGradient>
-    <linearGradient id="cardB" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#123D5A"/>
-      <stop offset="1" stop-color="#0A2437"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0A0A0C"/>
+      <stop offset="1" stop-color="#121214"/>
     </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#F2B26E"/>
-      <stop offset="1" stop-color="#C77636"/>
+      <stop stop-color="#FF4D5E"/>
+      <stop offset="1" stop-color="#C23A48"/>
     </linearGradient>
     <filter id="shadow" x="-40" y="-40" width="1360" height="800" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#021015" flood-opacity="0.4"/>
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#000000" flood-opacity="0.45"/>
     </filter>
   </defs>
+
   <rect width="1280" height="720" rx="36" fill="url(#bg)"/>
-  <circle cx="1080" cy="130" r="170" fill="#1AAE9A" fill-opacity="0.08"/>
-  <circle cx="180" cy="610" r="210" fill="#F2B26E" fill-opacity="0.08"/>
+  <circle cx="1090" cy="120" r="180" fill="#FF4D5E" fill-opacity="0.06"/>
+  <circle cx="170" cy="620" r="200" fill="#FF4D5E" fill-opacity="0.05"/>
 
   <g filter="url(#shadow)">
-    <rect x="64" y="56" width="1152" height="608" rx="30" fill="#0A1F29" fill-opacity="0.88" stroke="#2D6B73" stroke-opacity="0.45"/>
+    <rect x="64" y="56" width="1152" height="608" rx="30" fill="#121214" stroke="#2C2C33"/>
   </g>
 
-  <text x="100" y="132" fill="#F4F7F8" font-size="42" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Monolith Product Surface</text>
-  <text x="100" y="170" fill="#91AFB5" font-size="19" font-family="Segoe UI, Arial, sans-serif">Offline-first playback, shared Flutter UI, and platform-native media controls.</text>
+  <text x="100" y="130" fill="#F5F5F7" font-size="40" font-weight="800" letter-spacing="-0.5">Product surface</text>
+  <text x="100" y="166" fill="#A2A2AC" font-size="19">Offline-first playback, one shared Flutter UI, platform-native media controls.</text>
 
-  <rect x="100" y="226" width="320" height="250" rx="26" fill="url(#cardA)"/>
-  <text x="132" y="286" fill="#F7FBFC" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Library</text>
-  <text x="132" y="326" fill="#D7F1EE" font-size="18" font-family="Segoe UI, Arial, sans-serif">Import device audio, browse playlists,</text>
-  <text x="132" y="352" fill="#D7F1EE" font-size="18" font-family="Segoe UI, Arial, sans-serif">and keep local listening organized.</text>
-  <rect x="132" y="388" width="108" height="32" rx="16" fill="#F8FFFE" fill-opacity="0.16"/>
-  <text x="156" y="410" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif">Tracks</text>
-  <rect x="252" y="388" width="120" height="32" rx="16" fill="#F8FFFE" fill-opacity="0.16"/>
-  <text x="280" y="410" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif">Playlists</text>
-  <circle cx="352" cy="296" r="34" fill="#F8FFFE" fill-opacity="0.12"/>
-  <path d="M338 285H366V291H338V285ZM338 297H360V303H338V297ZM338 309H354V315H338V309Z" fill="#F7FBFC"/>
+  <!-- Card: Library -->
+  <rect x="100" y="222" width="344" height="250" rx="24" fill="#1B1B1F" stroke="#2C2C33" stroke-width="1.5"/>
+  <rect x="132" y="258" width="56" height="56" rx="15" fill="#FF4D5E" fill-opacity="0.16"/>
+  <path d="M148 274h24M148 286h24M148 298h16" stroke="#FF4D5E" stroke-width="3" stroke-linecap="round"/>
+  <text x="132" y="356" fill="#F5F5F7" font-size="26" font-weight="700">Library</text>
+  <text x="132" y="388" fill="#A2A2AC" font-size="16">Import device audio, browse</text>
+  <text x="132" y="410" fill="#A2A2AC" font-size="16">playlists, keep listening tidy.</text>
+  <rect x="132" y="430" width="92" height="30" rx="15" fill="#FFFFFF" fill-opacity="0.06"/>
+  <text x="178" y="450" text-anchor="middle" fill="#F5F5F7" font-size="14">Tracks</text>
+  <rect x="234" y="430" width="104" height="30" rx="15" fill="#FFFFFF" fill-opacity="0.06"/>
+  <text x="286" y="450" text-anchor="middle" fill="#F5F5F7" font-size="14">Playlists</text>
 
-  <rect x="480" y="226" width="320" height="250" rx="26" fill="url(#cardB)" stroke="#3A6C89" stroke-opacity="0.45"/>
-  <text x="512" y="286" fill="#F7FBFC" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Downloads</text>
-  <text x="512" y="326" fill="#B4C6D4" font-size="18" font-family="Segoe UI, Arial, sans-serif">Manage offline files, downloader state,</text>
-  <text x="512" y="352" fill="#B4C6D4" font-size="18" font-family="Segoe UI, Arial, sans-serif">and filtered local storage views.</text>
-  <rect x="512" y="388" width="92" height="32" rx="16" fill="#F8FFFE" fill-opacity="0.12"/>
-  <text x="537" y="410" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif">A-Z</text>
-  <rect x="616" y="388" width="110" height="32" rx="16" fill="#F8FFFE" fill-opacity="0.12"/>
-  <text x="646" y="410" fill="#F7FBFC" font-size="14" font-family="Segoe UI, Arial, sans-serif">Imported</text>
-  <path d="M690 278C703 278 714 289 714 302C714 315 703 326 690 326C677 326 666 315 666 302C666 289 677 278 690 278ZM690 288C682 288 676 294 676 302C676 310 682 316 690 316C698 316 704 310 704 302C704 294 698 288 690 288Z" fill="#F7FBFC" fill-opacity="0.92"/>
-  <path d="M688 295H692V307H688V295ZM683 302H697V306H683V302Z" fill="#F7FBFC"/>
+  <!-- Card: Downloads -->
+  <rect x="468" y="222" width="344" height="250" rx="24" fill="#1B1B1F" stroke="#2C2C33" stroke-width="1.5"/>
+  <rect x="500" y="258" width="56" height="56" rx="15" fill="#FF4D5E" fill-opacity="0.16"/>
+  <path d="M528 270v26m0 0l-9 -9m9 9l9 -9M518 302h20" stroke="#FF4D5E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <text x="500" y="356" fill="#F5F5F7" font-size="26" font-weight="700">Downloads</text>
+  <text x="500" y="388" fill="#A2A2AC" font-size="16">Manage offline files, track</text>
+  <text x="500" y="410" fill="#A2A2AC" font-size="16">downloader state and storage.</text>
+  <rect x="500" y="430" width="74" height="30" rx="15" fill="#FFFFFF" fill-opacity="0.06"/>
+  <text x="537" y="450" text-anchor="middle" fill="#F5F5F7" font-size="14">A–Z</text>
+  <rect x="584" y="430" width="108" height="30" rx="15" fill="#FFFFFF" fill-opacity="0.06"/>
+  <text x="638" y="450" text-anchor="middle" fill="#F5F5F7" font-size="14">Imported</text>
 
-  <rect x="860" y="226" width="320" height="250" rx="26" fill="#161F25" stroke="#A26739" stroke-opacity="0.55"/>
-  <text x="892" y="286" fill="#F7FBFC" font-size="28" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Playback</text>
-  <text x="892" y="326" fill="#D6C2B2" font-size="18" font-family="Segoe UI, Arial, sans-serif">Animate the player, publish MediaItem</text>
-  <text x="892" y="352" fill="#D6C2B2" font-size="18" font-family="Segoe UI, Arial, sans-serif">metadata, and expose system controls.</text>
-  <circle cx="1032" cy="340" r="56" fill="url(#accent)" fill-opacity="0.95"/>
-  <circle cx="1032" cy="340" r="22" fill="#0A1F29"/>
-  <path d="M1026 323L1050 340L1026 357V323Z" fill="#FFF5EB"/>
-  <rect x="892" y="388" width="126" height="32" rx="16" fill="#FFF5EB" fill-opacity="0.1"/>
-  <text x="920" y="410" fill="#FFF5EB" font-size="14" font-family="Segoe UI, Arial, sans-serif">Lock Screen</text>
-  <rect x="1032" y="388" width="120" height="32" rx="16" fill="#FFF5EB" fill-opacity="0.1"/>
-  <text x="1058" y="410" fill="#FFF5EB" font-size="14" font-family="Segoe UI, Arial, sans-serif">Android Deck</text>
+  <!-- Card: Playback -->
+  <rect x="836" y="222" width="344" height="250" rx="24" fill="#1B1B1F" stroke="#2C2C33" stroke-width="1.5"/>
+  <circle cx="1008" cy="300" r="44" fill="url(#accent)"/>
+  <path d="M998 282l24 18l-24 18z" fill="#FFFFFF"/>
+  <text x="868" y="356" fill="#F5F5F7" font-size="26" font-weight="700">Playback</text>
+  <text x="868" y="388" fill="#A2A2AC" font-size="16">Animate the player, publish</text>
+  <text x="868" y="410" fill="#A2A2AC" font-size="16">MediaItem, expose controls.</text>
+  <rect x="868" y="430" width="124" height="30" rx="15" fill="#FFFFFF" fill-opacity="0.06"/>
+  <text x="930" y="450" text-anchor="middle" fill="#F5F5F7" font-size="14">Lock screen</text>
+  <rect x="1002" y="430" width="146" height="30" rx="15" fill="#FFFFFF" fill-opacity="0.06"/>
+  <text x="1075" y="450" text-anchor="middle" fill="#F5F5F7" font-size="14">Android deck</text>
 
-  <path d="M420 351H468" stroke="#4FD4C0" stroke-width="4" stroke-linecap="round"/>
-  <path d="M800 351H848" stroke="#D79663" stroke-width="4" stroke-linecap="round"/>
-  <path d="M456 341L472 351L456 361" fill="none" stroke="#4FD4C0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M836 341L852 351L836 361" fill="none" stroke="#D79663" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- connectors -->
+  <path d="M444 347h24" stroke="#FF4D5E" stroke-width="3" stroke-linecap="round"/>
+  <path d="M460 339l10 8l-10 8" stroke="#FF4D5E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M812 347h24" stroke="#FF4D5E" stroke-width="3" stroke-linecap="round"/>
+  <path d="M828 339l10 8l-10 8" stroke="#FF4D5E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 
-  <rect x="100" y="536" width="1080" height="102" rx="22" fill="#0F2D38" stroke="#2D6B73" stroke-opacity="0.45"/>
-  <text x="136" y="566" fill="#F7FBFC" font-size="20" font-family="Segoe UI, Arial, sans-serif" font-weight="600">Shared Flutter Shell</text>
-  <text x="136" y="592" fill="#9AB7BD" font-size="16" font-family="Segoe UI, Arial, sans-serif">One controller orchestrates imports, downloads, playlists, playback, and theme</text>
-  <text x="136" y="613" fill="#9AB7BD" font-size="16" font-family="Segoe UI, Arial, sans-serif">while Android and iOS expose native media surfaces.</text>
+  <!-- footer -->
+  <rect x="100" y="520" width="1080" height="112" rx="22" fill="#16161A" stroke="#2C2C33" stroke-width="1.5"/>
+  <rect x="100" y="520" width="6" height="112" rx="3" fill="#FF4D5E"/>
+  <text x="136" y="560" fill="#F5F5F7" font-size="20" font-weight="700">One shared Flutter shell</text>
+  <text x="136" y="590" fill="#A2A2AC" font-size="16">A single controller orchestrates imports, downloads, playlists, playback and theme,</text>
+  <text x="136" y="612" fill="#A2A2AC" font-size="16">while Android and iOS expose their native media surfaces.</text>
 </svg>

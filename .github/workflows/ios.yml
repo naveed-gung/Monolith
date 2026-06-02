@@ -62,12 +62,6 @@ jobs:
           key: ${{ runner.os }}-pods-${{ hashFiles('pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pods-
 
-      - name: Cache DerivedData
-        uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/DerivedData
-          key: ${{ runner.os }}-derived-${{ hashFiles('ios/Podfile.lock', 'pubspec.lock', 'ios/Runner.xcodeproj/project.pbxproj') }}
-          restore-keys: ${{ runner.os }}-derived-
 
       - name: Cache Flutter build artifacts
         uses: actions/cache@v4
@@ -130,8 +124,6 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            -parallelizeTargets \
-            -jobs "$(sysctl -n hw.logicalcpu)" \
             ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \

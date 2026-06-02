@@ -63,13 +63,6 @@ jobs:
           restore-keys: ${{ runner.os }}-pods-
 
 
-      - name: Cache Flutter build artifacts
-        uses: actions/cache@v4
-        with:
-          path: build/ios
-          key: ${{ runner.os }}-flutter-ios-${{ hashFiles('pubspec.lock', 'lib/**/*.dart') }}
-          restore-keys: ${{ runner.os }}-flutter-ios-
-
       - name: Install dependencies
         run: flutter pub get
 
@@ -111,51 +104,30 @@ jobs:
             sed -i '' 's/static const /static final /g' "$PKG/phosphor_icons_${style}.dart"
           done
 
-      - name: Install CocoaPods dependencies
-        run: cd ios && pod install
-
+      # Build via Flutter's own toolchain rather than a hand-rolled xcodebuild
+      # invocation. `flutter build ios` runs `pod install` and generates the
+      # correct xcodebuild command that compiles AND exposes every plugin pod
+      # module (audio_service, just_audio, etc.) to the Runner target. The raw
+      # xcodebuild approach failed because plugin framework modules weren't on
+      # Runner's module search path → "Module 'audio_service' not found".
       - name: Build unsigned iOS app
-        run: |
-          set -eo pipefail
-          LOG="$RUNNER_TEMP/xcodebuild.log"
-          xcodebuild \
-            -workspace ios/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            ONLY_ACTIVE_ARCH=YES \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            DEVELOPMENT_TEAM="" \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            DEBUG_INFORMATION_FORMAT=dwarf \
-            build 2>&1 | tee "$LOG"
-          if ! grep -q "BUILD SUCCEEDED" "$LOG"; then
-            echo "=== errors ==="
-            grep -E "error:|Build input file cannot be found|PhaseScriptExecution" "$LOG" | head -40 || true
-            echo "=== last 30 lines ==="
-            tail -30 "$LOG"
-            exit 1
-          fi
+        run: flutter build ios --release --no-codesign
 
       - name: Package unsigned IPA
         run: |
           set -eo pipefail
-          APP=$(find "$RUNNER_TEMP/DerivedData" -name "Runner.app" -path "*/Release-iphoneos/*" | head -1)
+          APP="build/ios/iphoneos/Runner.app"
           echo "Packaging: $APP"
           mkdir -p Payload
           cp -R "$APP" Payload/
-          zip -qry "Monolith-${{ github.ref_name }}-unsigned.ipa" Payload
+          zip -qry "monolith.ipa" Payload
           rm -rf Payload
 
       - name: Upload IPA as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: Monolith-iOS-unsigned
-          path: Monolith-*-unsigned.ipa
+          path: monolith.ipa
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -164,10 +136,16 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: Monolith-*-unsigned.ipa
+          files: monolith.ipa
           fail_on_unmatched_files: true
+          append_body: true
           body: |
-            ## iOS (unsigned IPA)
+            ## iOS — `monolith.ipa` (unsigned)
+
+            - **App:** Monolith
+            - **Version:** ${{ github.ref_name }}
+            - **Bundle ID:** `dev.naveed-gung.monolith`
+            - **Developer:** naveed-gung
 
             This IPA is **not App Store signed**. Install via AltStore, Sideloadly, or
             any sideloading tool of your choice.

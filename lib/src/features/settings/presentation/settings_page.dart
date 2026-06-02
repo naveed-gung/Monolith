@@ -11,13 +11,15 @@ import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
 import '../../../core/widgets/app_icons.dart';
 import '../../storage/presentation/storage_page.dart';
+import '../contributors.dart';
+import '../developer_identity.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
-  static final Uri _githubUri = Uri.parse('https://github.com/naveed-gung/');
-  static final Uri _portfolioUri = Uri.parse('https://naveed-gung.dev/');
-  static final Uri _instagramUri = Uri.parse('https://instagram.com/naveed._.gung');
+  static Uri get _githubUri => DeveloperIdentity.githubUri;
+  static Uri get _portfolioUri => DeveloperIdentity.portfolioUri;
+  static Uri get _instagramUri => DeveloperIdentity.instagramUri;
 
   static Future<void> _launch(BuildContext context, Uri uri) async {
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
@@ -87,6 +89,29 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
           ),
+
+          // ── Contributors (only shown when list is non-empty) ────────
+          if (contributors.isNotEmpty) ...[
+            _SectionLabel(label: 'Contributors'),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenInset,
+                  0,
+                  AppSpacing.screenInset,
+                  AppSpacing.xxl,
+                ),
+                child: _SettingsGroup(
+                  children: [
+                    for (int i = 0; i < contributors.length; i++) ...[
+                      if (i > 0) _Divider(),
+                      _ContributorRow(entry: contributors[i]),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
 
           // ── Appearance ──────────────────────────────────────────────
           _SectionLabel(label: 'Appearance'),
@@ -364,13 +389,13 @@ class _DeveloperCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Naveed Gung',
+                  DeveloperIdentity.name,
                   style: textTheme.titleMedium?.copyWith(
                     fontWeight: AppType.title,
                   ),
                 ),
                 Text(
-                  'Developer',
+                  DeveloperIdentity.role,
                   style: textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
@@ -441,6 +466,75 @@ class _ProfileButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Contributor row ──────────────────────────────────────────────────────────
+
+class _ContributorRow extends StatelessWidget {
+  const _ContributorRow({required this.entry});
+  final ContributorEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHigh,
+              borderRadius: AppRadii.all(AppRadii.sm),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.4),
+                width: 0.5,
+              ),
+            ),
+            child: Center(
+              child: PhosphorIcon(
+                AppIcons.person,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.name,
+                  style: textTheme.bodyLarge?.copyWith(fontWeight: AppType.body),
+                ),
+                Text(
+                  entry.role,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (entry.githubHandle != null)
+            _ProfileButton(
+              tooltip: 'GitHub',
+              onTap: () => launchUrl(
+                Uri.parse('https://github.com/${entry.githubHandle}'),
+                mode: LaunchMode.externalApplication,
+              ),
+              child: const FaIcon(FontAwesomeIcons.github, size: 16),
+            ),
+        ],
       ),
     );
   }

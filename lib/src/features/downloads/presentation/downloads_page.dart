@@ -168,6 +168,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
                           submitting: _submitting,
                           error: _error,
                           downloaderError: controller.downloaderError,
+                          isOnline: controller.isOnline,
                           onInspect: () => _inspect(controller),
                           onDownload: () => _download(controller),
                           onClearPreview: _clearPreview,
@@ -503,6 +504,7 @@ class _AdderCard extends StatelessWidget {
     required this.submitting,
     required this.error,
     required this.downloaderError,
+    required this.isOnline,
     required this.onInspect,
     required this.onDownload,
     required this.onClearPreview,
@@ -516,6 +518,7 @@ class _AdderCard extends StatelessWidget {
   final bool submitting;
   final String? error;
   final String? downloaderError;
+  final bool isOnline;
   final VoidCallback onInspect;
   final VoidCallback onDownload;
   final VoidCallback onClearPreview;
@@ -539,17 +542,53 @@ class _AdderCard extends StatelessWidget {
               PhosphorIcon(
                 AppIcons.downloadFill,
                 size: 20,
-                color: scheme.primary,
+                color: isOnline ? scheme.primary : scheme.onSurfaceVariant,
               ),
               const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Download audio',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: AppType.title,
+              Expanded(
+                child: Text(
+                  'Download audio',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: AppType.title,
+                  ),
                 ),
               ),
+              if (!isOnline)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.errorContainer,
+                    borderRadius: AppRadii.all(AppRadii.sm),
+                  ),
+                  child: Text(
+                    'Offline',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: scheme.onErrorContainer,
+                      fontWeight: AppType.label,
+                    ),
+                  ),
+                ),
             ],
           ),
+          if (!isOnline) ...[
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHigh,
+                borderRadius: AppRadii.all(AppRadii.sm),
+              ),
+              child: Text(
+                'No internet connection. Connect to download music.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
           if (downloaderError != null) ...[
             const SizedBox(height: AppSpacing.md),
             Container(
@@ -572,6 +611,7 @@ class _AdderCard extends StatelessWidget {
               controller: urlController,
               keyboardType: TextInputType.url,
               onChanged: onUrlChanged,
+              enabled: isOnline,
               decoration: const InputDecoration(
                 labelText: 'Media URL',
                 hintText: 'https://youtube.com/watch?v=…',
@@ -582,7 +622,7 @@ class _AdderCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: hasUrl && !inspecting ? onInspect : null,
+                  onPressed: isOnline && hasUrl && !inspecting ? onInspect : null,
                   icon: inspecting
                       ? const SizedBox(
                           width: 16,
@@ -620,7 +660,7 @@ class _AdderCard extends StatelessWidget {
                     flex: 2,
                     child: FilledButton.icon(
                       onPressed:
-                          hasUrl && hasName && !submitting ? onDownload : null,
+                          isOnline && hasUrl && hasName && !submitting ? onDownload : null,
                       icon: submitting
                           ? const SizedBox(
                               width: 16,

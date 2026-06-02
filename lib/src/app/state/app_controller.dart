@@ -40,6 +40,7 @@ class MonolithController extends ChangeNotifier {
            manualAudioImportService ?? ManualAudioImportService() {
     _bindAudioPlayer();
     _bindDownloader();
+    _bindConnectivity();
     unawaited(_bootstrap());
   }
 
@@ -57,6 +58,7 @@ class MonolithController extends ChangeNotifier {
   late final StreamSubscription<DownloadState> _downloadStateSubscription;
   late final StreamSubscription<DownloadError> _downloadErrorSubscription;
   late final StreamSubscription<LogMessage> _downloadLogSubscription;
+  late final StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
 
   AppTab _currentTab = AppTab.downloads;
   LibraryCategory _selectedCategory = LibraryCategory.tracks;
@@ -86,6 +88,8 @@ class MonolithController extends ChangeNotifier {
   Duration _lastPositionNotification = Duration.zero;
   Duration? _currentTrackDuration;
   bool _completionHandled = false;
+
+  List<ConnectivityResult> _connectivityResults = const [ConnectivityResult.wifi];
 
   bool _downloadsOnWifi = true;
   bool _normalizeAudio = true;
@@ -119,6 +123,8 @@ class MonolithController extends ChangeNotifier {
   }
 
   String get searchQuery => _searchQuery;
+  bool get isOnline =>
+      _connectivityResults.any((r) => r != ConnectivityResult.none);
   bool get downloadsOnWifi => _downloadsOnWifi;
   bool get normalizeAudio => _normalizeAudio;
   bool get smoothTransitions => _smoothTransitions;
@@ -1058,6 +1064,18 @@ class MonolithController extends ChangeNotifier {
     await session.configure(AudioSessionConfiguration.music());
   }
 
+  void _bindConnectivity() {
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((results) {
+      _connectivityResults = results;
+      notifyListeners();
+    });
+    unawaited(Connectivity().checkConnectivity().then((r) {
+      _connectivityResults = r;
+      notifyListeners();
+    }));
+  }
+
   void _bindAudioPlayer() {
     _playerStateSubscription = _audioPlayer.playerStateStream.listen((state) {
       _isPlaying = state.playing;
@@ -1805,6 +1823,7 @@ class MonolithController extends ChangeNotifier {
     _downloadStateSubscription.cancel();
     _downloadErrorSubscription.cancel();
     _downloadLogSubscription.cancel();
+    _connectivitySubscription.cancel();
     _youtubeDL.dispose();
     super.dispose();
   }

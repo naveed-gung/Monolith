@@ -278,7 +278,13 @@ class SettingsPage extends StatelessWidget {
                     icon: AppIcons.playCircle,
                     title: 'Open player',
                     subtitle: 'Jump to the active playback controls',
-                    onTap: controller.openPlayer,
+                    // Leave Settings first (it slides off to the right), then
+                    // raise the player so its own open animation plays cleanly
+                    // over the shell instead of behind this route.
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      controller.openPlayer();
+                    },
                   ),
                   _Divider(),
                   _ActionRow(

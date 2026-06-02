@@ -64,7 +64,7 @@
   <text x="886" y="478" fill="#A2A2AC" font-size="17">and the system media deck.</text>
 
   <rect x="766" y="520" width="524" height="8" rx="4" fill="#26262C"/>
-  <rect x="766" y="520" width="300" height="8" rx="4" fill="#FF4D5E"/>
+  <rect x="766" y="520" width="224" height="8" rx="4" fill="#FF4D5E"/>
   <text x="766" y="552" fill="#6C6C76" font-size="14">1:24</text>
   <text x="1290" y="552" text-anchor="end" fill="#6C6C76" font-size="14">3:18</text>
 

@@ -61,7 +61,13 @@ Grab the latest build from the [**Releases**](https://github.com/naveed-gung/Mon
 | Platform | File | Install |
 | --- | --- | --- |
 | **Android** | `monolith.apk` | Download and open on any Android 7.0+ device (allow install from unknown sources). |
-| **iOS** | `monolith.ipa` | Unsigned build — sideload with [AltStore](https://altstore.io) or [Sideloadly](https://sideloadly.io), or re-sign with your own Apple ID in Xcode. |
+| **iOS** | `monolith.ipa` | Unsigned build. Sideload with [AltStore](https://altstore.io) / [Sideloadly](https://sideloadly.io), re-sign with your own Apple ID in Xcode, or install it **permanently** with TrollStore (see below). |
+
+> **Jailbroken or TrollStore-capable iOS?**
+> - **Jailbroken device** → install `monolith.ipa` permanently with [**TrollStore**](https://github.com/opa334/TrollStore). No 7-day re-sign, no computer, no developer account.
+> - **iOS 16.7.x** → use [**TrollStore Lite**](https://github.com/opa334/TrollStore) to install the same IPA permanently.
+>
+> TrollStore-installed apps stay signed forever, so this is the smoothest way to run Monolith on a supported iPhone.
 
 ---
 

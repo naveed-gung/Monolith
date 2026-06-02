@@ -26,7 +26,8 @@
 
   <!-- Stage A -->
   <rect x="118" y="232" width="56" height="56" rx="15" fill="#FF4D5E" fill-opacity="0.16"/>
-  <path d="M138 248v36c0 5 -4 8 -8 8s-8 -3 -8 -8s4 -8 8 -8c2 0 3 0 5 1v-22l18 -4v18" stroke="#FF4D5E" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <ellipse cx="142" cy="272" rx="7" ry="5.5" fill="#FF4D5E"/>
+  <path d="M148.5 272V244q8 2 9 12" stroke="#FF4D5E" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="118" y="328" fill="#F5F5F7" font-size="24" font-weight="700">Track activation</text>
   <text x="118" y="364" fill="#A2A2AC" font-size="16">Controller selects a track,</text>
   <text x="118" y="386" fill="#A2A2AC" font-size="16">resolves artwork, and loads</text>
@@ -52,8 +53,8 @@
 
   <!-- Stage C -->
   <rect x="890" y="232" width="56" height="56" rx="15" fill="#FF4D5E" fill-opacity="0.16"/>
-  <rect x="906" y="248" width="24" height="40" rx="5" stroke="#FF4D5E" stroke-width="3" fill="none"/>
-  <circle cx="918" cy="280" r="2.5" fill="#FF4D5E"/>
+  <rect x="906" y="240" width="24" height="40" rx="5" stroke="#FF4D5E" stroke-width="3" fill="none"/>
+  <circle cx="918" cy="272" r="2.5" fill="#FF4D5E"/>
   <text x="890" y="328" fill="#F5F5F7" font-size="24" font-weight="700">System surfaces</text>
   <text x="890" y="364" fill="#A2A2AC" font-size="16">Android exposes a notification</text>
   <text x="890" y="386" fill="#A2A2AC" font-size="16">deck; iOS publishes to Lock</text>

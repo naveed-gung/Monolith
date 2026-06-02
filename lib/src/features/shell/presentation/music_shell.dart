@@ -197,18 +197,22 @@ class _MusicShellState extends State<MusicShell>
       PageRouteBuilder<void>(
         pageBuilder: (_, _, _) => const SettingsPage(),
         transitionDuration: AppMotion.durMedium,
-        reverseTransitionDuration: AppMotion.durFast,
-        transitionsBuilder: (_, animation, _, child) => FadeTransition(
-          opacity: CurvedAnimation(parent: animation, curve: AppMotion.standard),
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.04),
-              end: Offset.zero,
-            ).animate(
-              CurvedAnimation(parent: animation, curve: AppMotion.emphasized),
+        reverseTransitionDuration: AppMotion.durMedium,
+        // Horizontal page slide: enters from the right, and on pop the whole
+        // screen swipes back off to the right (iOS-style). "Open player" relies
+        // on this reverse to glide Settings away as the player rises.
+        transitionsBuilder: (_, animation, _, child) => SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(
+              parent: animation,
+              curve: AppMotion.emphasized,
+              reverseCurve: AppMotion.exit,
             ),
-            child: child,
           ),
+          child: child,
         ),
       ),
     );

@@ -106,7 +106,9 @@ class _ArtworkSection extends StatelessWidget {
             animation: animation,
             builder: (context, child) {
               final t = animation.value;
-              final bass = controller.isPlaying
+              // Immersive canvas drives the reactive pulse. When it's off the
+              // glow stays calm and static instead of breathing with the bass.
+              final bass = (controller.isPlaying && controller.immersiveCanvas)
                   ? ((math.sin(t * math.pi * 2) *
                               math.sin(t * math.pi * 3.1) *
                               0.6 +

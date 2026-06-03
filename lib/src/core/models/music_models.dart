@@ -34,6 +34,9 @@ class Track {
     this.artworkQueryId,
     this.artworkFilePath,
     this.artworkUrl,
+    this.playCount = 0,
+    this.lastPlayed,
+    this.addedAt,
   });
 
   final String id;
@@ -49,6 +52,12 @@ class Track {
   final int? artworkQueryId;
   final String? artworkFilePath;
   final String? artworkUrl;
+
+  // Smart-playlist metadata (persisted in the manifest; nullable so the const
+  // constructor and older manifests both stay valid).
+  final int playCount;
+  final DateTime? lastPlayed;
+  final DateTime? addedAt;
 
   bool get canPlay => filePath != null && filePath!.isNotEmpty;
 
@@ -66,6 +75,9 @@ class Track {
     int? artworkQueryId,
     String? artworkFilePath,
     String? artworkUrl,
+    int? playCount,
+    DateTime? lastPlayed,
+    DateTime? addedAt,
   }) {
     return Track(
       id: id ?? this.id,
@@ -81,6 +93,9 @@ class Track {
       artworkQueryId: artworkQueryId ?? this.artworkQueryId,
       artworkFilePath: artworkFilePath ?? this.artworkFilePath,
       artworkUrl: artworkUrl ?? this.artworkUrl,
+      playCount: playCount ?? this.playCount,
+      lastPlayed: lastPlayed ?? this.lastPlayed,
+      addedAt: addedAt ?? this.addedAt,
     );
   }
 
@@ -99,6 +114,9 @@ class Track {
       'artworkQueryId': artworkQueryId,
       'artworkFilePath': artworkFilePath,
       'artworkUrl': artworkUrl,
+      'playCount': playCount,
+      'lastPlayedMs': lastPlayed?.millisecondsSinceEpoch,
+      'addedAtMs': addedAt?.millisecondsSinceEpoch,
     };
   }
 
@@ -121,6 +139,13 @@ class Track {
       artworkQueryId: json['artworkQueryId'] as int?,
       artworkFilePath: json['artworkFilePath'] as String?,
       artworkUrl: json['artworkUrl'] as String?,
+      playCount: json['playCount'] as int? ?? 0,
+      lastPlayed: json['lastPlayedMs'] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(json['lastPlayedMs'] as int),
+      addedAt: json['addedAtMs'] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(json['addedAtMs'] as int),
     );
   }
 

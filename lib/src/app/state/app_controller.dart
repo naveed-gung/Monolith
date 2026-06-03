@@ -984,6 +984,15 @@ class MonolithController extends ChangeNotifier {
     await _localMediaService.scanMedia(result.outputPath!);
 
     _rebuildTracks(preferredTrackId: track.id);
+
+    // Load the just-downloaded file into the player engine NOW so the first tap
+    // on Play works without a relaunch. Without this the track is selected but
+    // no AudioSource is set, and togglePlayback() has nothing to play — the iOS
+    // "won't play until the app is killed and reopened" bug. autoplay:false so a
+    // finished download doesn't start blasting on its own. Every other path
+    // (refreshLibrary, import, delete, bulk-remove) already does this.
+    await _syncSelectedTrack(autoplay: false);
+
     _upsertDownloadTask(
       _downloadTaskById(task.processId).copyWith(
         status: DownloadTaskStatus.completed,

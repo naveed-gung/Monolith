@@ -95,6 +95,7 @@ class MonolithController extends ChangeNotifier {
   Duration _currentPosition = Duration.zero;
   Duration? _currentTrackDuration;
   bool _completionHandled = false;
+  String? _lastRegisteredPlayId;
 
   /// Live playback position + [0,1] progress, exposed as listenables so the
   /// seek bar and time labels can repaint in isolation instead of rebuilding
@@ -182,6 +183,35 @@ class MonolithController extends ChangeNotifier {
   String? get downloaderError => _downloaderError;
   List<DownloadTaskInfo> get downloadTasks => _downloadTasks;
   List<Track> get offlineTracks => _downloadedTracks;
+
+  // ── Smart playlists (computed; no storage of their own) ──────────────────
+  static final DateTime _epoch = DateTime.fromMillisecondsSinceEpoch(0);
+  List<Track> get recentlyAdded => ([..._downloadedTracks]..sort(
+        (a, b) => (b.addedAt ?? _epoch).compareTo(a.addedAt ?? _epoch),
+      )).take(50).toList();
+  List<Track> get mostPlayed => ([..._downloadedTracks]
+        ..sort((a, b) => b.playCount.compareTo(a.playCount)))
+      .where((t) => t.playCount > 0)
+      .toList();
+  List<Track> get neverPlayed =>
+      _downloadedTracks.where((t) => t.playCount == 0).toList();
+
+  /// Bump play count + lastPlayed for a downloaded/imported track and persist.
+  void _registerPlay(Track track) {
+    if (track.source != TrackSource.downloaded &&
+        track.source != TrackSource.imported) {
+      return;
+    }
+    final updated = track.copyWith(
+      playCount: track.playCount + 1,
+      lastPlayed: DateTime.now(),
+    );
+    _downloadedTracks = _downloadedTracks
+        .map((t) => t.id == track.id ? updated : t)
+        .toList(growable: false);
+    unawaited(_downloadStore.saveTracks(_downloadedTracks));
+  }
+
   List<String> get playlistNames =>
       _playlistTrackIds.keys.toList(growable: false);
   List<Track> tracksForPlaylist(String playlistName) {
@@ -635,6 +665,7 @@ class MonolithController extends ChangeNotifier {
               source: TrackSource.imported,
               filePath: storedFile.path,
               artworkFilePath: artworkFilePath,
+              addedAt: DateTime.now(),
             ),
           );
         } catch (_) {
@@ -1012,6 +1043,7 @@ class MonolithController extends ChangeNotifier {
       filePath: result.outputPath,
       artworkFilePath: artworkFilePath,
       artworkUrl: preview.thumbnailUrl,
+      addedAt: DateTime.now(),
     );
 
     _downloadedTracks = [
@@ -1155,6 +1187,16 @@ class MonolithController extends ChangeNotifier {
   void _bindAudioPlayer() {
     _playerStateSubscription = _audioPlayer.playerStateStream.listen((state) {
       _isPlaying = state.playing;
+
+      // Count a play once per track activation (when it actually starts), not
+      // on every pause/resume — used by the "most/never played" smart lists.
+      if (state.playing) {
+        final track = currentTrack;
+        if (track != null && track.id != _lastRegisteredPlayId) {
+          _lastRegisteredPlayId = track.id;
+          _registerPlay(track);
+        }
+      }
 
       if (state.processingState == ProcessingState.completed) {
         if (_completionHandled) {

@@ -338,6 +338,47 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
 
+          // ── Library & storage ───────────────────────────────────────
+          _SectionLabel(label: 'Library & storage'),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenInset,
+                0,
+                AppSpacing.screenInset,
+                AppSpacing.xxl,
+              ),
+              child: _SettingsGroup(
+                children: [
+                  if (controller.supportsAppleMusicImportPrompt) ...[
+                    _ToggleRow(
+                      title: 'Apple Music import',
+                      subtitle: 'Pull songs from your device music library',
+                      value: controller.isAppleMusicImportEnabled,
+                      onChanged: (v) => controller.setAppleMusicImportEnabled(
+                        v,
+                        retryPermissionRequest: true,
+                      ),
+                    ),
+                    _Divider(),
+                  ],
+                  _ActionRow(
+                    icon: AppIcons.folderOpen,
+                    title: 'Monolith folder',
+                    subtitle: Theme.of(context).platform == TargetPlatform.iOS
+                        ? 'On My iPhone › Monolith › Music'
+                        : 'Browse downloaded & imported files',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const StoragePage(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
           // ── About ────────────────────────────────────────────────────
           _SectionLabel(label: 'About'),
           SliverToBoxAdapter(

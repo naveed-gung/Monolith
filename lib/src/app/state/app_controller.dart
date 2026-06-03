@@ -484,6 +484,12 @@ class MonolithController extends ChangeNotifier {
   void hapticTap([HapticStrength strength = HapticStrength.light]) =>
       _haptics.tap(strength);
 
+  // Convenience wrappers so UI files don't need to import HapticStrength.
+  void hapticSelection() => _haptics.tap(HapticStrength.selection);
+  void hapticLight() => _haptics.tap(HapticStrength.light);
+  void hapticMedium() => _haptics.tap(HapticStrength.medium);
+  void hapticHeavy() => _haptics.tap(HapticStrength.heavy);
+
   // ── Audio helpers ──────────────────────────────────────────────────────
 
   Future<void> _applyAudioVolume() async {

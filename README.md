@@ -222,5 +222,6 @@ Monolith is **source-available**, not open-source.
 See [**LICENSE**](LICENSE) for the full terms. For a commercial license, contact **Naveed Sohail Gung** — naveedsohailg@gmail.com.
 
 <div align="center">
+<sub>📓 Release notes live in the <a href="CHANGELOG.md">Changelog</a></sub><br/>
 <sub>Built by <a href="https://github.com/naveed-gung">naveed-gung</a> · © 2026 Naveed Sohail Gung</sub>
 </div>

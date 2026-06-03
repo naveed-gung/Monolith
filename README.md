@@ -101,6 +101,12 @@ Grab the latest build from the [**Releases**](https://github.com/naveed-gung/Mon
 | **System integration** | Notification controls, headset buttons, lock screen, and Control Center are first-class. |
 | **Library ownership** | Imports, playlists, and manifest-backed downloads form a permanent collection. |
 
+### Gestures & input
+
+- **Swipe between tabs** — a horizontal swipe moves between Library, Downloads, and Search; a swipe right also leaves Settings.
+- **Tap to dismiss** — tap anywhere off a text field to close the keyboard, and sheets like *Add to playlist* rise above it.
+- **Pull-down player** — drag the player sheet down to dismiss it; the mini deck stays put when the keyboard opens.
+
 ---
 
 ## <img src="docs/assets/icons/ic-playback.svg" width="22" align="center" /> Playback pipeline

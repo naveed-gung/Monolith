@@ -121,7 +121,14 @@ class _LibraryPageState extends State<LibraryPage> {
     final name = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
-      builder: (ctx) => Padding(
+      // Let the sheet grow taller than half-screen and ride above the
+      // keyboard: viewInsets padding lifts the text field clear of it.
+      isScrollControlled: true,
+      builder: (ctx) => AnimatedPadding(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: Padding(
         padding: const EdgeInsets.fromLTRB(AppSpacing.screenInset, AppSpacing.sm, AppSpacing.screenInset, AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -146,6 +153,7 @@ class _LibraryPageState extends State<LibraryPage> {
               Expanded(child: FilledButton.icon(onPressed: () => Navigator.pop(ctx, playlistC.text.trim()), icon: PhosphorIcon(AppIcons.plusCircle, size: 18), label: const Text('Create & add'))),
             ]),
           ],
+        ),
         ),
       ),
     );

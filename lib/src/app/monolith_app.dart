@@ -119,6 +119,14 @@ class _MonolithAppState extends State<MonolithApp> {
               AccentSwatch.of(_controller.accentPreset),
             ),
             home: const MusicShell(),
+            // Tap anywhere outside a focused text field to dismiss the
+            // keyboard (no need to drag it down). Translucent so it never
+            // swallows taps meant for buttons, lists, or sliders.
+            builder: (context, child) => GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+              child: child,
+            ),
           );
         },
       ),

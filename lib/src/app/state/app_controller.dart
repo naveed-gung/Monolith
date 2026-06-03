@@ -166,6 +166,14 @@ class MonolithController extends ChangeNotifier {
     _hasSeenImportPrompt = true;
     await _prefs?.setBool(_kSeenImportPrompt, true);
   }
+
+  /// Clear the "seen" flag so the first-visit Apple Music import prompt shows
+  /// again on the next launch (used by the Settings re-trigger row).
+  Future<void> resetImportPrompt() async {
+    _hasSeenImportPrompt = false;
+    await _prefs?.remove(_kSeenImportPrompt);
+    notifyListeners();
+  }
   bool get isLibraryLoading => _isLibraryLoading;
   bool get hasLibraryPermission => _hasLibraryPermission;
   String? get libraryError => _libraryError;

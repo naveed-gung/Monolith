@@ -35,6 +35,7 @@ class _MusicShellState extends State<MusicShell>
   // Created once the controller is known so it can open on the correct tab
   // (default is Downloads) with no first-frame flash.
   PageController? _pageController;
+  int? _lastSyncedTabIndex;
   MonolithController? _controller;
 
   @override
@@ -100,20 +101,28 @@ class _MusicShellState extends State<MusicShell>
     // Keep the swipeable PageView aligned with tab changes that originate from
     // the bottom nav (a tap) instead of a swipe. We skip this while the view is
     // actively scrolling so a programmatic animation never fights the finger.
+    // Only schedule a page sync when the tab actually changed. build() runs on
+    // every controller notify (≈1–4×/sec during playback), and scheduling a
+    // post-frame callback every time kept the engine doing continuous frame
+    // work — denying the SoC idle gaps and cooking the phone. Guarding on the
+    // tab index makes this fire only on real tab changes.
     final tabIndex = AppTab.values.indexOf(controller.currentTab);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final pc = _pageController;
-      if (!mounted || pc == null || !pc.hasClients) return;
-      if (pc.page?.round() == tabIndex) return;
-      // Skip while a finger drag or an in-flight animation owns the view, so a
-      // programmatic jump never fights the user's swipe.
-      if (pc.position.isScrollingNotifier.value) return;
-      pc.animateToPage(
-        tabIndex,
-        duration: AppMotion.durMedium,
-        curve: AppMotion.emphasized,
-      );
-    });
+    if (tabIndex != _lastSyncedTabIndex) {
+      _lastSyncedTabIndex = tabIndex;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final pc = _pageController;
+        if (!mounted || pc == null || !pc.hasClients) return;
+        if (pc.page?.round() == tabIndex) return;
+        // Skip while a finger drag or an in-flight animation owns the view, so
+        // a programmatic jump never fights the user's swipe.
+        if (pc.position.isScrollingNotifier.value) return;
+        pc.animateToPage(
+          tabIndex,
+          duration: AppMotion.durMedium,
+          curve: AppMotion.emphasized,
+        );
+      });
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {

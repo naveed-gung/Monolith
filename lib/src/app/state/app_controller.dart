@@ -91,9 +91,16 @@ class MonolithController extends ChangeNotifier {
   bool _hasAttemptedYoutubeDlRefresh = false;
 
   Duration _currentPosition = Duration.zero;
-  Duration _lastPositionNotification = Duration.zero;
   Duration? _currentTrackDuration;
   bool _completionHandled = false;
+
+  /// Live playback position + [0,1] progress, exposed as listenables so the
+  /// seek bar and time labels can repaint in isolation instead of rebuilding
+  /// the whole shell on every position tick. This is the big heat/battery win:
+  /// the position stream no longer calls notifyListeners().
+  final ValueNotifier<Duration> positionListenable =
+      ValueNotifier<Duration>(Duration.zero);
+  final ValueNotifier<double> progress = ValueNotifier<double>(0);
 
   List<ConnectivityResult> _connectivityResults = const [ConnectivityResult.wifi];
 
@@ -1130,14 +1137,14 @@ class MonolithController extends ChangeNotifier {
       position,
     ) {
       _currentPosition = position;
-      final delta =
-          (position - _lastPositionNotification).inMilliseconds.abs();
-      if (delta < 250 &&
-          position.inSeconds == _lastPositionNotification.inSeconds) {
-        return;
-      }
-      _lastPositionNotification = position;
-      notifyListeners();
+      positionListenable.value = position;
+      final total = currentTrackDuration.inMilliseconds;
+      progress.value =
+          total == 0 ? 0 : (position.inMilliseconds / total).clamp(0.0, 1.0);
+      // Intentionally NO notifyListeners() here — the seek bar and time labels
+      // listen to positionListenable/progress and repaint on their own. Shell
+      // rebuilds stay reserved for discrete events (play/pause, track change,
+      // completion), so the SoC gets idle gaps back.
     });
 
     _playerDurationSubscription = _audioPlayer.durationStream.listen((
@@ -1148,6 +1155,11 @@ class MonolithController extends ChangeNotifier {
       if (duration != null && duration > Duration.zero) {
         _persistResolvedCurrentTrackDuration(duration);
       }
+      // Total changed → recompute progress so the bar is correct immediately.
+      final total = currentTrackDuration.inMilliseconds;
+      progress.value = total == 0
+          ? 0
+          : (_currentPosition.inMilliseconds / total).clamp(0.0, 1.0);
       notifyListeners();
     });
   }
@@ -1456,6 +1468,8 @@ class MonolithController extends ChangeNotifier {
 
     _selectedTrackIndex = index;
     _currentPosition = Duration.zero;
+    positionListenable.value = Duration.zero;
+    progress.value = 0;
     _currentTrackDuration = currentTrack?.duration ?? Duration.zero;
     if (openPlayer) {
       _isPlayerOpen = true;
@@ -1858,6 +1872,8 @@ class MonolithController extends ChangeNotifier {
 
   @override
   void dispose() {
+    positionListenable.dispose();
+    progress.dispose();
     unawaited(_audioPlayer.dispose());
     _playerStateSubscription.cancel();
     _playerPositionSubscription.cancel();

@@ -21,6 +21,7 @@ Local listening, managed downloads, playlist control, and system-grade playback 
   <a href="https://github.com/naveed-gung/Monolith/issues"><img alt="Issues" src="https://img.shields.io/github/issues/naveed-gung/Monolith?style=flat-square&color=FF4D5E" /></a>
   <img alt="Code size" src="https://img.shields.io/github/languages/code-size/naveed-gung/Monolith?style=flat-square&color=FF4D5E" />
   <img alt="Top language" src="https://img.shields.io/github/languages/top/naveed-gung/Monolith?style=flat-square&color=FF4D5E" />
+  <a href="#-download"><img alt="TrollStore Ready" src="https://img.shields.io/badge/TrollStore-Ready-FF4D5E?style=flat-square&logo=apple&logoColor=white" /></a>
 </p>
 
 <p>

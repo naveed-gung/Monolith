@@ -30,6 +30,26 @@ class _LibraryPageState extends State<LibraryPage> {
   // Non-null when user has drilled into an artist / album / playlist
   String? _drillItem;
 
+  // ── Smart (virtual) playlists ─────────────────────────────────────────────
+  static const _smartRecent = 'Recently added';
+  static const _smartMost = 'Most played';
+  static const _smartNever = 'Never played';
+  static const _smartNames = [_smartRecent, _smartMost, _smartNever];
+
+  /// Returns the computed track list for a smart-playlist name, or null if the
+  /// name isn't a smart playlist.
+  List<Track>? _smartListFor(MonolithController controller, String name) {
+    switch (name) {
+      case _smartRecent:
+        return controller.recentlyAdded;
+      case _smartMost:
+        return controller.mostPlayed;
+      case _smartNever:
+        return controller.neverPlayed;
+    }
+    return null;
+  }
+
   // ── Sort helpers ────────────────────────────────────────────────────────
 
   List<Track> _sortedTracks(List<Track> src) {
@@ -256,16 +276,28 @@ class _LibraryPageState extends State<LibraryPage> {
           controller.tracks.where((t) => t.album == _drillItem).toList(),
         );
       } else if (cat == LibraryCategory.playlists) {
-        drillTracks = _sortedTracks(controller.tracksForPlaylist(_drillItem!));
+        // Smart virtual playlists keep their intrinsic order; real playlists
+        // honour the chosen sort. Real playlists win on a name clash.
+        final smart = controller.playlistNames.contains(_drillItem)
+            ? null
+            : _smartListFor(controller, _drillItem!);
+        drillTracks =
+            smart ?? _sortedTracks(controller.tracksForPlaylist(_drillItem!));
       } else {
         drillTracks = const [];
       }
+
+      final isSmartDrill = cat == LibraryCategory.playlists &&
+          !controller.playlistNames.contains(_drillItem) &&
+          _smartNames.contains(_drillItem);
 
       contentSliver = _DrillTrackList(
         title: _drillItem!,
         tracks: drillTracks,
         controller: controller,
-        playlistContext: cat == LibraryCategory.playlists ? _drillItem : null,
+        playlistContext: (cat == LibraryCategory.playlists && !isSmartDrill)
+            ? _drillItem
+            : null,
         onBack: () => setState(() => _drillItem = null),
         onMenu: (t, {String? playlistContext}) =>
             _openMenu(t, controller, playlistContext: playlistContext),
@@ -311,6 +343,11 @@ class _LibraryPageState extends State<LibraryPage> {
         LibraryCategory.playlists => _PlaylistSliver(
             controller: controller,
             sortedPlaylists: _sortedStrings(controller.playlistNames),
+            smartPlaylists: {
+              _smartRecent: controller.recentlyAdded.length,
+              _smartMost: controller.mostPlayed.length,
+              _smartNever: controller.neverPlayed.length,
+            },
             onDrillIn: (name) => setState(() => _drillItem = name),
             onCreatePlaylist: () => _createPlaylist(controller),
             sortButton: sortBtn,
@@ -1104,6 +1141,7 @@ class _PlaylistSliver extends StatelessWidget {
   const _PlaylistSliver({
     required this.controller,
     required this.sortedPlaylists,
+    required this.smartPlaylists,
     required this.onDrillIn,
     required this.onCreatePlaylist,
     this.sortButton,
@@ -1111,6 +1149,7 @@ class _PlaylistSliver extends StatelessWidget {
 
   final MonolithController controller;
   final List<String> sortedPlaylists;
+  final Map<String, int> smartPlaylists; // name -> track count
   final ValueChanged<String> onDrillIn;
   final VoidCallback onCreatePlaylist;
   final Widget? sortButton;
@@ -1147,6 +1186,91 @@ class _PlaylistSliver extends StatelessWidget {
               ),
             );
           }
+          // index 1: pinned Smart playlists group
+          if (index == 1) {
+            final icons = <String, PhosphorIconData>{
+              'Recently added': PhosphorIcons.clock(),
+              'Most played': PhosphorIcons.chartBar(),
+              'Never played': PhosphorIcons.sparkle(),
+            };
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                    child: Text(
+                      'SMART',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontWeight: AppType.label,
+                            letterSpacing: AppType.trackWide,
+                          ),
+                    ),
+                  ),
+                  for (final entry in smartPlaylists.entries)
+                    InkWell(
+                      onTap: () => onDrillIn(entry.key),
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: scheme.primaryContainer,
+                                borderRadius: AppRadii.all(AppRadii.md),
+                              ),
+                              child: Center(
+                                child: PhosphorIcon(
+                                  icons[entry.key] ?? AppIcons.queue,
+                                  size: 20,
+                                  color: scheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    entry.key,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.copyWith(fontWeight: AppType.body),
+                                  ),
+                                  Text(
+                                    entry.value == 1
+                                        ? '1 track'
+                                        : '${entry.value} tracks',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: scheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            PhosphorIcon(
+                              AppIcons.caretRight,
+                              size: 18,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          }
           if (sortedPlaylists.isEmpty) {
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
@@ -1160,10 +1284,10 @@ class _PlaylistSliver extends StatelessWidget {
               ),
             );
           }
-          final name = sortedPlaylists[index - 1];
+          final name = sortedPlaylists[index - 2];
           final tracks = controller.tracksForPlaylist(name);
           final lead = controller.leadTrackForPlaylist(name);
-          final isLast = index == sortedPlaylists.length;
+          final isLast = index == sortedPlaylists.length + 1;
 
           return Column(
             children: [
@@ -1205,7 +1329,7 @@ class _PlaylistSliver extends StatelessWidget {
             ],
           );
         },
-        childCount: sortedPlaylists.isEmpty ? 2 : sortedPlaylists.length + 1,
+        childCount: sortedPlaylists.isEmpty ? 3 : sortedPlaylists.length + 2,
       ),
     );
   }

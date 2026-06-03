@@ -32,6 +32,9 @@ class _MusicShellState extends State<MusicShell>
     with TickerProviderStateMixin {
   late final AnimationController _visualizerController;
   late final AnimationController _artworkController;
+  // Created once the controller is known so it can open on the correct tab
+  // (default is Downloads) with no first-frame flash.
+  PageController? _pageController;
   MonolithController? _controller;
 
   @override
@@ -51,6 +54,9 @@ class _MusicShellState extends State<MusicShell>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final controller = AppScope.watch(context);
+    _pageController ??= PageController(
+      initialPage: AppTab.values.indexOf(controller.currentTab),
+    );
     if (controller != _controller) {
       _controller?.removeListener(_handleControllerChanged);
       _controller = controller;
@@ -64,24 +70,50 @@ class _MusicShellState extends State<MusicShell>
     _controller?.removeListener(_handleControllerChanged);
     _visualizerController.dispose();
     _artworkController.dispose();
+    _pageController?.dispose();
     super.dispose();
   }
 
   void _handleControllerChanged() {
     final controller = _controller;
     if (controller == null || !mounted) return;
-    if (controller.isPlaying) {
+    // Only spin the reactive visualizer when it can actually be seen and the
+    // user wants it: the player sheet is open, audio is playing, and immersive
+    // canvas is on. Leaving it running behind a closed sheet (or with the
+    // toggle off) just pegged the CPU/GPU and cooked the phone for no visible
+    // benefit.
+    final shouldAnimate = controller.isPlaying &&
+        controller.isPlayerOpen &&
+        controller.immersiveCanvas;
+    if (shouldAnimate) {
       if (!_visualizerController.isAnimating) _visualizerController.repeat();
-      if (!_artworkController.isAnimating) _artworkController.repeat();
-    } else {
+    } else if (_visualizerController.isAnimating) {
       _visualizerController.stop();
-      _artworkController.stop();
     }
+    // The slow artwork rotation is unused for visuals; keep it parked.
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.watch(context);
+
+    // Keep the swipeable PageView aligned with tab changes that originate from
+    // the bottom nav (a tap) instead of a swipe. We skip this while the view is
+    // actively scrolling so a programmatic animation never fights the finger.
+    final tabIndex = AppTab.values.indexOf(controller.currentTab);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final pc = _pageController;
+      if (!mounted || pc == null || !pc.hasClients) return;
+      if (pc.page?.round() == tabIndex) return;
+      // Skip while a finger drag or an in-flight animation owns the view, so a
+      // programmatic jump never fights the user's swipe.
+      if (pc.position.isScrollingNotifier.value) return;
+      pc.animateToPage(
+        tabIndex,
+        duration: AppMotion.durMedium,
+        curve: AppMotion.emphasized,
+      );
+    });
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -164,31 +196,30 @@ class _MusicShellState extends State<MusicShell>
   }
 
   Widget _buildPage(MonolithController controller) {
-    final inner = switch (controller.currentTab) {
-      AppTab.library => LibraryPage(
-          key: const ValueKey('library'),
-          onOpenSettings: _openSettings,
+    // Horizontally swipeable tabs. Child order MUST match AppTab.values so a
+    // settled page maps back to the right tab. A hard left→right swipe moves to
+    // the previous tab (e.g. Downloads → Library); right→left to the next.
+    return PageView(
+      controller: _pageController,
+      physics: const BouncingScrollPhysics(),
+      onPageChanged: (index) => controller.selectTab(AppTab.values[index]),
+      children: [
+        SafeArea(
+          bottom: false,
+          child: LibraryPage(
+            key: const ValueKey('library'),
+            onOpenSettings: _openSettings,
+          ),
         ),
-      AppTab.downloads => const DownloadsPage(
-          key: ValueKey('downloads'),
-          embedded: true,
+        const SafeArea(
+          bottom: false,
+          child: DownloadsPage(key: ValueKey('downloads'), embedded: true),
         ),
-      AppTab.search => const SearchPage(key: ValueKey('search')),
-    };
-
-    return AnimatedSwitcher(
-      duration: AppMotion.durFast,
-      switchInCurve: AppMotion.standard,
-      switchOutCurve: AppMotion.exit,
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: child,
-      ),
-      child: SafeArea(
-        key: ValueKey(controller.currentTab),
-        bottom: false,
-        child: inner,
-      ),
+        const SafeArea(
+          bottom: false,
+          child: SearchPage(key: ValueKey('search')),
+        ),
+      ],
     );
   }
 

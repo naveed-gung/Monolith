@@ -264,25 +264,34 @@ class _ProgressSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final elapsed = PlayerPage.formatDuration(controller.currentPosition);
     final total = PlayerPage.formatDuration(controller.currentTrackDuration);
+    final timeStyle = textTheme.labelSmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+      fontWeight: AppType.body,
+    );
 
     return Column(
       children: [
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 4,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
-            activeTrackColor: scheme.primary,
-            inactiveTrackColor:
-                scheme.outlineVariant.withValues(alpha: 0.5),
-            thumbColor: Colors.white,
-            overlayColor: scheme.primary.withValues(alpha: 0.16),
-          ),
-          child: Slider(
-            value: controller.playbackProgress,
-            onChanged: controller.setPlaybackProgress,
+        // Seek bar driven by the progress notifier so it repaints in isolation
+        // (no per-tick shell rebuild).
+        RepaintBoundary(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 4,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+              activeTrackColor: scheme.primary,
+              inactiveTrackColor: scheme.outlineVariant.withValues(alpha: 0.5),
+              thumbColor: Colors.white,
+              overlayColor: scheme.primary.withValues(alpha: 0.16),
+            ),
+            child: ValueListenableBuilder<double>(
+              valueListenable: controller.progress,
+              builder: (_, value, _) => Slider(
+                value: value,
+                onChanged: controller.setPlaybackProgress,
+              ),
+            ),
           ),
         ),
         Padding(
@@ -290,20 +299,16 @@ class _ProgressSection extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                elapsed,
-                style: textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  fontWeight: AppType.body,
+              RepaintBoundary(
+                child: ValueListenableBuilder<Duration>(
+                  valueListenable: controller.positionListenable,
+                  builder: (_, pos, _) => Text(
+                    PlayerPage.formatDuration(pos),
+                    style: timeStyle,
+                  ),
                 ),
               ),
-              Text(
-                total,
-                style: textTheme.labelSmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  fontWeight: AppType.body,
-                ),
-              ),
+              Text(total, style: timeStyle),
             ],
           ),
         ),

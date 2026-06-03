@@ -491,16 +491,24 @@ class _MiniPlayer extends StatelessWidget {
                   ),
                 ),
               ),
-              // Thin progress bar
+              // Thin progress bar — repaints in isolation off the progress
+              // notifier so a position tick never rebuilds the whole shell.
               SizedBox(
                 height: 3,
                 child: ClipRRect(
                   borderRadius: AppRadii.all(AppRadii.pill),
-                  child: LinearProgressIndicator(
-                    value: controller.playbackProgress,
-                    backgroundColor: scheme.outlineVariant.withValues(alpha: 0.3),
-                    valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
-                    minHeight: 3,
+                  child: RepaintBoundary(
+                    child: ValueListenableBuilder<double>(
+                      valueListenable: controller.progress,
+                      builder: (_, value, _) => LinearProgressIndicator(
+                        value: value,
+                        backgroundColor:
+                            scheme.outlineVariant.withValues(alpha: 0.3),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(scheme.primary),
+                        minHeight: 3,
+                      ),
+                    ),
                   ),
                 ),
               ),

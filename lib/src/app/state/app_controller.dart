@@ -15,6 +15,7 @@ import '../../core/services/local_media_service.dart';
 import '../../core/services/media_downloader.dart';
 import '../../core/services/media_downloader_models.dart';
 import '../../core/services/manual_audio_import_service.dart';
+import '../../core/services/haptics_service.dart';
 
 class MonolithController extends ChangeNotifier {
   // SharedPreferences keys
@@ -24,6 +25,7 @@ class MonolithController extends ChangeNotifier {
   static const _kNormalize = 'pref_normalize';
   static const _kTransitions = 'pref_transitions';
   static const _kCanvas = 'pref_canvas';
+  static const _kHaptics = 'pref_haptics';
   static const _kSeenImportPrompt = 'pref_seen_import_prompt';
 
   MonolithController({
@@ -108,6 +110,8 @@ class MonolithController extends ChangeNotifier {
   bool _normalizeAudio = true;
   bool _smoothTransitions = true;
   bool _immersiveCanvas = true;
+  bool _hapticsEnabled = true;
+  final HapticsService _haptics = HapticsService();
   bool _isPlayerOpen = false;
   bool _iosAppleMusicImportEnabled =
       defaultTargetPlatform != TargetPlatform.iOS;
@@ -146,6 +150,7 @@ class MonolithController extends ChangeNotifier {
   bool get normalizeAudio => _normalizeAudio;
   bool get smoothTransitions => _smoothTransitions;
   bool get immersiveCanvas => _immersiveCanvas;
+  bool get hapticsEnabled => _hapticsEnabled;
   bool get isPlayerOpen => _isPlayerOpen;
   bool get supportsAppleMusicImportPrompt =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
@@ -463,6 +468,21 @@ class MonolithController extends ChangeNotifier {
     _prefs?.setBool(_kCanvas, value);
     notifyListeners();
   }
+
+  void setHapticsEnabled(bool value) {
+    if (_hapticsEnabled == value) return;
+    _hapticsEnabled = value;
+    _haptics.enabled = value;
+    _prefs?.setBool(_kHaptics, value);
+    // Confirm the new state with a tap when turning it on.
+    if (value) _haptics.tap(HapticStrength.selection);
+    notifyListeners();
+  }
+
+  /// Fire a haptic tap for a user interaction (respects the global toggle).
+  /// Call this from UI gesture handlers — never from audio/stream callbacks.
+  void hapticTap([HapticStrength strength = HapticStrength.light]) =>
+      _haptics.tap(strength);
 
   // ── Audio helpers ──────────────────────────────────────────────────────
 
@@ -1095,6 +1115,8 @@ class MonolithController extends ChangeNotifier {
     _normalizeAudio = p.getBool(_kNormalize) ?? true;
     _smoothTransitions = p.getBool(_kTransitions) ?? true;
     _immersiveCanvas = p.getBool(_kCanvas) ?? true;
+    _hapticsEnabled = p.getBool(_kHaptics) ?? true;
+    _haptics.enabled = _hapticsEnabled;
     _hasSeenImportPrompt = p.getBool(_kSeenImportPrompt) ?? false;
     notifyListeners();
   }

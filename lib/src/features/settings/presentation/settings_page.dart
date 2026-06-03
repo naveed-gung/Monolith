@@ -258,6 +258,13 @@ class SettingsPage extends StatelessWidget {
                     value: controller.smoothTransitions,
                     onChanged: controller.setSmoothTransitions,
                   ),
+                  _Divider(),
+                  _ToggleRow(
+                    title: 'Haptic feedback',
+                    subtitle: 'Vibrate on taps and controls',
+                    value: controller.hapticsEnabled,
+                    onChanged: controller.setHapticsEnabled,
+                  ),
                 ],
               ),
             ),

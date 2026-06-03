@@ -118,8 +118,11 @@ class _ArtworkSection extends StatelessWidget {
                   : 0.0;
 
               // Only the glow pulses — image/thumbnail stays at fixed size.
-              final glowRadius = 28 + bass * 52;
-              final glowAlpha = 0.18 + bass * 0.36;
+              // Kept deliberately modest: a big animated blur re-rasterises the
+              // shadow every frame (heavy on 120Hz panels), so the ceiling is
+              // capped to stay smooth and cool.
+              final glowRadius = 24 + bass * 30;
+              final glowAlpha = 0.16 + bass * 0.28;
 
               return Container(
                 width: maxSize,
@@ -130,7 +133,7 @@ class _ArtworkSection extends StatelessWidget {
                     BoxShadow(
                       color: scheme.primary.withValues(alpha: glowAlpha),
                       blurRadius: glowRadius,
-                      spreadRadius: bass * 6,
+                      spreadRadius: bass * 3,
                       offset: const Offset(0, 16),
                     ),
                     BoxShadow(

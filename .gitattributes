@@ -1,0 +1,15 @@
+# Normalize line endings so Windows checkouts stop reporting LF→CRLF churn.
+* text=auto eol=lf
+
+# Binary assets — never normalize.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ipa binary
+*.apk binary
+*.keystore binary
+*.jks binary
+
+# Generated / vendored — keep diffs quiet.
+*.g.dart linguist-generated=true
+third_party/** linguist-vendored=true

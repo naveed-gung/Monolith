@@ -77,11 +77,11 @@ class _MonolithAppState extends State<MonolithApp> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Not now'),
+              child: const Text('Cancel'),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Import library'),
+              child: const Text('Import'),
             ),
           ],
         );

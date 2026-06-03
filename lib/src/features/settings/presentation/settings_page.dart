@@ -313,6 +313,26 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (controller.supportsAppleMusicImportPrompt) ...[
+                    _Divider(),
+                    _ActionRow(
+                      icon: AppIcons.refresh,
+                      title: 'Re-run import prompt',
+                      subtitle: 'Show the Apple Music import prompt again',
+                      onTap: () async {
+                        controller.hapticLight();
+                        await controller.resetImportPrompt();
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'The import prompt will appear next time you open Monolith.',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),

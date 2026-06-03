@@ -159,7 +159,7 @@ jobs:
 
       - name: Publish to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: monolith.ipa
           fail_on_unmatched_files: true

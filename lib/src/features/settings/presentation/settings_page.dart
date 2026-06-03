@@ -36,7 +36,15 @@ class SettingsPage extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
+    return GestureDetector(
+      // A hard left→right swipe pops Settings (it slides back off to the
+      // right), matching the swipe-between-tabs gesture on the main screens.
+      onHorizontalDragEnd: (details) {
+        if ((details.primaryVelocity ?? 0) > 300) {
+          Navigator.of(context).maybePop();
+        }
+      },
+      child: Scaffold(
       backgroundColor: scheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -332,6 +340,7 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

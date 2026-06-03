@@ -297,7 +297,10 @@ class _BottomNav extends StatelessWidget {
                       child: _NavItem(
                         tab: tab,
                         isSelected: AppTab.values.indexOf(tab) == selected,
-                        onTap: () => controller.selectTab(tab),
+                        onTap: () {
+                          controller.hapticSelection();
+                          controller.selectTab(tab);
+                        },
                       ),
                     ),
                 ],
@@ -406,7 +409,10 @@ class _MiniPlayer extends StatelessWidget {
             children: [
               // Main row
               InkWell(
-                onTap: controller.openPlayer,
+                onTap: () {
+                  controller.hapticLight();
+                  controller.openPlayer();
+                },
                 borderRadius: AppRadii.all(AppRadii.xl),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
@@ -462,7 +468,10 @@ class _MiniPlayer extends StatelessWidget {
                         children: [
                           _MiniButton(
                             icon: AppIcons.skipBack,
-                            onPressed: controller.previousTrack,
+                            onPressed: () {
+                              controller.hapticLight();
+                              controller.previousTrack();
+                            },
                             size: 22,
                             tooltip: 'Previous',
                           ),
@@ -471,7 +480,10 @@ class _MiniPlayer extends StatelessWidget {
                                 ? AppIcons.pauseCircle
                                 : AppIcons.playCircle,
                             onPressed: track.canPlay
-                                ? controller.togglePlayback
+                                ? () {
+                                    controller.hapticMedium();
+                                    controller.togglePlayback();
+                                  }
                                 : null,
                             size: 32,
                             color: scheme.primary,
@@ -479,8 +491,10 @@ class _MiniPlayer extends StatelessWidget {
                           ),
                           _MiniButton(
                             icon: AppIcons.skipForward,
-                            onPressed: () =>
-                                controller.nextTrack(openPlayer: false),
+                            onPressed: () {
+                              controller.hapticLight();
+                              controller.nextTrack(openPlayer: false);
+                            },
                             size: 22,
                             tooltip: 'Next',
                           ),

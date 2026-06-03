@@ -297,6 +297,7 @@ class SettingsPage extends StatelessWidget {
                     // raise the player so its own open animation plays cleanly
                     // over the shell instead of behind this route.
                     onTap: () {
+                      controller.hapticLight();
                       Navigator.of(context).pop();
                       controller.openPlayer();
                     },
@@ -686,7 +687,10 @@ class _ToggleRow extends StatelessWidget {
           Switch(
             key: switchKey,
             value: value,
-            onChanged: onChanged,
+            onChanged: (v) {
+              AppScope.read(context).hapticSelection();
+              onChanged(v);
+            },
           ),
         ],
       ),
@@ -782,7 +786,10 @@ class _AccentDot extends StatelessWidget {
     return Tooltip(
       message: swatch.label,
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          AppScope.read(context).hapticSelection();
+          onTap();
+        },
         child: AnimatedContainer(
           duration: AppMotion.durFast,
           curve: AppMotion.standard,

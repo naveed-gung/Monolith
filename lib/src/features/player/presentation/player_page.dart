@@ -341,21 +341,32 @@ class _TransportControls extends StatelessWidget {
                 ? AppIcons.shuffleFill
                 : AppIcons.shuffle,
             active: controller.shuffleEnabled,
-            onPressed: controller.toggleShuffle,
+            onPressed: () {
+              controller.hapticSelection();
+              controller.toggleShuffle();
+            },
             tooltip: 'Shuffle',
           ),
           // Previous
           _TransportButton(
             key: const Key('player-prev'),
             icon: AppIcons.skipBack,
-            onPressed: controller.previousTrack,
+            onPressed: () {
+              controller.hapticLight();
+              controller.previousTrack();
+            },
             size: 28,
             tooltip: 'Previous',
           ),
           // Play / pause (large)
           GestureDetector(
             key: const Key('player-play-toggle'),
-            onTap: track.canPlay ? controller.togglePlayback : null,
+            onTap: track.canPlay
+                ? () {
+                    controller.hapticMedium();
+                    controller.togglePlayback();
+                  }
+                : null,
             child: AnimatedContainer(
               duration: AppMotion.durFast,
               curve: AppMotion.standard,
@@ -385,7 +396,10 @@ class _TransportControls extends StatelessWidget {
           _TransportButton(
             key: const Key('playback-next'),
             icon: AppIcons.skipForward,
-            onPressed: () => controller.nextTrack(openPlayer: true),
+            onPressed: () {
+              controller.hapticLight();
+              controller.nextTrack(openPlayer: true);
+            },
             size: 28,
             tooltip: 'Next',
           ),
@@ -394,7 +408,10 @@ class _TransportControls extends StatelessWidget {
             key: const Key('player-repeat'),
             icon: _repeatIcon(controller.repeatMode),
             active: controller.repeatMode != RepeatMode.off,
-            onPressed: controller.cycleRepeatMode,
+            onPressed: () {
+              controller.hapticSelection();
+              controller.cycleRepeatMode();
+            },
             tooltip: 'Repeat',
           ),
         ],

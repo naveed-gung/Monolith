@@ -55,6 +55,7 @@ class AppIcons {
       PhosphorIcons.downloadSimple(PhosphorIconsStyle.fill);
   static final PhosphorIconData fileAudio = PhosphorIcons.fileAudio();
   static final PhosphorIconData musicNote = PhosphorIcons.musicNote();
+  static final PhosphorIconData folderOpen = PhosphorIcons.folderOpen();
 
   // ── Theme toggles ─────────────────────────────────────────────────────────
   static final PhosphorIconData themeSystem = PhosphorIcons.circleHalf();

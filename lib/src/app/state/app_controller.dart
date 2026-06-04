@@ -26,6 +26,7 @@ class MonolithController extends ChangeNotifier {
   static const _kNormalize = 'pref_normalize';
   static const _kTransitions = 'pref_transitions';
   static const _kCanvas = 'pref_canvas';
+  static const _kReduceEffects = 'pref_reduce_effects';
   static const _kHaptics = 'pref_haptics';
   static const _kEqEnabled = 'pref_eq_enabled';
   static const _kEqGains = 'pref_eq_gains';
@@ -123,6 +124,11 @@ class MonolithController extends ChangeNotifier {
   bool _normalizeAudio = true;
   bool _smoothTransitions = true;
   bool _immersiveCanvas = true;
+  // When on, every BackdropFilter blur in the shell is replaced by a flat
+  // translucent fill. Blur readback is the single most expensive GPU primitive
+  // on older A-series chips (iPhone X / A11), so this is the biggest heat win on
+  // low-power hardware. See [[project-release-103]] heat notes.
+  bool _reduceVisualEffects = false;
   bool _hapticsEnabled = true;
   bool _equalizerEnabled = false;
   final HapticsService _haptics = HapticsService();
@@ -164,6 +170,7 @@ class MonolithController extends ChangeNotifier {
   bool get normalizeAudio => _normalizeAudio;
   bool get smoothTransitions => _smoothTransitions;
   bool get immersiveCanvas => _immersiveCanvas;
+  bool get reduceVisualEffects => _reduceVisualEffects;
   bool get hapticsEnabled => _hapticsEnabled;
   bool get isPlayerOpen => _isPlayerOpen;
   bool get supportsAppleMusicImportPrompt =>
@@ -520,6 +527,13 @@ class MonolithController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setReduceVisualEffects(bool value) {
+    if (_reduceVisualEffects == value) return;
+    _reduceVisualEffects = value;
+    _prefs?.setBool(_kReduceEffects, value);
+    notifyListeners();
+  }
+
   void setHapticsEnabled(bool value) {
     if (_hapticsEnabled == value) return;
     _hapticsEnabled = value;
@@ -650,7 +664,9 @@ class MonolithController extends ChangeNotifier {
           _iosAppleMusicImportEnabled ||
           retryPermissionRequest;
 
-      _downloadedTracks = await _downloadStore.loadTracks();
+      // Merge in any audio files found on disk that aren't in the manifest, so
+      // the library repopulates from surviving files after a reinstall (Task D).
+      _downloadedTracks = await _downloadStore.loadTracksMergingDisk();
       final mediaSnapshot = await _localMediaService.loadTracks(
         retryRequest: retryPermissionRequest,
         requestPermission: shouldLoadDeviceLibrary,
@@ -1114,6 +1130,14 @@ class MonolithController extends ChangeNotifier {
 
     _rebuildTracks(preferredTrackId: track.id);
 
+    // INVARIANT: the download path has ZERO lyric dependency. Lyrics (.lrc
+    // sidecar / embedded USLT) are read lazily at display time in the player,
+    // never fetched here. A track must download, persist, and become playable
+    // whether or not lyrics exist. If lyrics fetching is ever wired into a
+    // download, it MUST be best-effort (try/catch, non-blocking) and must not
+    // fail or delay the audio. See test/lyrics_download_independence_test.dart
+    // and TASK C in MONOLITH_1.0.4.
+
     // Load the just-downloaded file into the player engine NOW so the first tap
     // on Play works without a relaunch. Without this the track is selected but
     // no AudioSource is set, and togglePlayback() has nothing to play — the iOS
@@ -1217,6 +1241,7 @@ class MonolithController extends ChangeNotifier {
     _normalizeAudio = p.getBool(_kNormalize) ?? true;
     _smoothTransitions = p.getBool(_kTransitions) ?? true;
     _immersiveCanvas = p.getBool(_kCanvas) ?? true;
+    _reduceVisualEffects = p.getBool(_kReduceEffects) ?? false;
     _hapticsEnabled = p.getBool(_kHaptics) ?? true;
     _haptics.enabled = _hapticsEnabled;
     _equalizerEnabled = p.getBool(_kEqEnabled) ?? false;
@@ -1758,6 +1783,11 @@ class MonolithController extends ChangeNotifier {
   }
 
   void _rebuildTracks({String? preferredTrackId}) {
+    // Deliberate ordering (Task D1): downloaded/imported tracks first, device
+    // library after. Within _downloadedTracks the order is newest-first — new
+    // downloads are prepended at the source (see _startManagedDownload), and
+    // disk-recovered orphans are appended after the known manifest entries by
+    // loadTracksMergingDisk. This is intentional, not incidental.
     final nextTracks = [..._downloadedTracks, ..._deviceTracks];
     final oldTrackId =
         preferredTrackId ??

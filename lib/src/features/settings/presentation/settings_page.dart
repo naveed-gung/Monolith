@@ -222,6 +222,14 @@ class SettingsPage extends StatelessWidget {
                     value: controller.immersiveCanvas,
                     onChanged: controller.setImmersiveCanvas,
                   ),
+                  _Divider(),
+                  _ToggleRow(
+                    title: 'Reduce visual effects',
+                    subtitle: 'Drops blur for flat panels — cooler & '
+                        'longer battery on older phones',
+                    value: controller.reduceVisualEffects,
+                    onChanged: controller.setReduceVisualEffects,
+                  ),
                 ],
               ),
             ),
@@ -414,7 +422,7 @@ class SettingsPage extends StatelessWidget {
                   _InfoRow(
                     icon: AppIcons.musicNote,
                     title: 'Version',
-                    trailing: '1.0.3',
+                    trailing: '1.0.4',
                   ),
                   _Divider(),
                   _InfoRow(
@@ -1060,7 +1068,7 @@ class _CheckUpdateButton extends StatefulWidget {
 }
 
 class _CheckUpdateButtonState extends State<_CheckUpdateButton> {
-  static const _currentVersion = '1.0.3';
+  static const _currentVersion = '1.0.4';
   static const _apiUrl =
       'https://api.github.com/repos/naveed-gung/Monolith/releases/latest';
   static const _releasesUrl =

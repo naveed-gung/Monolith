@@ -1,0 +1,131 @@
+name: Android Build & Release
+
+# Tags only — mirrors ios.yml so a single `v*` tag push produces BOTH the
+# unsigned IPA and the APK on the same GitHub Release. Triggering on branches
+# too would double-run; tags-only gives exactly one run per release.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.4) — leave blank to use current commit'
+        required: false
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      CI: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Same phosphor_flutter 2.1.0 -> Flutter 3.44 patch as ios.yml. Linux sed
+      # uses `-i` with no backup-suffix argument (BSD/macOS needs `-i ''`).
+      # See ios.yml for the full three-part explanation of why this is needed.
+      - name: Patch phosphor_flutter for Flutter 3.44
+        run: |
+          set -euo pipefail
+          ROOT="$HOME/.pub-cache/hosted/pub.dev/phosphor_flutter-2.1.0"
+          PKG="$ROOT/lib/src"
+          if [ ! -d "$PKG" ]; then
+            echo "ERROR: phosphor_flutter not found at $PKG"
+            ls "$HOME/.pub-cache/hosted/pub.dev/" | grep phosphor || echo "(no phosphor entries)"
+            exit 1
+          fi
+          cp .github/patches/phosphor_icon_data_flutter344.dart "$PKG/phosphor_icon_data.dart"
+          cp .github/patches/phosphor_icon_flutter344.dart      "$PKG/phosphor_icon.dart"
+          while IFS= read -r f; do
+            head -1 "$f" | grep -q '^// @dart=' && continue
+            { printf '// @dart=3.3\n'; cat "$f"; } > "${f}.tmp" && mv "${f}.tmp" "$f"
+          done < <(find "$ROOT/lib" -name "*.dart")
+          for style in regular thin light bold fill duotone; do
+            sed -i 's/static const /static final /g' "$PKG/phosphor_icons_${style}.dart"
+          done
+
+      # --no-tree-shake-icons is REQUIRED here too: the phosphor patch turns the
+      # icon constructors into `static final`, which Flutter's icon tree-shaker
+      # rejects (it only accepts const IconData).
+      #
+      # NOTE ON SIGNING: this release APK is signed with the **debug keystore**
+      # (android/app/build.gradle.kts -> release { signingConfig =
+      # signingConfigs.getByName("debug") }). That's a deliberate, acceptable
+      # choice for a sideloaded build — it is NOT a Play Store upload. We do NOT
+      # ship a real release keystore in the repo (see SECURITY.md). If a proper
+      # signing key is added later, it must come from CI secrets, never git.
+      - name: Build release APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk monolith.apk
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Monolith-Android
+          path: monolith.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      # Appends to the SAME release as ios.yml (append_body: true). The two jobs
+      # run independently, so the order of the iOS/Android sections in the final
+      # release body may vary — that's expected and fine.
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: monolith.apk
+          fail_on_unmatched_files: true
+          append_body: true
+          body: |
+            ## Android — `monolith.apk`
+
+            - **App:** Monolith
+            - **Version:** ${{ github.ref_name }}
+            - **Min Android:** 7.0 (API 24)
+            - **Bundle ID:** `dev.naveed_gung.monolith`
+
+            Install on any Android 7.0+ device: download `monolith.apk`, then
+            enable **Install unknown apps** for your browser/file manager when
+            prompted. No Play Store account needed.
+
+            > **Note:** this build is signed with a debug key (fine for
+            > sideloading). Android may warn it's from an unknown developer —
+            > that's expected for a non–Play Store APK.

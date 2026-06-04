@@ -107,9 +107,13 @@ class _ArtworkSection extends StatelessWidget {
             animation: animation,
             builder: (context, child) {
               final t = animation.value;
-              // Immersive canvas drives the reactive pulse. When it's off the
-              // glow stays calm and static instead of breathing with the bass.
-              final bass = (controller.isPlaying && controller.immersiveCanvas)
+              // Immersive canvas drives the reactive pulse. When it's off — or
+              // "Reduce visual effects" is on — the glow stays calm and static
+              // instead of breathing with the bass.
+              final reactive = controller.isPlaying &&
+                  controller.immersiveCanvas &&
+                  !controller.reduceVisualEffects;
+              var bass = reactive
                   ? ((math.sin(t * math.pi * 2) *
                               math.sin(t * math.pi * 3.1) *
                               0.6 +
@@ -117,13 +121,17 @@ class _ArtworkSection extends StatelessWidget {
                       .abs()
                       .clamp(0.0, 1.0))
                   : 0.0;
+              // Quantise to 0.1 steps so the blurred shadow only re-rasterises
+              // ~10 distinct times per cycle instead of every 60/120Hz frame.
+              // Re-blurring a BoxShadow every frame is heavy on the A11 GPU; the
+              // step makes most frames a no-op repaint.
+              bass = (bass * 10).round() / 10;
 
               // Only the glow pulses — image/thumbnail stays at fixed size.
-              // Kept deliberately modest: a big animated blur re-rasterises the
-              // shadow every frame (heavy on 120Hz panels), so the ceiling is
-              // capped to stay smooth and cool.
-              final glowRadius = 24 + bass * 30;
-              final glowAlpha = 0.16 + bass * 0.28;
+              // Ceiling capped low (max blur ~36, was ~54) so the animated blur
+              // stays cheap to re-rasterise on older GPUs.
+              final glowRadius = 18 + bass * 18;
+              final glowAlpha = 0.14 + bass * 0.20;
 
               return Container(
                 width: maxSize,

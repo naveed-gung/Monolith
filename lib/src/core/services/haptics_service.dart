@@ -13,15 +13,21 @@ class HapticsService {
 
   Future<void> tap([HapticStrength strength = HapticStrength.light]) async {
     if (!enabled) return;
-    switch (strength) {
-      case HapticStrength.selection:
-        await HapticFeedback.selectionClick();
-      case HapticStrength.light:
-        await HapticFeedback.lightImpact();
-      case HapticStrength.medium:
-        await HapticFeedback.mediumImpact();
-      case HapticStrength.heavy:
-        await HapticFeedback.heavyImpact();
+    // Some Android OEMs/devices without a vibrator (or with VIBRATE absent)
+    // throw from the platform channel — never let a cosmetic tap crash the UI.
+    try {
+      switch (strength) {
+        case HapticStrength.selection:
+          await HapticFeedback.selectionClick();
+        case HapticStrength.light:
+          await HapticFeedback.lightImpact();
+        case HapticStrength.medium:
+          await HapticFeedback.mediumImpact();
+        case HapticStrength.heavy:
+          await HapticFeedback.heavyImpact();
+      }
+    } catch (_) {
+      // No haptics hardware / permission — silently ignore.
     }
   }
 }

@@ -9,6 +9,12 @@ import '../models/music_models.dart';
 class DownloadStore {
   static const _sep = '/';
 
+  /// Audio container extensions we recognise when rebuilding the library from
+  /// files found on disk (used by [loadTracksMergingDisk]).
+  static const _audioExtensions = {
+    'mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'opus', 'webm', 'mp4',
+  };
+
   /// Monolith's own top-level folder. On iOS this lives in the app's Documents
   /// directory, which — with UIFileSharingEnabled + LSSupportsOpeningDocuments
   /// InPlace set in Info.plist — shows up in the Files app under
@@ -65,6 +71,83 @@ class DownloadStore {
     }
 
     return tracks;
+  }
+
+  /// Load the manifest, then merge in any audio files that exist on disk in the
+  /// Music folder but are missing from the manifest, re-adding them with
+  /// best-effort metadata (filename → title, file mtime → addedAt).
+  ///
+  /// This is what makes a library repopulate from surviving files: after a
+  /// reinstall (or once downloads live in OS-public storage that outlives the
+  /// app), the manifest may be gone while the audio files remain — this rebuilds
+  /// the library from the files on disk. Order: manifest entries first
+  /// (newest-first, as stored), then disk-only orphans by modified time
+  /// (newest-first).
+  Future<List<Track>> loadTracksMergingDisk() async {
+    final manifest = await loadTracks();
+    final known = manifest
+        .map((t) => t.filePath)
+        .whereType<String>()
+        .map(_canonical)
+        .toSet();
+
+    final musicDir = await getDownloadDirectory();
+    final orphans = <Track>[];
+    if (await musicDir.exists()) {
+      await for (final entity in musicDir.list(recursive: true)) {
+        if (entity is! File) continue;
+        final ext = _extension(entity.path);
+        if (!_audioExtensions.contains(ext)) continue;
+        if (known.contains(_canonical(entity.path))) continue;
+        orphans.add(await _trackFromDiskFile(entity));
+      }
+    }
+
+    if (orphans.isEmpty) return manifest;
+
+    orphans.sort((a, b) => (b.addedAt ?? DateTime(0)).compareTo(
+          a.addedAt ?? DateTime(0),
+        ));
+    final merged = [...manifest, ...orphans];
+    // Persist so the re-discovered files become first-class manifest entries
+    // (smart-playlist counts, ordering, etc.) on the next boot.
+    await saveTracks(merged);
+    return merged;
+  }
+
+  Future<Track> _trackFromDiskFile(File file) async {
+    final name = file.uri.pathSegments.last;
+    final title = _stem(name);
+    DateTime? addedAt;
+    try {
+      addedAt = (await file.stat()).modified;
+    } catch (_) {
+      addedAt = null;
+    }
+    final artwork = await findArtworkForAudio(file.path);
+    return Track(
+      // Stable id derived from the path so repeated rescans don't duplicate.
+      id: 'disk-${file.path.hashCode}',
+      title: title,
+      artist: 'Unknown',
+      album: 'Downloads',
+      genre: 'Downloaded audio',
+      duration: Duration.zero,
+      colors: Track.paletteForSeed(file.path),
+      blurb: 'Recovered from $name',
+      source: TrackSource.downloaded,
+      filePath: file.path,
+      artworkFilePath: artwork,
+      addedAt: addedAt,
+    );
+  }
+
+  String _canonical(String path) => path.replaceAll('\\', '/');
+
+  String _extension(String path) {
+    final dot = path.lastIndexOf('.');
+    if (dot == -1 || dot == path.length - 1) return '';
+    return path.substring(dot + 1).toLowerCase();
   }
 
   Future<void> saveTracks(List<Track> tracks) async {

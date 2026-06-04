@@ -2,6 +2,27 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.0.4] — 2026-06-04
+
+### Fixed / Performance
+- **Heat & battery (the real culprit)** — the two always-on backdrop blurs (bottom nav + mini-player) are now each isolated in a `RepaintBoundary` and use lower blur sigma, so they stop re-rasterising on unrelated repaints. The player glow is capped and step-quantised so its blurred shadow no longer re-blurs every frame.
+- **Reduce visual effects** — a new Settings → Appearance switch drops every blur for flat panels: the biggest heat/battery win on older phones (e.g. iPhone X / A11).
+
+### Added
+- **Android CI** — a `v*` tag now builds and publishes `monolith.apk` automatically alongside the iOS IPA, each with its own platform section in the release notes.
+- **Library re-discovery** — on launch the app rebuilds the library from any audio files found on disk that aren't in the manifest, so a reinstall can repopulate from surviving files.
+- **Haptics on Android** — `VIBRATE` permission added and every tap is crash-safe on OEMs without a vibrator; the Settings toggle gates both platforms.
+
+### Docs
+- `docs/ci.md` (Dependabot/CI explainer + PR triage), `docs/storage.md` (honest update-vs-uninstall behaviour per platform), `docs/deferred.md` (FFT visualizer + per-accent icon recipes), and README features refreshed.
+
+### Notes / deferred
+- **iOS** deleting the app still removes downloads (Apple sandbox rule); iCloud sync is the only survival path and is not yet implemented. **Android** true uninstall-survival needs MediaStore public storage (native, device-verified) — in progress; the re-discovery half is ready for it.
+- Real FFT visualizer and per-accent launcher icons remain deferred on both platforms (native + device/Mac verification; visualizer also needs a `RECORD_AUDIO` decision). See `docs/deferred.md`.
+- Heat fix is code-side; on-device raster-thread/temperature before/after still needs a device to measure.
+
+[1.0.4]: https://github.com/naveed-gung/Monolith/releases/tag/v1.0.4
+
 ## [1.0.3] — 2026-06-03
 
 ### Fixed

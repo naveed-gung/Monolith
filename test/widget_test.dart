@@ -23,8 +23,8 @@ void main() {
     expect(find.text('Downloads'), findsWidgets);
     expect(controller.currentTab, AppTab.downloads);
     expect(controller.selectedCategory, LibraryCategory.tracks);
-    expect(controller.currentTrack.title, 'Midnight Breeze');
-    expect(controller.currentTrack.artist, 'Luna Sol');
+    expect(controller.currentTrack?.title, 'Midnight Breeze');
+    expect(controller.currentTrack?.artist, 'Luna Sol');
   });
 
   testWidgets('Downloads tab searches offline tracks', (
@@ -198,8 +198,8 @@ void main() {
     expect(controller.currentTab, AppTab.search);
     expect(controller.isPlayerOpen, isTrue);
     expect(find.byKey(const Key('player-overlay-sheet')), findsOneWidget);
-    expect(controller.currentTrack.title, 'Midnight Breeze');
-    expect(controller.currentTrack.artist, 'Luna Sol');
+    expect(controller.currentTrack?.title, 'Midnight Breeze');
+    expect(controller.currentTrack?.artist, 'Luna Sol');
   });
 
   test('Controller imports audio files into the offline library', () async {

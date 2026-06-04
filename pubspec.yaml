@@ -60,6 +60,9 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  # Used only in tests to mock path_provider for DownloadStore (Task D).
+  path_provider_platform_interface: ^2.1.2
+  plugin_platform_interface: ^2.1.8
 
 dependency_overrides:
   file_selector_android:

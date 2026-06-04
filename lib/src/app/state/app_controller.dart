@@ -664,7 +664,9 @@ class MonolithController extends ChangeNotifier {
           _iosAppleMusicImportEnabled ||
           retryPermissionRequest;
 
-      _downloadedTracks = await _downloadStore.loadTracks();
+      // Merge in any audio files found on disk that aren't in the manifest, so
+      // the library repopulates from surviving files after a reinstall (Task D).
+      _downloadedTracks = await _downloadStore.loadTracksMergingDisk();
       final mediaSnapshot = await _localMediaService.loadTracks(
         retryRequest: retryPermissionRequest,
         requestPermission: shouldLoadDeviceLibrary,
@@ -1781,6 +1783,11 @@ class MonolithController extends ChangeNotifier {
   }
 
   void _rebuildTracks({String? preferredTrackId}) {
+    // Deliberate ordering (Task D1): downloaded/imported tracks first, device
+    // library after. Within _downloadedTracks the order is newest-first — new
+    // downloads are prepended at the source (see _startManagedDownload), and
+    // disk-recovered orphans are appended after the known manifest entries by
+    // loadTracksMergingDisk. This is intentional, not incidental.
     final nextTracks = [..._downloadedTracks, ..._deviceTracks];
     final oldTrackId =
         preferredTrackId ??

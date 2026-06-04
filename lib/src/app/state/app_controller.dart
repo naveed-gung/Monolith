@@ -1128,6 +1128,14 @@ class MonolithController extends ChangeNotifier {
 
     _rebuildTracks(preferredTrackId: track.id);
 
+    // INVARIANT: the download path has ZERO lyric dependency. Lyrics (.lrc
+    // sidecar / embedded USLT) are read lazily at display time in the player,
+    // never fetched here. A track must download, persist, and become playable
+    // whether or not lyrics exist. If lyrics fetching is ever wired into a
+    // download, it MUST be best-effort (try/catch, non-blocking) and must not
+    // fail or delay the audio. See test/lyrics_download_independence_test.dart
+    // and TASK C in MONOLITH_1.0.4.
+
     // Load the just-downloaded file into the player engine NOW so the first tap
     // on Play works without a relaunch. Without this the track is selected but
     // no AudioSource is set, and togglePlayback() has nothing to play — the iOS

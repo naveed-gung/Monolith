@@ -222,6 +222,14 @@ class SettingsPage extends StatelessWidget {
                     value: controller.immersiveCanvas,
                     onChanged: controller.setImmersiveCanvas,
                   ),
+                  _Divider(),
+                  _ToggleRow(
+                    title: 'Reduce visual effects',
+                    subtitle: 'Drops blur for flat panels — cooler & '
+                        'longer battery on older phones',
+                    value: controller.reduceVisualEffects,
+                    onChanged: controller.setReduceVisualEffects,
+                  ),
                 ],
               ),
             ),

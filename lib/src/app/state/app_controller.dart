@@ -26,6 +26,7 @@ class MonolithController extends ChangeNotifier {
   static const _kNormalize = 'pref_normalize';
   static const _kTransitions = 'pref_transitions';
   static const _kCanvas = 'pref_canvas';
+  static const _kReduceEffects = 'pref_reduce_effects';
   static const _kHaptics = 'pref_haptics';
   static const _kEqEnabled = 'pref_eq_enabled';
   static const _kEqGains = 'pref_eq_gains';
@@ -123,6 +124,11 @@ class MonolithController extends ChangeNotifier {
   bool _normalizeAudio = true;
   bool _smoothTransitions = true;
   bool _immersiveCanvas = true;
+  // When on, every BackdropFilter blur in the shell is replaced by a flat
+  // translucent fill. Blur readback is the single most expensive GPU primitive
+  // on older A-series chips (iPhone X / A11), so this is the biggest heat win on
+  // low-power hardware. See [[project-release-103]] heat notes.
+  bool _reduceVisualEffects = false;
   bool _hapticsEnabled = true;
   bool _equalizerEnabled = false;
   final HapticsService _haptics = HapticsService();
@@ -164,6 +170,7 @@ class MonolithController extends ChangeNotifier {
   bool get normalizeAudio => _normalizeAudio;
   bool get smoothTransitions => _smoothTransitions;
   bool get immersiveCanvas => _immersiveCanvas;
+  bool get reduceVisualEffects => _reduceVisualEffects;
   bool get hapticsEnabled => _hapticsEnabled;
   bool get isPlayerOpen => _isPlayerOpen;
   bool get supportsAppleMusicImportPrompt =>
@@ -517,6 +524,13 @@ class MonolithController extends ChangeNotifier {
     if (_immersiveCanvas == value) return;
     _immersiveCanvas = value;
     _prefs?.setBool(_kCanvas, value);
+    notifyListeners();
+  }
+
+  void setReduceVisualEffects(bool value) {
+    if (_reduceVisualEffects == value) return;
+    _reduceVisualEffects = value;
+    _prefs?.setBool(_kReduceEffects, value);
     notifyListeners();
   }
 
@@ -1217,6 +1231,7 @@ class MonolithController extends ChangeNotifier {
     _normalizeAudio = p.getBool(_kNormalize) ?? true;
     _smoothTransitions = p.getBool(_kTransitions) ?? true;
     _immersiveCanvas = p.getBool(_kCanvas) ?? true;
+    _reduceVisualEffects = p.getBool(_kReduceEffects) ?? false;
     _hapticsEnabled = p.getBool(_kHaptics) ?? true;
     _haptics.enabled = _hapticsEnabled;
     _equalizerEnabled = p.getBool(_kEqEnabled) ?? false;

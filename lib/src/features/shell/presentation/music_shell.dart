@@ -270,44 +270,58 @@ class _BottomNav extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final brightness = Theme.of(context).brightness;
     final selected = AppTab.values.indexOf(controller.currentTab);
+    final reduceEffects = controller.reduceVisualEffects;
 
-    return ClipRect(
-      key: const Key('bottom-nav'),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: (brightness == Brightness.dark ? Colors.black : Colors.white)
-                .withValues(alpha: 0.82),
-            border: Border(
-              top: BorderSide(
-                color: scheme.outlineVariant.withValues(alpha: 0.4),
-                width: 0.5,
-              ),
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: SizedBox(
-              height: _kNavBarHeight,
-              child: Row(
-                children: [
-                  for (final tab in AppTab.values)
-                    Expanded(
-                      child: _NavItem(
-                        tab: tab,
-                        isSelected: AppTab.values.indexOf(tab) == selected,
-                        onTap: () {
-                          controller.hapticSelection();
-                          controller.selectTab(tab);
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
+    final bar = DecoratedBox(
+      decoration: BoxDecoration(
+        color: (brightness == Brightness.dark ? Colors.black : Colors.white)
+            // Flat fill needs more opacity to hide the content scrolling under
+            // it once the blur is gone.
+            .withValues(alpha: reduceEffects ? 0.95 : 0.82),
+        border: Border(
+          top: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.4),
+            width: 0.5,
           ),
         ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: _kNavBarHeight,
+          child: Row(
+            children: [
+              for (final tab in AppTab.values)
+                Expanded(
+                  child: _NavItem(
+                    tab: tab,
+                    isSelected: AppTab.values.indexOf(tab) == selected,
+                    onTap: () {
+                      controller.hapticSelection();
+                      controller.selectTab(tab);
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // RepaintBoundary caches the blurred nav so a repaint above it (page swipe,
+    // mini-player tick) can't force the backdrop to re-rasterize every frame —
+    // the always-on-screen blur was a primary heat source on A11.
+    return RepaintBoundary(
+      child: ClipRect(
+        key: const Key('bottom-nav'),
+        child: reduceEffects
+            ? bar
+            // Sigma dropped from 28 → 14: blur cost scales with sigma and this
+            // is visually close but much cheaper on older GPUs.
+            : BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: bar,
+              ),
       ),
     );
   }
@@ -400,6 +414,7 @@ class _MiniPlayer extends StatelessWidget {
       key: const Key('mini-player'),
       borderRadius: AppRadii.all(AppRadii.xl),
       padding: EdgeInsets.zero,
+      reduceEffects: controller.reduceVisualEffects,
       child: Material(
         color: Colors.transparent,
         child: ClipRRect(

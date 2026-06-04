@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -26,6 +27,8 @@ class MonolithController extends ChangeNotifier {
   static const _kTransitions = 'pref_transitions';
   static const _kCanvas = 'pref_canvas';
   static const _kHaptics = 'pref_haptics';
+  static const _kEqEnabled = 'pref_eq_enabled';
+  static const _kEqGains = 'pref_eq_gains';
   static const _kSeenImportPrompt = 'pref_seen_import_prompt';
 
   MonolithController({
@@ -36,10 +39,17 @@ class MonolithController extends ChangeNotifier {
     ManualAudioImportService? manualAudioImportService,
   }) : _localMediaService = localMediaService ?? LocalMediaService(),
        _downloadStore = downloadStore ?? DownloadStore(),
-       _audioPlayer = audioPlayer ?? AudioPlayer(),
        _youtubeDL = mediaDownloader ?? MediaDownloader.platform(),
        _manualAudioImportService =
            manualAudioImportService ?? ManualAudioImportService() {
+    // Attach the Android EQ to the pipeline (Android only); other platforms
+    // get a plain player. An injected player (tests) is used as-is.
+    _audioPlayer = audioPlayer ??
+        AudioPlayer(
+          audioPipeline: _supportsEqualizer
+              ? AudioPipeline(androidAudioEffects: [_equalizer])
+              : null,
+        );
     _bindAudioPlayer();
     _bindDownloader();
     _bindConnectivity();
@@ -54,7 +64,9 @@ class MonolithController extends ChangeNotifier {
 
   final LocalMediaService _localMediaService;
   final DownloadStore _downloadStore;
-  final AudioPlayer _audioPlayer;
+  late final AudioPlayer _audioPlayer;
+  // Android-only graphic EQ; attached to the player pipeline on Android.
+  final AndroidEqualizer _equalizer = AndroidEqualizer();
   final MediaDownloader _youtubeDL;
   final ManualAudioImportService _manualAudioImportService;
   SharedPreferences? _prefs;
@@ -112,6 +124,7 @@ class MonolithController extends ChangeNotifier {
   bool _smoothTransitions = true;
   bool _immersiveCanvas = true;
   bool _hapticsEnabled = true;
+  bool _equalizerEnabled = false;
   final HapticsService _haptics = HapticsService();
   bool _isPlayerOpen = false;
   bool _iosAppleMusicImportEnabled =
@@ -521,6 +534,49 @@ class MonolithController extends ChangeNotifier {
   /// Call this from UI gesture handlers — never from audio/stream callbacks.
   void hapticTap([HapticStrength strength = HapticStrength.light]) =>
       _haptics.tap(strength);
+
+  // ── Equalizer (Android only) ─────────────────────────────────────────────
+  bool get _supportsEqualizer =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get supportsEqualizer => _supportsEqualizer;
+  bool get equalizerEnabled => _equalizerEnabled;
+  AndroidEqualizer get equalizer => _equalizer;
+
+  Future<void> setEqEnabled(bool value) async {
+    _equalizerEnabled = value;
+    _prefs?.setBool(_kEqEnabled, value);
+    if (_supportsEqualizer) {
+      await _equalizer.setEnabled(value);
+    }
+    notifyListeners();
+  }
+
+  /// Persist the current per-band gains (call after the user adjusts a band).
+  Future<void> persistEqGains() async {
+    if (!_supportsEqualizer) return;
+    try {
+      final params = await _equalizer.parameters;
+      final gains = params.bands.map((b) => b.gain).toList();
+      await _prefs?.setString(_kEqGains, jsonEncode(gains));
+    } catch (_) {/* EQ not available */}
+  }
+
+  Future<void> _restoreEqualizer() async {
+    if (!_supportsEqualizer) return;
+    try {
+      await _equalizer.setEnabled(_equalizerEnabled);
+      final raw = _prefs?.getString(_kEqGains);
+      if (raw == null) return;
+      final gains = (jsonDecode(raw) as List)
+          .cast<num>()
+          .map((e) => e.toDouble())
+          .toList();
+      final params = await _equalizer.parameters;
+      for (var i = 0; i < params.bands.length && i < gains.length; i++) {
+        await params.bands[i].setGain(gains[i]);
+      }
+    } catch (_) {/* EQ not available */}
+  }
 
   // Convenience wrappers so UI files don't need to import HapticStrength.
   void hapticSelection() => _haptics.tap(HapticStrength.selection);
@@ -1163,6 +1219,8 @@ class MonolithController extends ChangeNotifier {
     _immersiveCanvas = p.getBool(_kCanvas) ?? true;
     _hapticsEnabled = p.getBool(_kHaptics) ?? true;
     _haptics.enabled = _hapticsEnabled;
+    _equalizerEnabled = p.getBool(_kEqEnabled) ?? false;
+    unawaited(_restoreEqualizer());
     _hasSeenImportPrompt = p.getBool(_kSeenImportPrompt) ?? false;
     notifyListeners();
   }

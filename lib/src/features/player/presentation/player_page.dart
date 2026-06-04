@@ -9,6 +9,7 @@ import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
 import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/track_artwork.dart';
+import 'lyrics_sheet.dart';
 
 class PlayerPage extends StatelessWidget {
   const PlayerPage({
@@ -207,10 +208,59 @@ class _TrackInfo extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.md),
-            _SourceBadge(source: track.source),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _SourceBadge(source: track.source),
+                if (track.canPlay) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  _LyricsButton(controller: controller, track: track),
+                ],
+              ],
+            ),
           ],
         ),
       ],
+    );
+  }
+}
+
+class _LyricsButton extends StatelessWidget {
+  const _LyricsButton({required this.controller, required this.track});
+  final MonolithController controller;
+  final Track track;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return TextButton.icon(
+      onPressed: () {
+        controller.hapticLight();
+        showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (_) => LyricsSheet(
+            track: track,
+            position: controller.positionListenable,
+          ),
+        );
+      },
+      icon: Icon(Icons.lyrics_outlined, size: 16, color: scheme.onSurfaceVariant),
+      label: Text(
+        'Lyrics',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+      ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: 2,
+        ),
+        minimumSize: const Size(0, 0),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
     );
   }
 }

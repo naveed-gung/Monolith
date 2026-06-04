@@ -370,6 +370,32 @@ class _LibraryPageState extends State<LibraryPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                // Brand mark — the "m" tile follows the selected accent
+                // (colorScheme.primary == the accent) on both platforms.
+                Container(
+                  width: 38,
+                  height: 38,
+                  margin: const EdgeInsets.only(
+                    right: AppSpacing.md,
+                    bottom: 4,
+                  ),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: scheme.primary,
+                    borderRadius: AppRadii.all(AppRadii.md),
+                  ),
+                  child: Text(
+                    'm',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontFamilyFallback: const ['Times New Roman', 'serif'],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 24,
+                      height: 1.0,
+                      color: scheme.onPrimary,
+                    ),
+                  ),
+                ),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

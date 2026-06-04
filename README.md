@@ -76,12 +76,16 @@ Grab the latest build from the [**Releases**](https://github.com/naveed-gung/Mon
 <img src="docs/assets/product-overview.svg" alt="Product surface" width="100%" />
 
 - **Library** — import on-device audio, browse and manage playlists, organise listening.
+- **Smart playlists** — auto-curated *Recently added*, *Most played*, and *Never played* lists, backed by manifest play counts.
 - **Downloads** — fetch and manage offline files with progress, pause, cancel, retry, and fatal-error handling.
 - **Player** — full-screen player with animated artwork, scrubbing, repeat/shuffle, and queue navigation.
+- **Lyrics** — `.lrc` sidecar (and embedded ID3 `USLT`) with synced line highlighting and a clean *No lyrics* empty state.
+- **Equalizer** *(Android only)* — per-band graphic EQ in **Settings → Sound**, persisted across launches.
+- **Haptics** — feedback on transport, navigation, and controls, with a toggle in **Settings → Playback** (Android + iOS).
 - **Search** — surface tracks instantly and jump straight into playback.
-- **Storage** — browse, share, and inspect every downloaded file in Monolith's own folder.
+- **Storage** — browse, share, and inspect every downloaded file in Monolith's own folder; iOS Apple Music import toggle and a re-runnable import prompt in Settings.
 - **System integration** — background metadata for Android notifications and the iOS lock screen / Control Center.
-- **Theming** — light/dark with a user-selectable accent.
+- **Theming** — light/dark with a user-selectable accent, an accent-following in-app **m** logo, and a *Reduce visual effects* switch for cooler, longer battery life on older phones.
 
 ### Experience pillars
 
@@ -91,6 +95,7 @@ Grab the latest build from the [**Releases**](https://github.com/naveed-gung/Mon
 | **Unified player** | One controller keeps queue, metadata, and transport state consistent across every surface. |
 | **System integration** | Notification controls, headset buttons, lock screen, and Control Center are first-class. |
 | **Library ownership** | Imports, playlists, and manifest-backed downloads form a permanent collection. |
+| **Runs cool** | Backdrop blurs are cached and capped, and *Reduce visual effects* drops them entirely — tuned for older hardware like the iPhone X (A11). |
 
 ### Gestures & input
 
@@ -167,6 +172,11 @@ flutter build ios --release --no-codesign   # macOS only
 **Android** — device-library access, downloads, media notifications, lock-screen controls. Release builds are shrunk and arm64 ABI-filtered, built locally and published to Releases as `monolith.apk`.
 
 **iOS** — shared Flutter UI; min deployment iOS 16.4. A one-time startup prompt offers Apple Music / media-library import. CI builds an **unsigned IPA** (no Apple Developer Program required) on each `v*` tag and attaches `monolith.ipa` to the release. No signing material is ever committed.
+
+**Platform gating (honest):**
+
+- The **equalizer is Android-only** — it rides Android's audio-effect pipeline; iOS shows no EQ section.
+- **Downloads & uninstall:** updating the app over an old build keeps every download on both platforms. *Deleting* the app removes downloads — on iOS this is Apple's sandbox rule and is unavoidable in-app (iCloud is the only survival path); on Android, true uninstall-survival needs downloads in OS-public storage (MediaStore), which is in progress. The library already re-discovers any audio files that survive on disk. See [`docs/storage.md`](docs/storage.md).
 
 ---
 

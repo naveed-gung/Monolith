@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:just_audio/just_audio.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/state/app_controller.dart';
 import '../../../app/state/app_scope.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
@@ -337,6 +339,24 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
           ),
+
+          // ── Sound (Android equalizer) ────────────────────────────────
+          if (controller.supportsEqualizer) ...[
+            _SectionLabel(label: 'Sound'),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenInset,
+                  0,
+                  AppSpacing.screenInset,
+                  AppSpacing.xxl,
+                ),
+                child: _SettingsGroup(
+                  children: [_EqualizerControls(controller: controller)],
+                ),
+              ),
+            ),
+          ],
 
           // ── Library & storage ───────────────────────────────────────
           _SectionLabel(label: 'Library & storage'),
@@ -882,6 +902,99 @@ class _AccentDot extends StatelessWidget {
               : null,
         ),
       ),
+    );
+  }
+}
+
+// ── Equalizer (Android only) ─────────────────────────────────────────────────
+
+class _EqualizerControls extends StatefulWidget {
+  const _EqualizerControls({required this.controller});
+  final MonolithController controller;
+
+  @override
+  State<_EqualizerControls> createState() => _EqualizerControlsState();
+}
+
+class _EqualizerControlsState extends State<_EqualizerControls> {
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      children: [
+        _ToggleRow(
+          title: 'Equalizer',
+          subtitle: 'Shape the sound with a graphic EQ',
+          value: controller.equalizerEnabled,
+          onChanged: (v) => controller.setEqEnabled(v),
+        ),
+        if (controller.equalizerEnabled)
+          FutureBuilder<AndroidEqualizerParameters>(
+            future: controller.equalizer.parameters,
+            builder: (context, snapshot) {
+              final params = snapshot.data;
+              if (params == null) {
+                return const Padding(
+                  padding: EdgeInsets.all(AppSpacing.lg),
+                  child: Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  0,
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                ),
+                child: Column(
+                  children: [
+                    for (final band in params.bands)
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 56,
+                            child: Text(
+                              '${(band.centerFrequency).round()}',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: StreamBuilder<double>(
+                              stream: band.gainStream,
+                              builder: (context, snap) {
+                                final gain = snap.data ?? band.gain;
+                                return Slider(
+                                  min: params.minDecibels,
+                                  max: params.maxDecibels,
+                                  value: gain.clamp(
+                                    params.minDecibels,
+                                    params.maxDecibels,
+                                  ),
+                                  onChanged: (v) => band.setGain(v),
+                                  onChangeEnd: (_) => controller.persistEqGains(),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
     );
   }
 }

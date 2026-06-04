@@ -9,7 +9,6 @@ All notable changes to Monolith are documented here.
 - **Reduce visual effects** — a new Settings → Appearance switch drops every blur for flat panels: the biggest heat/battery win on older phones (e.g. iPhone X / A11).
 
 ### Added
-- **Android CI** — a `v*` tag now builds and publishes `monolith.apk` automatically alongside the iOS IPA, each with its own platform section in the release notes.
 - **Library re-discovery** — on launch the app rebuilds the library from any audio files found on disk that aren't in the manifest, so a reinstall can repopulate from surviving files.
 - **Haptics on Android** — `VIBRATE` permission added and every tap is crash-safe on OEMs without a vibrator; the Settings toggle gates both platforms.
 

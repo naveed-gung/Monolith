@@ -7,16 +7,18 @@ This repo's automation, and why the bot runs you sometimes see are normal.
 | File | Trigger | What it does |
 | --- | --- | --- |
 | `.github/workflows/ios.yml` | push of a `v*` tag (or manual) | Builds the **unsigned IPA**, uploads `monolith.ipa` to the tag's GitHub Release. macOS runner. |
-| `.github/workflows/android.yml` | push of a `v*` tag (or manual) | Builds the release **APK**, uploads `monolith.apk` to the **same** Release. Ubuntu runner. |
 
-One `v*` tag push fires **both** jobs; each appends its own platform section to
-the release body (`append_body: true`), so the order may vary — that's expected.
+**iOS is the ONLY thing CI builds.** There is deliberately **no Android
+workflow** — the **APK is built locally on the Windows dev machine**
+(`flutter build apk --release --no-tree-shake-icons`) and uploaded to the
+release by hand (`gh release upload v<x.y.z> monolith.apk`). This avoids
+duplicate/competing runs and keeps Android off CI entirely.
 
-Both builds need `--no-tree-shake-icons` because of the vendored
+The iOS build needs `--no-tree-shake-icons` because of the vendored
 `phosphor_flutter` 3.44 patch (icon constructors become `static final`, which
-the icon tree-shaker rejects). The Android release APK is signed with the
-**debug keystore** on purpose — fine for a sideloaded build, and we never commit
-a real release key (see `SECURITY.md`).
+the icon tree-shaker rejects). The local Android release APK is signed with the
+**debug keystore** — fine for a sideloaded build, and we never commit a real
+release key (see `SECURITY.md`).
 
 ## Dependabot — what those scheduled bot runs are
 

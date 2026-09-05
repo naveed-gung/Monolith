@@ -121,10 +121,17 @@ jobs:
           compression-level: 0
           retention-days: 7
 
+      - name: Extract app version
+        id: app_version
+        run: |
+          VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1 | tr -d '[:space:]')
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
       - name: Publish to GitHub Releases
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || steps.app_version.outputs.tag }}
+          name: "Monolith ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || steps.app_version.outputs.tag }}"
           files: monolith.ipa
           fail_on_unmatched_files: true
           append_body: true
@@ -132,12 +139,9 @@ jobs:
             ## iOS — `monolith.ipa` (unsigned)
 
             - **App:** Monolith
-            - **Version:** ${{ github.ref_name }}
+            - **Version:** ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || steps.app_version.outputs.tag }}
             - **Bundle ID:** `dev.naveed-gung.monolith`
             - **Developer:** naveed-gung
 
-            This IPA is **not App Store signed**. Install via AltStore, Sideloadly, or
+            This IPA is **not App Store signed**. Install via AltStore, Sideloadly, TrollStore, or
             any sideloading tool of your choice.
-
-            > **Note:** You will need to re-sign it with your own Apple ID Developer
-            > certificate before it can run on a physical device.

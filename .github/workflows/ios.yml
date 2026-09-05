@@ -1,9 +1,10 @@
 name: iOS Build & Release
 
-# Tags only — one run per release. Triggering on branches AND tags meant a
-# commit + its tag pushed together fired two runs; tags-only gives exactly one.
+# Runs on pushes to main, version tags (v*), and manual dispatch.
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -59,43 +60,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # phosphor_flutter 2.1.0 uses 'extends IconData' which became illegal in
-      # Flutter 3.44 (IconData is now a final class). Three-part patch:
-      #   1. phosphor_icon_data.dart  — extension types replacing class hierarchy.
-      #      PhosphorDuotoneIconData implements PhosphorIconData (not just IconData)
-      #      so phosphor_icons_base.dart return types (PhosphorIconData) are satisfied.
-      #   2. phosphor_icon.dart       — duotone 'is' check removed (ext-type erasure
-      #                                  makes it always-true at runtime)
-      #   3. Generated icon files     — 'static const' → 'static final' because
-      #                                  non-const ext-type constructors can't be const
-      - name: Patch phosphor_flutter for Flutter 3.44
-        run: |
-          set -euo pipefail
-          ROOT="$HOME/.pub-cache/hosted/pub.dev/phosphor_flutter-2.1.0"
-          PKG="$ROOT/lib/src"
-          if [ ! -d "$PKG" ]; then
-            echo "ERROR: phosphor_flutter not found at $PKG"
-            ls "$HOME/.pub-cache/hosted/pub.dev/" | grep phosphor || echo "(no phosphor entries)"
-            exit 1
-          fi
-          # Patch 1: replace the two core source files with Flutter-3.44-compatible versions.
-          # Both patch files already carry '// @dart=3.3' so extension types are enabled
-          # for those files regardless of the package's pubspec.yaml SDK minimum.
-          cp .github/patches/phosphor_icon_data_flutter344.dart "$PKG/phosphor_icon_data.dart"
-          cp .github/patches/phosphor_icon_flutter344.dart      "$PKG/phosphor_icon.dart"
-          # Patch 2: every remaining source file (barrel + icon files + base file) needs
-          # '// @dart=3.3' so the Dart compiler enables extension types for those files too.
-          # Without this, the package's pre-3.3 pubspec.yaml SDK minimum keeps them at
-          # language version 2.12, which disables extension types and causes cascading
-          # "Can't create typedef from non-function type" errors at every icon call site.
-          while IFS= read -r f; do
-            head -1 "$f" | grep -q '^// @dart=' && continue
-            { printf '// @dart=3.3\n'; cat "$f"; } > "${f}.tmp" && mv "${f}.tmp" "$f"
-          done < <(find "$ROOT/lib" -name "*.dart")
-          # Patch 3: extension type constructors cannot be 'const'; change to 'final'.
-          for style in regular thin light bold fill duotone; do
-            sed -i '' 's/static const /static final /g' "$PKG/phosphor_icons_${style}.dart"
-          done
 
       # Hybrid build: let Flutter do the CONFIGURATION only (pub get, Swift
       # Package Manager integration, and the correct `pod install` that exposes

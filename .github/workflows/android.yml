@@ -1,0 +1,97 @@
+name: Android Build & Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.4) — leave blank to use current commit'
+        required: false
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      CI: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # NOTE ON SIGNING: this release APK is signed with the debug keystore
+      # (android/app/build.gradle.kts -> release { signingConfig = signingConfigs.getByName("debug") }).
+      # Deliberate choice for sideloaded builds.
+      - name: Build release APK
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Rename APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk monolith.apk
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Monolith-Android
+          path: monolith.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: monolith.apk
+          fail_on_unmatched_files: true
+          append_body: true
+          body: |
+            ## Android — `monolith.apk`
+
+            - **App:** Monolith
+            - **Version:** ${{ github.ref_name }}
+            - **Min Android:** 7.0 (API 24)
+            - **Bundle ID:** `dev.naveed_gung.monolith`
+
+            Install on any Android 7.0+ device: download `monolith.apk`, then
+            enable **Install unknown apps** for your browser/file manager when
+            prompted. No Play Store account needed.
+
+            > **Note:** this build is signed with a debug key (fine for
+            > sideloading). Android may warn it's from an unknown developer —
+            > that's expected for a non–Play Store APK.

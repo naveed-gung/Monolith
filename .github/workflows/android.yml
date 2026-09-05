@@ -58,11 +58,24 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
+      - name: Ensure debug keystore exists
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
       # NOTE ON SIGNING: this release APK is signed with the debug keystore
       # (android/app/build.gradle.kts -> release { signingConfig = signingConfigs.getByName("debug") }).
       # Deliberate choice for sideloaded builds.
       - name: Build release APK
-        run: flutter build apk --release --no-tree-shake-icons
+        run: |
+          set -eo pipefail
+          flutter build apk --release --no-tree-shake-icons 2>&1 | tee build.log || {
+            echo "=== FLUTTER BUILD ERROR LOG ==="
+            tail -n 120 build.log
+            exit 1
+          }
 
       - name: Rename APK
         run: cp build/app/outputs/flutter-apk/app-release.apk monolith.apk

@@ -26,6 +26,7 @@ jobs:
 
     env:
       CI: true
+      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx2560m -Dorg.gradle.parallel=false -Dorg.gradle.workers.max=2"
 
     steps:
       - name: Checkout
@@ -70,12 +71,13 @@ jobs:
       # Deliberate choice for sideloaded builds.
       - name: Build release APK
         run: |
-          set -eo pipefail
-          flutter build apk --release --no-tree-shake-icons 2>&1 | tee build.log || {
-            echo "=== FLUTTER BUILD ERROR LOG ==="
-            tail -n 120 build.log
+          if ! flutter build apk --release --no-tree-shake-icons 2>&1 | tee build.log; then
+            echo "## Android Build Failure" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -n 120 build.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
-          }
+          fi
 
       - name: Rename APK
         run: cp build/app/outputs/flutter-apk/app-release.apk monolith.apk

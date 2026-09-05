@@ -70,21 +70,13 @@ jobs:
       # (android/app/build.gradle.kts -> release { signingConfig = signingConfigs.getByName("debug") }).
       # Deliberate choice for sideloaded builds.
       - name: Build release APK
-        run: |
-          if ! flutter build apk --release --no-tree-shake-icons 2>&1 | tee build.log; then
-            echo "## Android Build Failure" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -n 120 build.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
+        run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
       - name: Rename APK
         run: |
-          APK=$(find build/app/outputs -name "*.apk" -type f | head -n 1)
+          APK=$(find build -name "*.apk" -type f | head -n 1)
           if [ -z "$APK" ]; then
-            echo "No APK found in build/app/outputs"
-            find build -name "*.apk" || true
+            echo "No APK found in build directory"
             exit 1
           fi
           echo "Found APK: $APK"

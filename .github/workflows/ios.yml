@@ -2,8 +2,8 @@ name: iOS Build & Release
 
 on:
   push:
-    branches:
-      - main
+#    branches:
+#      - main
     tags:
       - 'v*'
   workflow_dispatch:

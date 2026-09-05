@@ -55,6 +55,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
       # NOTE ON SIGNING: this release APK is signed with the debug keystore
       # (android/app/build.gradle.kts -> release { signingConfig = signingConfigs.getByName("debug") }).
       # Deliberate choice for sideloaded builds.

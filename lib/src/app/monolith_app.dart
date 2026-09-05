@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../core/services/app_update_service.dart';
 
 import 'package:flutter/material.dart';
 
@@ -21,12 +22,14 @@ class _MonolithAppState extends State<MonolithApp> {
   late final MonolithController _controller;
   late final bool _ownsController;
   bool _didQueueStartupPrompt = false;
+  final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
     _ownsController = widget.controller == null;
     _controller = widget.controller ?? MonolithController();
+    if (_ownsController) unawaited(AppUpdateService.instance.initialize());
   }
 
   @override
@@ -66,13 +69,15 @@ class _MonolithAppState extends State<MonolithApp> {
       return;
     }
 
+    final navigatorContext = _navigatorKey.currentContext;
+    if (navigatorContext == null || !navigatorContext.mounted) return;
     final shouldImport = await showDialog<bool>(
-      context: context,
+      context: navigatorContext,
       builder: (context) {
         return AlertDialog(
           title: const Text('Import from Apple Music?'),
           content: const Text(
-            'On iOS, Monolith can pull in the songs already available in your Apple Music library and downloaded music collection. Import them now?',
+            'Copy unprotected songs stored in Music for offline listening. Subscription-protected songs cannot be copied. You can also import original audio from Files.',
           ),
           actions: [
             TextButton(
@@ -95,10 +100,17 @@ class _MonolithAppState extends State<MonolithApp> {
     // First-visit request: retry=false so iOS shows the system permission
     // dialog. (retry=true skips straight to Settings, which is only useful
     // after a prior denial.)
-    await _controller.setAppleMusicImportEnabled(
-      true,
-      retryPermissionRequest: false,
-    );
+    try {
+      final message = await _controller.importFromMusicLibrary();
+      final currentContext = _navigatorKey.currentContext;
+      if (currentContext != null && message != null && currentContext.mounted) {
+        ScaffoldMessenger.of(
+          currentContext,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } catch (_) {
+      // Import remains available in Settings after a denied permission.
+    }
   }
 
   @override
@@ -110,6 +122,7 @@ class _MonolithAppState extends State<MonolithApp> {
         builder: (context, _) {
           return MaterialApp(
             title: 'Monolith',
+            navigatorKey: _navigatorKey,
             debugShowCheckedModeBanner: false,
             themeMode: _controller.themeMode,
             theme: MonolithTheme.light(

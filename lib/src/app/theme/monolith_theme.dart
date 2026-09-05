@@ -8,8 +8,7 @@ class MonolithTheme {
   static ThemeData light(AccentSwatch accent) =>
       _build(Brightness.light, accent);
 
-  static ThemeData dark(AccentSwatch accent) =>
-      _build(Brightness.dark, accent);
+  static ThemeData dark(AccentSwatch accent) => _build(Brightness.dark, accent);
 
   static ThemeData _build(Brightness brightness, AccentSwatch accent) {
     final s = brightness == Brightness.light
@@ -33,8 +32,12 @@ class MonolithTheme {
       onTertiaryContainer: s.textPrimary,
       error: isLight ? const Color(0xFFB3261E) : const Color(0xFFCF6679),
       onError: isLight ? const Color(0xFFFFFFFF) : const Color(0xFF370009),
-      errorContainer: isLight ? const Color(0xFFF9DEDC) : const Color(0xFF93000A),
-      onErrorContainer: isLight ? const Color(0xFF410E0B) : const Color(0xFFFFDAD6),
+      errorContainer: isLight
+          ? const Color(0xFFF9DEDC)
+          : const Color(0xFF93000A),
+      onErrorContainer: isLight
+          ? const Color(0xFF410E0B)
+          : const Color(0xFFFFDAD6),
       surface: s.canvas,
       onSurface: s.textPrimary,
       surfaceContainerLowest: s.canvas,
@@ -47,8 +50,12 @@ class MonolithTheme {
       outlineVariant: s.border.withValues(alpha: 0.65),
       shadow: const Color(0xFF000000),
       scrim: const Color(0xFF000000),
-      inverseSurface: isLight ? AppSurfaces.dark.canvas : AppSurfaces.light.canvas,
-      onInverseSurface: isLight ? AppSurfaces.dark.textPrimary : AppSurfaces.light.textPrimary,
+      inverseSurface: isLight
+          ? AppSurfaces.dark.canvas
+          : AppSurfaces.light.canvas,
+      onInverseSurface: isLight
+          ? AppSurfaces.dark.textPrimary
+          : AppSurfaces.light.textPrimary,
       inversePrimary: accent.base,
     );
 
@@ -59,6 +66,12 @@ class MonolithTheme {
     );
 
     final textTheme = base.textTheme.copyWith(
+      labelSmall: base.textTheme.labelSmall?.copyWith(
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+      bodySmall: base.textTheme.bodySmall?.copyWith(
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
       displaySmall: base.textTheme.displaySmall?.copyWith(
         fontWeight: AppType.display,
         letterSpacing: AppType.trackTight,
@@ -123,6 +136,7 @@ class MonolithTheme {
           shape: RoundedRectangleBorder(
             borderRadius: AppRadii.all(AppRadii.md),
           ),
+          minimumSize: const Size(48, 48),
           textStyle: textTheme.labelLarge,
         ),
       ),
@@ -137,6 +151,7 @@ class MonolithTheme {
           shape: RoundedRectangleBorder(
             borderRadius: AppRadii.all(AppRadii.md),
           ),
+          minimumSize: const Size(48, 48),
           textStyle: textTheme.labelLarge,
         ),
       ),
@@ -194,20 +209,14 @@ class MonolithTheme {
           side: BorderSide(color: s.border, width: 0.5),
         ),
       ),
-      dividerTheme: DividerThemeData(
-        color: s.border,
-        thickness: 0.5,
-        space: 0,
-      ),
+      dividerTheme: DividerThemeData(color: s.border, thickness: 0.5, space: 0),
       listTileTheme: ListTileThemeData(
         tileColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.lg,
           vertical: AppSpacing.xs,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: AppRadii.all(AppRadii.sm),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: AppRadii.all(AppRadii.sm)),
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
@@ -221,9 +230,7 @@ class MonolithTheme {
             if (states.contains(WidgetState.selected)) return accent.base;
             return s.textSecondary;
           }),
-          side: WidgetStatePropertyAll(
-            BorderSide(color: s.border, width: 0.5),
-          ),
+          side: WidgetStatePropertyAll(BorderSide(color: s.border, width: 0.5)),
           textStyle: WidgetStatePropertyAll(
             textTheme.labelMedium?.copyWith(fontWeight: AppType.label),
           ),

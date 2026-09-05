@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import '../../../data/platform_channels/media_import_channel.dart';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -45,7 +46,8 @@ class MonolithController extends ChangeNotifier {
            manualAudioImportService ?? ManualAudioImportService() {
     // Attach the Android EQ to the pipeline (Android only); other platforms
     // get a plain player. An injected player (tests) is used as-is.
-    _audioPlayer = audioPlayer ??
+    _audioPlayer =
+        audioPlayer ??
         AudioPlayer(
           audioPipeline: _supportsEqualizer
               ? AudioPipeline(androidAudioEffects: [_equalizer])
@@ -79,9 +81,10 @@ class MonolithController extends ChangeNotifier {
   late final StreamSubscription<DownloadState> _downloadStateSubscription;
   late final StreamSubscription<DownloadError> _downloadErrorSubscription;
   late final StreamSubscription<LogMessage> _downloadLogSubscription;
-  late final StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
+  late final StreamSubscription<List<ConnectivityResult>>
+  _connectivitySubscription;
 
-  AppTab _currentTab = AppTab.downloads;
+  AppTab _currentTab = AppTab.library;
   LibraryCategory _selectedCategory = LibraryCategory.tracks;
   ThemePreference _themePreference = ThemePreference.system;
   AccentPreset _accentPreset = AccentSwatch.fallback;
@@ -114,11 +117,14 @@ class MonolithController extends ChangeNotifier {
   /// seek bar and time labels can repaint in isolation instead of rebuilding
   /// the whole shell on every position tick. This is the big heat/battery win:
   /// the position stream no longer calls notifyListeners().
-  final ValueNotifier<Duration> positionListenable =
-      ValueNotifier<Duration>(Duration.zero);
+  final ValueNotifier<Duration> positionListenable = ValueNotifier<Duration>(
+    Duration.zero,
+  );
   final ValueNotifier<double> progress = ValueNotifier<double>(0);
 
-  List<ConnectivityResult> _connectivityResults = const [ConnectivityResult.wifi];
+  List<ConnectivityResult> _connectivityResults = const [
+    ConnectivityResult.wifi,
+  ];
 
   bool _downloadsOnWifi = true;
   bool _normalizeAudio = true;
@@ -128,7 +134,7 @@ class MonolithController extends ChangeNotifier {
   // translucent fill. Blur readback is the single most expensive GPU primitive
   // on older A-series chips (iPhone X / A11), so this is the biggest heat win on
   // low-power hardware. See [[project-release-103]] heat notes.
-  bool _reduceVisualEffects = false;
+  bool _reduceVisualEffects = true;
   bool _hapticsEnabled = true;
   bool _equalizerEnabled = false;
   final HapticsService _haptics = HapticsService();
@@ -195,6 +201,7 @@ class MonolithController extends ChangeNotifier {
     await _prefs?.remove(_kSeenImportPrompt);
     notifyListeners();
   }
+
   bool get isLibraryLoading => _isLibraryLoading;
   bool get hasLibraryPermission => _hasLibraryPermission;
   String? get libraryError => _libraryError;
@@ -206,13 +213,17 @@ class MonolithController extends ChangeNotifier {
 
   // ── Smart playlists (computed; no storage of their own) ──────────────────
   static final DateTime _epoch = DateTime.fromMillisecondsSinceEpoch(0);
-  List<Track> get recentlyAdded => ([..._downloadedTracks]..sort(
-        (a, b) => (b.addedAt ?? _epoch).compareTo(a.addedAt ?? _epoch),
-      )).take(50).toList();
-  List<Track> get mostPlayed => ([..._downloadedTracks]
-        ..sort((a, b) => b.playCount.compareTo(a.playCount)))
-      .where((t) => t.playCount > 0)
-      .toList();
+  List<Track> get recentlyAdded =>
+      ([..._downloadedTracks]..sort(
+            (a, b) => (b.addedAt ?? _epoch).compareTo(a.addedAt ?? _epoch),
+          ))
+          .take(50)
+          .toList();
+  List<Track> get mostPlayed =>
+      ([..._downloadedTracks]
+            ..sort((a, b) => b.playCount.compareTo(a.playCount)))
+          .where((t) => t.playCount > 0)
+          .toList();
   List<Track> get neverPlayed =>
       _downloadedTracks.where((t) => t.playCount == 0).toList();
 
@@ -572,7 +583,9 @@ class MonolithController extends ChangeNotifier {
       final params = await _equalizer.parameters;
       final gains = params.bands.map((b) => b.gain).toList();
       await _prefs?.setString(_kEqGains, jsonEncode(gains));
-    } catch (_) {/* EQ not available */}
+    } catch (_) {
+      /* EQ not available */
+    }
   }
 
   Future<void> _restoreEqualizer() async {
@@ -589,7 +602,9 @@ class MonolithController extends ChangeNotifier {
       for (var i = 0; i < params.bands.length && i < gains.length; i++) {
         await params.bands[i].setGain(gains[i]);
       }
-    } catch (_) {/* EQ not available */}
+    } catch (_) {
+      /* EQ not available */
+    }
   }
 
   // Convenience wrappers so UI files don't need to import HapticStrength.
@@ -782,6 +797,53 @@ class MonolithController extends ChangeNotifier {
           ? error.message.toString()
           : 'Could not import audio from Files.';
       throw StateError(message);
+    } finally {
+      _isImportingAudio = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> importFromMusicLibrary() async {
+    if (_isImportingAudio) return null;
+    _isImportingAudio = true;
+    notifyListeners();
+    try {
+      final items = await MediaImportChannel().pickFromMusicLibrary();
+      if (items.isEmpty) return null;
+      final previousId = currentTrack?.id;
+      final imported = <Track>[];
+      for (final item in items) {
+        if (item.status != ImportedItemStatus.copied || item.path == null) {
+          continue;
+        }
+        imported.add(
+          Track(
+            id: 'music-${DateTime.now().microsecondsSinceEpoch}-${imported.length}',
+            title: item.title,
+            artist: item.artist,
+            album: 'Music library',
+            genre: 'Imported audio',
+            duration: Duration(milliseconds: item.durationMs),
+            colors: Track.paletteForSeed(item.path!),
+            blurb: 'Saved from your Music library for offline listening.',
+            source: TrackSource.imported,
+            filePath: item.path,
+            artworkFilePath: await _downloadStore.findArtworkForAudio(
+              item.path!,
+            ),
+            addedAt: DateTime.now(),
+          ),
+        );
+      }
+      _downloadedTracks = [...imported, ..._downloadedTracks];
+      await _downloadStore.saveTracks(_downloadedTracks);
+      _rebuildTracks(preferredTrackId: previousId);
+      if (previousId == null && imported.isNotEmpty) {
+        await _syncSelectedTrack(autoplay: false);
+      }
+      final skipped = items.length - imported.length;
+      return 'Imported ${imported.length} tracks.'
+          '${skipped == 0 ? '' : ' $skipped unavailable or protected tracks skipped. Import original audio files for protected songs.'}';
     } finally {
       _isImportingAudio = false;
       notifyListeners();
@@ -1241,7 +1303,7 @@ class MonolithController extends ChangeNotifier {
     _normalizeAudio = p.getBool(_kNormalize) ?? true;
     _smoothTransitions = p.getBool(_kTransitions) ?? true;
     _immersiveCanvas = p.getBool(_kCanvas) ?? true;
-    _reduceVisualEffects = p.getBool(_kReduceEffects) ?? false;
+    _reduceVisualEffects = p.getBool(_kReduceEffects) ?? true;
     _hapticsEnabled = p.getBool(_kHaptics) ?? true;
     _haptics.enabled = _hapticsEnabled;
     _equalizerEnabled = p.getBool(_kEqEnabled) ?? false;
@@ -1251,20 +1313,28 @@ class MonolithController extends ChangeNotifier {
   }
 
   Future<void> _configureAudioSession() async {
-    final session = await AudioSession.instance;
-    await session.configure(AudioSessionConfiguration.music());
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(AudioSessionConfiguration.music());
+    } catch (_) {
+      // Platforms without an audio_session implementation (e.g. Windows
+      // desktop, tests) keep OS-default audio behaviour.
+    }
   }
 
   void _bindConnectivity() {
-    _connectivitySubscription =
-        Connectivity().onConnectivityChanged.listen((results) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      results,
+    ) {
       _connectivityResults = results;
       notifyListeners();
     });
-    unawaited(Connectivity().checkConnectivity().then((r) {
-      _connectivityResults = r;
-      notifyListeners();
-    }));
+    unawaited(
+      Connectivity().checkConnectivity().then((r) {
+        _connectivityResults = r;
+        notifyListeners();
+      }),
+    );
   }
 
   void _bindAudioPlayer() {
@@ -1294,19 +1364,23 @@ class MonolithController extends ChangeNotifier {
       notifyListeners();
     });
 
-    _playerPositionSubscription = _audioPlayer.positionStream.listen((
-      position,
-    ) {
-      _currentPosition = position;
-      positionListenable.value = position;
-      final total = currentTrackDuration.inMilliseconds;
-      progress.value =
-          total == 0 ? 0 : (position.inMilliseconds / total).clamp(0.0, 1.0);
-      // Intentionally NO notifyListeners() here — the seek bar and time labels
-      // listen to positionListenable/progress and repaint on their own. Shell
-      // rebuilds stay reserved for discrete events (play/pause, track change,
-      // completion), so the SoC gets idle gaps back.
-    });
+    _playerPositionSubscription = _audioPlayer
+        .createPositionStream(
+          minPeriod: const Duration(milliseconds: 250),
+          maxPeriod: const Duration(milliseconds: 500),
+        )
+        .listen((position) {
+          _currentPosition = position;
+          positionListenable.value = position;
+          final total = currentTrackDuration.inMilliseconds;
+          progress.value = total == 0
+              ? 0
+              : (position.inMilliseconds / total).clamp(0.0, 1.0);
+          // Intentionally NO notifyListeners() here — the seek bar and time labels
+          // listen to positionListenable/progress and repaint on their own. Shell
+          // rebuilds stay reserved for discrete events (play/pause, track change,
+          // completion), so the SoC gets idle gaps back.
+        });
 
     _playerDurationSubscription = _audioPlayer.durationStream.listen((
       duration,
@@ -1597,8 +1671,9 @@ class MonolithController extends ChangeNotifier {
 
     final removedIds = matchingTracks.map((track) => track.id).toSet();
     final currentId = currentTrack?.id;
-    final preferredTrackId =
-        currentId == null || removedIds.contains(currentId) ? null : currentId;
+    final preferredTrackId = currentId == null || removedIds.contains(currentId)
+        ? null
+        : currentId;
 
     _downloadedTracks = _downloadedTracks
         .where((track) => !removedIds.contains(track.id))

@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -56,9 +54,13 @@ class _LibraryPageState extends State<LibraryPage> {
     final list = [...src];
     switch (_sortOrder) {
       case _SortOrder.aToZ:
-        list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        list.sort(
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        );
       case _SortOrder.zToA:
-        list.sort((a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        list.sort(
+          (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()),
+        );
       case _SortOrder.newest:
         return list.reversed.toList();
       case _SortOrder.oldest:
@@ -102,22 +104,49 @@ class _LibraryPageState extends State<LibraryPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: titleC, decoration: const InputDecoration(labelText: 'Title'), textCapitalization: TextCapitalization.words),
+            TextField(
+              controller: titleC,
+              decoration: const InputDecoration(labelText: 'Title'),
+              textCapitalization: TextCapitalization.words,
+            ),
             const SizedBox(height: AppSpacing.md),
-            TextField(controller: artistC, decoration: const InputDecoration(labelText: 'Artist'), textCapitalization: TextCapitalization.words),
+            TextField(
+              controller: artistC,
+              decoration: const InputDecoration(labelText: 'Artist'),
+              textCapitalization: TextCapitalization.words,
+            ),
             const SizedBox(height: AppSpacing.md),
-            TextField(controller: albumC, decoration: const InputDecoration(labelText: 'Album'), textCapitalization: TextCapitalization.words),
+            TextField(
+              controller: albumC,
+              decoration: const InputDecoration(labelText: 'Album'),
+              textCapitalization: TextCapitalization.words,
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Save'),
+          ),
         ],
       ),
     );
-    final t = titleC.text; final a = artistC.text; final al = albumC.text;
+    final t = titleC.text;
+    final a = artistC.text;
+    final al = albumC.text;
     if (save != true || !mounted) return;
-    _showMsg(await controller.renameTrackMetadata(track: track, title: t, artist: a, album: al));
+    _showMsg(
+      await controller.renameTrackMetadata(
+        track: track,
+        title: t,
+        artist: a,
+        album: al,
+      ),
+    );
   }
 
   Future<void> _deleteTrack(Track track, MonolithController controller) async {
@@ -127,8 +156,14 @@ class _LibraryPageState extends State<LibraryPage> {
         title: const Text('Remove track'),
         content: Text('Remove ${track.title} from your library?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -136,7 +171,10 @@ class _LibraryPageState extends State<LibraryPage> {
     _showMsg(await controller.deleteTrack(track));
   }
 
-  Future<void> _addToPlaylist(Track track, MonolithController controller) async {
+  Future<void> _addToPlaylist(
+    Track track,
+    MonolithController controller,
+  ) async {
     final playlistC = TextEditingController();
     final name = await showModalBottomSheet<String>(
       context: context,
@@ -149,31 +187,64 @@ class _LibraryPageState extends State<LibraryPage> {
         curve: Curves.easeOut,
         padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
         child: Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.screenInset, AppSpacing.sm, AppSpacing.screenInset, AppSpacing.xxl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Add to playlist', style: Theme.of(ctx).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.md),
-            if (controller.playlistNames.isNotEmpty)
-              Wrap(
-                spacing: AppSpacing.sm, runSpacing: AppSpacing.sm,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenInset,
+            AppSpacing.sm,
+            AppSpacing.screenInset,
+            AppSpacing.xxl,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Add to playlist',
+                style: Theme.of(ctx).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (controller.playlistNames.isNotEmpty)
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    for (final n in controller.playlistNames)
+                      ActionChip(
+                        label: Text(n),
+                        onPressed: () => Navigator.pop(ctx, n),
+                      ),
+                  ],
+                ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: playlistC,
+                decoration: const InputDecoration(
+                  labelText: 'New playlist name',
+                  hintText: 'Night drive mix',
+                ),
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Row(
                 children: [
-                  for (final n in controller.playlistNames)
-                    ActionChip(label: Text(n), onPressed: () => Navigator.pop(ctx, n)),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () =>
+                          Navigator.pop(ctx, playlistC.text.trim()),
+                      icon: PhosphorIcon(AppIcons.plusCircle, size: 18),
+                      label: const Text('Create & add'),
+                    ),
+                  ),
                 ],
               ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(controller: playlistC, decoration: const InputDecoration(labelText: 'New playlist name', hintText: 'Night drive mix'), textCapitalization: TextCapitalization.words),
-            const SizedBox(height: AppSpacing.lg),
-            Row(children: [
-              Expanded(child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel'))),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(child: FilledButton.icon(onPressed: () => Navigator.pop(ctx, playlistC.text.trim()), icon: PhosphorIcon(AppIcons.plusCircle, size: 18), label: const Text('Create & add'))),
-            ]),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -185,7 +256,9 @@ class _LibraryPageState extends State<LibraryPage> {
     try {
       final fp = track.filePath;
       if (fp != null && fp.trim().isNotEmpty) {
-        await Share.shareXFiles([XFile(fp)], text: '${track.title} • ${track.artist}');
+        await Share.shareXFiles([
+          XFile(fp),
+        ], text: '${track.title} • ${track.artist}');
       } else {
         await Share.share('${track.title} • ${track.artist}');
       }
@@ -203,30 +276,66 @@ class _LibraryPageState extends State<LibraryPage> {
       context: context,
       showDragHandle: true,
       builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xl),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.xl,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(leading: PhosphorIcon(AppIcons.edit), title: const Text('Edit details'), onTap: () => Navigator.pop(ctx, _TrackAction.edit)),
-            ListTile(leading: PhosphorIcon(AppIcons.addToPlaylist), title: const Text('Add to playlist'), onTap: () => Navigator.pop(ctx, _TrackAction.addToPlaylist)),
-            ListTile(leading: PhosphorIcon(AppIcons.share), title: const Text('Share'), onTap: () => Navigator.pop(ctx, _TrackAction.share)),
+            ListTile(
+              leading: PhosphorIcon(AppIcons.edit),
+              title: const Text('Edit details'),
+              onTap: () => Navigator.pop(ctx, _TrackAction.edit),
+            ),
+            ListTile(
+              leading: PhosphorIcon(AppIcons.addToPlaylist),
+              title: const Text('Add to playlist'),
+              onTap: () => Navigator.pop(ctx, _TrackAction.addToPlaylist),
+            ),
+            ListTile(
+              leading: PhosphorIcon(AppIcons.share),
+              title: const Text('Share'),
+              onTap: () => Navigator.pop(ctx, _TrackAction.share),
+            ),
             if (playlistContext != null)
-              ListTile(leading: PhosphorIcon(AppIcons.delete), title: const Text('Remove from playlist'), onTap: () => Navigator.pop(ctx, _TrackAction.removeFromPlaylist)),
-            ListTile(leading: PhosphorIcon(AppIcons.delete), title: const Text('Delete'), onTap: () => Navigator.pop(ctx, _TrackAction.delete)),
+              ListTile(
+                leading: PhosphorIcon(AppIcons.delete),
+                title: const Text('Remove from playlist'),
+                onTap: () =>
+                    Navigator.pop(ctx, _TrackAction.removeFromPlaylist),
+              ),
+            ListTile(
+              leading: PhosphorIcon(AppIcons.delete),
+              title: const Text('Delete'),
+              onTap: () => Navigator.pop(ctx, _TrackAction.delete),
+            ),
           ],
         ),
       ),
     );
     switch (action) {
-      case _TrackAction.edit: await _editTrack(track, controller);
-      case _TrackAction.delete: await _deleteTrack(track, controller);
-      case _TrackAction.addToPlaylist: await _addToPlaylist(track, controller);
-      case _TrackAction.share: await _shareTrack(track);
+      case _TrackAction.edit:
+        await _editTrack(track, controller);
+      case _TrackAction.delete:
+        await _deleteTrack(track, controller);
+      case _TrackAction.addToPlaylist:
+        await _addToPlaylist(track, controller);
+      case _TrackAction.share:
+        await _shareTrack(track);
       case _TrackAction.removeFromPlaylist:
         if (playlistContext != null) {
-          _showMsg(controller.removeTrackFromPlaylist(track: track, playlistName: playlistContext));
+          _showMsg(
+            controller.removeTrackFromPlaylist(
+              track: track,
+              playlistName: playlistContext,
+            ),
+          );
         }
-      case null: return;
+      case null:
+        return;
     }
   }
 
@@ -241,13 +350,22 @@ class _LibraryPageState extends State<LibraryPage> {
         content: TextField(
           controller: nameC,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Playlist name', hintText: 'Night drive mix'),
+          decoration: const InputDecoration(
+            labelText: 'Playlist name',
+            hintText: 'Night drive mix',
+          ),
           textCapitalization: TextCapitalization.words,
           onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, nameC.text.trim()), child: const Text('Create')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, nameC.text.trim()),
+            child: const Text('Create'),
+          ),
         ],
       ),
     );
@@ -287,7 +405,8 @@ class _LibraryPageState extends State<LibraryPage> {
         drillTracks = const [];
       }
 
-      final isSmartDrill = cat == LibraryCategory.playlists &&
+      final isSmartDrill =
+          cat == LibraryCategory.playlists &&
           !controller.playlistNames.contains(_drillItem) &&
           _smartNames.contains(_drillItem);
 
@@ -314,44 +433,44 @@ class _LibraryPageState extends State<LibraryPage> {
         initialValue: _sortOrder,
         onSelected: (o) => setState(() => _sortOrder = o),
         itemBuilder: (_) => const [
-          PopupMenuItem(value: _SortOrder.aToZ,   child: Text('A → Z')),
-          PopupMenuItem(value: _SortOrder.zToA,   child: Text('Z → A')),
-          PopupMenuItem(value: _SortOrder.newest,  child: Text('Newest first')),
-          PopupMenuItem(value: _SortOrder.oldest,  child: Text('Oldest first')),
+          PopupMenuItem(value: _SortOrder.aToZ, child: Text('A → Z')),
+          PopupMenuItem(value: _SortOrder.zToA, child: Text('Z → A')),
+          PopupMenuItem(value: _SortOrder.newest, child: Text('Newest first')),
+          PopupMenuItem(value: _SortOrder.oldest, child: Text('Oldest first')),
         ],
       );
       contentSliver = switch (controller.selectedCategory) {
         LibraryCategory.tracks => _TracksSilver(
-            controller: controller,
-            sortedTracks: _sortedTracks(controller.tracks),
-            sortedHighlights: _sortedTracks(controller.highlightedTracks),
-            onMenu: (t) => _openMenu(t, controller),
-            sortButton: sortBtn,
-          ),
+          controller: controller,
+          sortedTracks: _sortedTracks(controller.tracks),
+          sortedHighlights: _sortedTracks(controller.highlightedTracks),
+          onMenu: (t) => _openMenu(t, controller),
+          sortButton: sortBtn,
+        ),
         LibraryCategory.artists => _ArtistSliver(
-            controller: controller,
-            sortedArtists: _sortedStrings(controller.libraryArtists),
-            onDrillIn: (name) => setState(() => _drillItem = name),
-            sortButton: sortBtn,
-          ),
+          controller: controller,
+          sortedArtists: _sortedStrings(controller.libraryArtists),
+          onDrillIn: (name) => setState(() => _drillItem = name),
+          sortButton: sortBtn,
+        ),
         LibraryCategory.albums => _AlbumSliver(
-            controller: controller,
-            sortedHighlights: _sortedTracks(controller.albumHighlights),
-            onDrillIn: (name) => setState(() => _drillItem = name),
-            sortButton: sortBtn,
-          ),
+          controller: controller,
+          sortedHighlights: _sortedTracks(controller.albumHighlights),
+          onDrillIn: (name) => setState(() => _drillItem = name),
+          sortButton: sortBtn,
+        ),
         LibraryCategory.playlists => _PlaylistSliver(
-            controller: controller,
-            sortedPlaylists: _sortedStrings(controller.playlistNames),
-            smartPlaylists: {
-              _smartRecent: controller.recentlyAdded.length,
-              _smartMost: controller.mostPlayed.length,
-              _smartNever: controller.neverPlayed.length,
-            },
-            onDrillIn: (name) => setState(() => _drillItem = name),
-            onCreatePlaylist: () => _createPlaylist(controller),
-            sortButton: sortBtn,
-          ),
+          controller: controller,
+          sortedPlaylists: _sortedStrings(controller.playlistNames),
+          smartPlaylists: {
+            _smartRecent: controller.recentlyAdded.length,
+            _smartMost: controller.mostPlayed.length,
+            _smartNever: controller.neverPlayed.length,
+          },
+          onDrillIn: (name) => setState(() => _drillItem = name),
+          onCreatePlaylist: () => _createPlaylist(controller),
+          sortButton: sortBtn,
+        ),
       };
     }
 
@@ -411,7 +530,7 @@ class _LibraryPageState extends State<LibraryPage> {
                       Text(
                         controller.isLibraryLoading
                             ? 'Loading…'
-                            : '${controller.tracks.length} tracks',
+                            : '${controller.tracks.length} ${controller.tracks.length == 1 ? 'track' : 'tracks'}',
                         style: textTheme.bodyLarge?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -533,88 +652,66 @@ class _LibraryPageState extends State<LibraryPage> {
 class _NowPlayingHero extends StatelessWidget {
   const _NowPlayingHero({required this.controller});
   final MonolithController controller;
-
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final track = controller.currentTrack!;
-    final canPlay = track.canPlay;
-
+    final scheme = Theme.of(context).colorScheme;
+    final type = Theme.of(context).textTheme;
     return AppCard(
-      padding: EdgeInsets.zero,
-      clip: true,
-      child: Stack(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      borderRadius: AppRadii.all(AppRadii.xl),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Positioned.fill(
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-              child: Container(
-                color: scheme.primaryContainer.withValues(alpha: 0.6),
-              ),
+          SizedBox(
+            width: MediaQuery.sizeOf(context).width < 380 ? 96 : 120,
+            height: 144,
+            child: TrackArtwork(
+              track: track,
+              borderRadius: AppRadii.all(AppRadii.md),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Row(
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 72,
-                  height: 72,
-                  child: ClipRRect(
-                    borderRadius: AppRadii.all(AppRadii.md),
-                    child: TrackArtwork(
-                      track: track,
-                      borderRadius: AppRadii.all(AppRadii.md),
-                    ),
+                Text(
+                  controller.isPlaying ? 'ON REPEAT' : 'YOUR NEXT LISTEN',
+                  style: type.labelSmall?.copyWith(
+                    color: scheme.primary,
+                    letterSpacing: 1.6,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.lg),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        canPlay ? 'Now Playing' : 'Up next',
-                        style: textTheme.labelSmall?.copyWith(
-                          color: scheme.primary,
-                          fontWeight: AppType.label,
-                          letterSpacing: AppType.trackWide,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        track.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: AppType.title,
-                        ),
-                      ),
-                      Text(
-                        track.artist,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  track.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: type.titleLarge?.copyWith(
+                    fontWeight: AppType.title,
+                    height: 1.1,
                   ),
                 ),
-                FilledButton(
-                  onPressed: canPlay
-                      ? () => controller.selectTrack(track, openPlayer: true)
-                      : null,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    minimumSize: const Size(48, 48),
-                    shape: const CircleBorder(),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  track.artist,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: type.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
                   ),
-                  child: PhosphorIcon(
-                    controller.isPlaying ? AppIcons.pauseCircle : AppIcons.playCircle,
-                    size: 22,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                FilledButton.icon(
+                  onPressed: track.canPlay ? controller.togglePlayback : null,
+                  icon: Icon(
+                    controller.isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    size: 20,
                   ),
+                  label: Text(controller.isPlaying ? 'Pause' : 'Listen'),
                 ),
               ],
             ),
@@ -624,8 +721,6 @@ class _NowPlayingHero extends StatelessWidget {
     );
   }
 }
-
-// ── Category tabs ────────────────────────────────────────────────────────────
 
 class _CategoryTabs extends StatelessWidget {
   const _CategoryTabs({required this.selected, required this.onSelected});
@@ -723,83 +818,83 @@ class _DrillTrackList extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          // index 0: back header
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: onBack,
-                    icon: PhosphorIcon(PhosphorIcons.caretLeft(), size: 22),
-                    color: scheme.primary,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.titleLarge?.copyWith(
-                            fontWeight: AppType.title,
-                          ),
-                        ),
-                        Text(
-                          '${tracks.length} track${tracks.length == 1 ? '' : 's'}',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          if (tracks.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
-              child: Center(
-                child: Text(
-                  'No tracks here yet',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
+      delegate: SliverChildBuilderDelegate((context, index) {
+        // index 0: back header
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: onBack,
+                  icon: PhosphorIcon(PhosphorIcons.caretLeft(), size: 22),
+                  color: scheme.primary,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
                   ),
                 ),
-              ),
-            );
-          }
-
-          final track = tracks[index - 1];
-          final isLast = index == tracks.length;
-          return Column(
-            children: [
-              _TrackRow(
-                track: track,
-                isActive: controller.currentTrack?.id == track.id,
-                onTap: () => controller.selectTrack(track, openPlayer: true),
-                onMenu: () => onMenu(track, playlistContext: playlistContext),
-              ),
-              if (!isLast)
-                Divider(
-                  height: 1,
-                  indent: 72,
-                  color: scheme.outlineVariant.withValues(alpha: 0.35),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: AppType.title,
+                        ),
+                      ),
+                      Text(
+                        '${tracks.length} track${tracks.length == 1 ? '' : 's'}',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-            ],
+              ],
+            ),
           );
-        },
-        childCount: tracks.isEmpty ? 2 : tracks.length + 1,
-      ),
+        }
+
+        if (tracks.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+            child: Center(
+              child: Text(
+                'No tracks here yet',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          );
+        }
+
+        final track = tracks[index - 1];
+        final isLast = index == tracks.length;
+        return Column(
+          children: [
+            _TrackRow(
+              track: track,
+              isActive: controller.currentTrack?.id == track.id,
+              onTap: () => controller.selectTrack(track, openPlayer: true),
+              onMenu: () => onMenu(track, playlistContext: playlistContext),
+            ),
+            if (!isLast)
+              Divider(
+                height: 1,
+                indent: 72,
+                color: scheme.outlineVariant.withValues(alpha: 0.35),
+              ),
+          ],
+        );
+      }, childCount: tracks.isEmpty ? 2 : tracks.length + 1),
     );
   }
 }
@@ -838,78 +933,78 @@ class _TracksSilver extends StatelessWidget {
     final totalCount = 1 + sortedTracks.length + 1 + gridRows;
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: SectionHeader(
-                title: 'Tracks',
-                actionLabel: '${sortedTracks.length} total',
-                trailing: sortButton,
-              ),
-            );
-          }
-          if (index <= sortedTracks.length) {
-            final track = sortedTracks[index - 1];
-            final isLast = index == sortedTracks.length;
-            return Column(
-              children: [
-                _TrackRow(
-                  track: track,
-                  isActive: controller.currentTrack?.id == track.id,
-                  onTap: () => controller.selectTrack(track, openPlayer: true),
-                  onMenu: () => onMenu(track),
-                ),
-                if (!isLast)
-                  Divider(
-                    height: 1,
-                    indent: 72,
-                    color: scheme.outlineVariant.withValues(alpha: 0.35),
-                  ),
-              ],
-            );
-          }
-          if (index == sortedTracks.length + 1) {
-            return Padding(
-              padding: const EdgeInsets.only(
-                top: AppSpacing.xxl,
-                bottom: AppSpacing.lg,
-              ),
-              child: const SectionHeader(title: 'Recent additions'),
-            );
-          }
-          final row = index - sortedTracks.length - 2;
-          final aIdx = row * 2;
-          if (aIdx >= sortedHighlights.length) return const SizedBox.shrink();
-          final a = sortedHighlights[aIdx];
-          final b = aIdx + 1 < sortedHighlights.length ? sortedHighlights[aIdx + 1] : null;
+      delegate: SliverChildBuilderDelegate((context, index) {
+        if (index == 0) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _AlbumCard(
-                    track: a,
-                    onTap: () => controller.selectTrack(a, openPlayer: true),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: b != null
-                      ? _AlbumCard(
-                          track: b,
-                          onTap: () => controller.selectTrack(b, openPlayer: true),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: SectionHeader(
+              title: 'Tracks',
+              actionLabel: '${sortedTracks.length} total',
+              trailing: sortButton,
             ),
           );
-        },
-        childCount: totalCount,
-      ),
+        }
+        if (index <= sortedTracks.length) {
+          final track = sortedTracks[index - 1];
+          final isLast = index == sortedTracks.length;
+          return Column(
+            children: [
+              _TrackRow(
+                track: track,
+                isActive: controller.currentTrack?.id == track.id,
+                onTap: () => controller.selectTrack(track, openPlayer: true),
+                onMenu: () => onMenu(track),
+              ),
+              if (!isLast)
+                Divider(
+                  height: 1,
+                  indent: 72,
+                  color: scheme.outlineVariant.withValues(alpha: 0.35),
+                ),
+            ],
+          );
+        }
+        if (index == sortedTracks.length + 1) {
+          return Padding(
+            padding: const EdgeInsets.only(
+              top: AppSpacing.xxl,
+              bottom: AppSpacing.lg,
+            ),
+            child: const SectionHeader(title: 'Recent additions'),
+          );
+        }
+        final row = index - sortedTracks.length - 2;
+        final aIdx = row * 2;
+        if (aIdx >= sortedHighlights.length) return const SizedBox.shrink();
+        final a = sortedHighlights[aIdx];
+        final b = aIdx + 1 < sortedHighlights.length
+            ? sortedHighlights[aIdx + 1]
+            : null;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _AlbumCard(
+                  track: a,
+                  onTap: () => controller.selectTrack(a, openPlayer: true),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: b != null
+                    ? _AlbumCard(
+                        track: b,
+                        onTap: () =>
+                            controller.selectTrack(b, openPlayer: true),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        );
+      }, childCount: totalCount),
     );
   }
 }
@@ -935,7 +1030,9 @@ class _TrackRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + AppSpacing.xs),
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.sm + AppSpacing.xs,
+        ),
         child: Row(
           children: [
             SizedBox(
@@ -1021,9 +1118,9 @@ class _AlbumCard extends StatelessWidget {
             track.artist,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -1051,59 +1148,77 @@ class _ArtistSliver extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: SectionHeader(title: 'Artists', trailing: sortButton),
-            );
-          }
-          final artist = sortedArtists[index - 1];
-          final trackCount = controller.tracks.where((t) => t.artist == artist).length;
-          final isLast = index == sortedArtists.length;
+      delegate: SliverChildBuilderDelegate((context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: SectionHeader(title: 'Artists', trailing: sortButton),
+          );
+        }
+        final artist = sortedArtists[index - 1];
+        final trackCount = controller.tracks
+            .where((t) => t.artist == artist)
+            .length;
+        final isLast = index == sortedArtists.length;
 
-          return Column(
-            children: [
-              InkWell(
-                onTap: () => onDrillIn(artist),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: scheme.primaryContainer,
-                        child: Text(
-                          artist.isNotEmpty ? artist.substring(0, 1).toUpperCase() : '?',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: scheme.onPrimaryContainer,
-                                fontWeight: AppType.label,
-                              ),
-                        ),
+        return Column(
+          children: [
+            InkWell(
+              onTap: () => onDrillIn(artist),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: scheme.primaryContainer,
+                      child: Text(
+                        artist.isNotEmpty
+                            ? artist.substring(0, 1).toUpperCase()
+                            : '?',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: scheme.onPrimaryContainer,
+                              fontWeight: AppType.label,
+                            ),
                       ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(artist, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: AppType.body)),
-                            Text('$trackCount track${trackCount == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
-                          ],
-                        ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            artist,
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(fontWeight: AppType.body),
+                          ),
+                          Text(
+                            '$trackCount track${trackCount == 1 ? '' : 's'}',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ],
                       ),
-                      PhosphorIcon(AppIcons.caretRight, size: 18, color: scheme.onSurfaceVariant),
-                    ],
-                  ),
+                    ),
+                    PhosphorIcon(
+                      AppIcons.caretRight,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
                 ),
               ),
-              if (!isLast)
-                Divider(height: 1, indent: 60, color: scheme.outlineVariant.withValues(alpha: 0.35)),
-            ],
-          );
-        },
-        childCount: sortedArtists.length + 1,
-      ),
+            ),
+            if (!isLast)
+              Divider(
+                height: 1,
+                indent: 60,
+                color: scheme.outlineVariant.withValues(alpha: 0.35),
+              ),
+          ],
+        );
+      }, childCount: sortedArtists.length + 1),
     );
   }
 }
@@ -1128,35 +1243,38 @@ class _AlbumSliver extends StatelessWidget {
     final rows = (sortedHighlights.length / 2).ceil();
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-              child: SectionHeader(title: 'Albums', trailing: sortButton),
-            );
-          }
-          final row = index - 1;
-          if (row >= rows) return null;
-          final a = sortedHighlights[row * 2];
-          final b = row * 2 + 1 < sortedHighlights.length ? sortedHighlights[row * 2 + 1] : null;
+      delegate: SliverChildBuilderDelegate((context, index) {
+        if (index == 0) {
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _AlbumCard(track: a, onTap: () => onDrillIn(a.album))),
-                if (b != null) ...[
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(child: _AlbumCard(track: b, onTap: () => onDrillIn(b.album))),
-                ] else
-                  const Expanded(child: SizedBox()),
-              ],
-            ),
+            child: SectionHeader(title: 'Albums', trailing: sortButton),
           );
-        },
-        childCount: rows + 1,
-      ),
+        }
+        final row = index - 1;
+        if (row >= rows) return null;
+        final a = sortedHighlights[row * 2];
+        final b = row * 2 + 1 < sortedHighlights.length
+            ? sortedHighlights[row * 2 + 1]
+            : null;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _AlbumCard(track: a, onTap: () => onDrillIn(a.album)),
+              ),
+              if (b != null) ...[
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: _AlbumCard(track: b, onTap: () => onDrillIn(b.album)),
+                ),
+              ] else
+                const Expanded(child: SizedBox()),
+            ],
+          ),
+        );
+      }, childCount: rows + 1),
     );
   }
 }
@@ -1185,178 +1303,197 @@ class _PlaylistSliver extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          // index 0: header + create button
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Row(
-                children: [
-                  const Expanded(child: SectionHeader(title: 'Playlists')),
-                  ?sortButton,
-                  FilledButton.icon(
-                    onPressed: onCreatePlaylist,
-                    icon: PhosphorIcon(AppIcons.plusCircle, size: 16),
-                    label: const Text('New'),
-                    style: FilledButton.styleFrom(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        // index 0: header + create button
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: Row(
+              children: [
+                const Expanded(child: SectionHeader(title: 'Playlists')),
+                ?sortButton,
+                FilledButton.icon(
+                  onPressed: onCreatePlaylist,
+                  icon: PhosphorIcon(AppIcons.plusCircle, size: 16),
+                  label: const Text('New'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                    minimumSize: const Size(0, 32),
+                    textStyle: Theme.of(context).textTheme.labelMedium,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        // index 1: pinned Smart playlists group
+        if (index == 1) {
+          final icons = <String, PhosphorIconData>{
+            'Recently added': PhosphorIcons.clock(),
+            'Most played': PhosphorIcons.chartBar(),
+            'Never played': PhosphorIcons.sparkle(),
+          };
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                  child: Text(
+                    'SMART',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: AppType.label,
+                      letterSpacing: AppType.trackWide,
+                    ),
+                  ),
+                ),
+                for (final entry in smartPlaylists.entries)
+                  InkWell(
+                    onTap: () => onDrillIn(entry.key),
+                    child: Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.xs,
+                        vertical: AppSpacing.sm,
                       ),
-                      minimumSize: const Size(0, 32),
-                      textStyle: Theme.of(context).textTheme.labelMedium,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-          // index 1: pinned Smart playlists group
-          if (index == 1) {
-            final icons = <String, PhosphorIconData>{
-              'Recently added': PhosphorIcons.clock(),
-              'Most played': PhosphorIcons.chartBar(),
-              'Never played': PhosphorIcons.sparkle(),
-            };
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: Text(
-                      'SMART',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            fontWeight: AppType.label,
-                            letterSpacing: AppType.trackWide,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: scheme.primaryContainer,
+                              borderRadius: AppRadii.all(AppRadii.md),
+                            ),
+                            child: Center(
+                              child: PhosphorIcon(
+                                icons[entry.key] ?? AppIcons.queue,
+                                size: 20,
+                                color: scheme.onPrimaryContainer,
+                              ),
+                            ),
                           ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  entry.key,
+                                  style: Theme.of(context).textTheme.bodyLarge
+                                      ?.copyWith(fontWeight: AppType.body),
+                                ),
+                                Text(
+                                  entry.value == 1
+                                      ? '1 track'
+                                      : '${entry.value} tracks',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PhosphorIcon(
+                            AppIcons.caretRight,
+                            size: 18,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  for (final entry in smartPlaylists.entries)
-                    InkWell(
-                      onTap: () => onDrillIn(entry.key),
-                      child: Padding(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
+              ],
+            ),
+          );
+        }
+        if (sortedPlaylists.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+            child: Center(
+              child: Text(
+                'No playlists yet — tap New to create one',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          );
+        }
+        final name = sortedPlaylists[index - 2];
+        final tracks = controller.tracksForPlaylist(name);
+        final lead = controller.leadTrackForPlaylist(name);
+        final isLast = index == sortedPlaylists.length + 1;
+
+        return Column(
+          children: [
+            InkWell(
+              onTap: () => onDrillIn(name),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: lead == null
+                          ? Container(
                               decoration: BoxDecoration(
                                 color: scheme.primaryContainer,
                                 borderRadius: AppRadii.all(AppRadii.md),
                               ),
-                              child: Center(
-                                child: PhosphorIcon(
-                                  icons[entry.key] ?? AppIcons.queue,
-                                  size: 20,
-                                  color: scheme.onPrimaryContainer,
-                                ),
+                              child: PhosphorIcon(
+                                AppIcons.queue,
+                                color: scheme.onPrimaryContainer,
                               ),
+                            )
+                          : TrackArtwork(
+                              track: lead,
+                              borderRadius: AppRadii.all(AppRadii.md),
                             ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    entry.key,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge
-                                        ?.copyWith(fontWeight: AppType.body),
-                                  ),
-                                  Text(
-                                    entry.value == 1
-                                        ? '1 track'
-                                        : '${entry.value} tracks',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
-                                        ?.copyWith(
-                                          color: scheme.onSurfaceVariant,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            PhosphorIcon(
-                              AppIcons.caretRight,
-                              size: 18,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ],
-                        ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: Theme.of(context).textTheme.bodyLarge
+                                ?.copyWith(fontWeight: AppType.body),
+                          ),
+                          Text(
+                            tracks.isEmpty
+                                ? 'Empty'
+                                : '${tracks.length} track${tracks.length == 1 ? '' : 's'}',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: scheme.onSurfaceVariant),
+                          ),
+                        ],
                       ),
                     ),
-                ],
-              ),
-            );
-          }
-          if (sortedPlaylists.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
-              child: Center(
-                child: Text(
-                  'No playlists yet — tap New to create one',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
+                    PhosphorIcon(
+                      AppIcons.caretRight,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
                 ),
               ),
-            );
-          }
-          final name = sortedPlaylists[index - 2];
-          final tracks = controller.tracksForPlaylist(name);
-          final lead = controller.leadTrackForPlaylist(name);
-          final isLast = index == sortedPlaylists.length + 1;
-
-          return Column(
-            children: [
-              InkWell(
-                onTap: () => onDrillIn(name),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 56,
-                        height: 56,
-                        child: lead == null
-                            ? Container(
-                                decoration: BoxDecoration(
-                                  color: scheme.primaryContainer,
-                                  borderRadius: AppRadii.all(AppRadii.md),
-                                ),
-                                child: PhosphorIcon(AppIcons.queue, color: scheme.onPrimaryContainer),
-                              )
-                            : TrackArtwork(track: lead, borderRadius: AppRadii.all(AppRadii.md)),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(name, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: AppType.body)),
-                            Text(tracks.isEmpty ? 'Empty' : '${tracks.length} track${tracks.length == 1 ? '' : 's'}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
-                          ],
-                        ),
-                      ),
-                      PhosphorIcon(AppIcons.caretRight, size: 18, color: scheme.onSurfaceVariant),
-                    ],
-                  ),
-                ),
+            ),
+            if (!isLast)
+              Divider(
+                height: 1,
+                indent: 72,
+                color: scheme.outlineVariant.withValues(alpha: 0.35),
               ),
-              if (!isLast) Divider(height: 1, indent: 72, color: scheme.outlineVariant.withValues(alpha: 0.35)),
-            ],
-          );
-        },
-        childCount: sortedPlaylists.isEmpty ? 3 : sortedPlaylists.length + 2,
-      ),
+          ],
+        );
+      }, childCount: sortedPlaylists.isEmpty ? 3 : sortedPlaylists.length + 2),
     );
   }
 }

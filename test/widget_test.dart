@@ -1,8 +1,9 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:monolith/src/app/state/app_controller.dart';
 import 'package:monolith/src/app/monolith_app.dart';
@@ -14,27 +15,41 @@ import 'package:monolith/src/core/services/manual_audio_import_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('Monolith opens on the downloads page', (tester) async {
-    final controller = await _buildTestController();
+  // Platform-plugin stubs: no real plugins exist under the test binding, and
+  // unhandled MissingPluginExceptions from controller bootstrap would fail
+  // every test.
+  SharedPreferences.setMockInitialValues({});
+  TestWidgetsFlutterBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(
+        const MethodChannel('dev.fluttercommunity.plus/connectivity_status'),
+        (call) async => null,
+      );
+  TestWidgetsFlutterBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(
+        const MethodChannel('dev.fluttercommunity.plus/connectivity'),
+        (call) async => <String>['none'],
+      );
+
+  testWidgets('Monolith opens on the library page', (tester) async {
+    final controller = await _buildTestController(tester);
 
     await tester.pumpWidget(MonolithApp(controller: controller));
     await tester.pumpAndSettle();
 
     expect(find.text('Downloads'), findsWidgets);
-    expect(controller.currentTab, AppTab.downloads);
+    expect(controller.currentTab, AppTab.library);
     expect(controller.selectedCategory, LibraryCategory.tracks);
     expect(controller.currentTrack?.title, 'Midnight Breeze');
     expect(controller.currentTrack?.artist, 'Luna Sol');
   });
 
-  testWidgets('Downloads tab searches offline tracks', (
-    tester,
-  ) async {
+  testWidgets('Downloads tab searches offline tracks', (tester) async {
     tester.view.devicePixelRatio = 1.0;
     tester.view.physicalSize = const Size(430, 1600);
     addTearDown(() => _resetSurface(tester));
 
     final controller = await _buildTestController(
+      tester,
       downloadedTracks: const [
         Track(
           id: 'download-zulu',
@@ -64,6 +79,8 @@ void main() {
     await tester.pumpWidget(MonolithApp(controller: controller));
     await tester.pumpAndSettle();
 
+    controller.selectTab(AppTab.downloads);
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('downloads-search-field')),
       'Aurora',
@@ -83,7 +100,7 @@ void main() {
     await _setPhoneSurface(tester);
     addTearDown(() => _resetSurface(tester));
 
-    final controller = await _buildTestController();
+    final controller = await _buildTestController(tester);
 
     await tester.pumpWidget(MonolithApp(controller: controller));
     await tester.pumpAndSettle();
@@ -106,7 +123,7 @@ void main() {
     await _setPhoneSurface(tester);
     addTearDown(() => _resetSurface(tester));
 
-    final controller = await _buildTestController();
+    final controller = await _buildTestController(tester);
 
     await tester.pumpWidget(MonolithApp(controller: controller));
     await tester.pumpAndSettle();
@@ -131,7 +148,7 @@ void main() {
     await _setPhoneSurface(tester);
     addTearDown(() => _resetSurface(tester));
 
-    final controller = await _buildTestController();
+    final controller = await _buildTestController(tester);
 
     await tester.pumpWidget(MonolithApp(controller: controller));
     await tester.pumpAndSettle();
@@ -148,7 +165,7 @@ void main() {
     tester.view.physicalSize = const Size(430, 1400);
     addTearDown(() => _resetSurface(tester));
 
-    final controller = await _buildTestController();
+    final controller = await _buildTestController(tester);
 
     await tester.pumpWidget(MonolithApp(controller: controller));
     await tester.pumpAndSettle();
@@ -173,7 +190,7 @@ void main() {
   testWidgets('Search filters tracks and opens matching result', (
     tester,
   ) async {
-    final controller = await _buildTestController();
+    final controller = await _buildTestController(tester);
 
     await tester.pumpWidget(MonolithApp(controller: controller));
     await tester.pumpAndSettle();
@@ -242,16 +259,24 @@ Future<void> _resetSurface(WidgetTester tester) async {
   await tester.pump();
 }
 
-Future<MonolithController> _buildTestController({
+Future<MonolithController> _buildTestController(
+  WidgetTester tester, {
   List<Track> downloadedTracks = const [],
 }) async {
-  final controller = MonolithController(
-    localMediaService: _FakeLocalMediaService(_sampleTracks),
-    downloadStore: _FakeDownloadStore(downloadedTracks),
-  );
+  // DownloadStore.loadTracksMergingDisk() streams real filesystem I/O
+  // (Directory.list), which never completes inside the FakeAsync zone that
+  // wraps testWidgets bodies. runAsync lifts the bootstrap onto the real
+  // event loop so the disk scan can finish.
+  final controller = await tester.runAsync(() async {
+    final fresh = MonolithController(
+      localMediaService: _FakeLocalMediaService(_sampleTracks),
+      downloadStore: _FakeDownloadStore(downloadedTracks),
+    );
 
-  await controller.refreshLibrary();
-  return controller;
+    await fresh.refreshLibrary();
+    return fresh;
+  });
+  return controller!;
 }
 
 const _sampleTracks = [

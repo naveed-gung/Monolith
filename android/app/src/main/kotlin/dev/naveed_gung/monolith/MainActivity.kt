@@ -1,5 +1,54 @@
 package dev.naveed_gung.monolith
 
-import io.flutter.embedding.android.FlutterActivity
+import android.content.Intent
+import androidx.core.content.FileProvider
+import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import com.ryanheise.audioservice.AudioServiceActivity
+import io.flutter.embedding.engine.FlutterEngine
 
-class MainActivity : FlutterActivity()
+/// Extends [AudioServiceActivity] (a FlutterActivity subclass) so that:
+/// 1. just_audio_background's media session works in the background, and
+/// 2. the launcher activity is our own class — configureFlutterEngine runs,
+///    registering the monolith/media_import channel (P2 review fix).
+class MainActivity : AudioServiceActivity() {
+
+    private var mediaImportHandler: MediaImportHandler? = null
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        mediaImportHandler = MediaImportHandler(this).also { it.attach(flutterEngine) }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "monolith/updates").setMethodCallHandler { call, result ->
+            if (call.method != "install") {
+                result.notImplemented()
+            } else try {
+                val file = File(call.argument<String>("path") ?: "").canonicalFile
+                val allowed = File(filesDir, "Updates").canonicalFile
+                require(file.parentFile == allowed && file.extension == "apk" && file.isFile) { "Invalid update path" }
+                val info = packageManager.getPackageArchiveInfo(file.path, 0)
+                require(info?.packageName == packageName) { "This update belongs to another app" }
+                val uri = FileProvider.getUriForFile(this, "$packageName.updates", file)
+                startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                result.success(null)
+            } catch (error: Exception) {
+                result.error("install_failed", error.message, null)
+            }
+        }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        mediaImportHandler?.detach()
+        mediaImportHandler = null
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        // Intercept the SAF export flow first; anything else keeps the
+        // default Flutter plugin forwarding behaviour.
+        if (mediaImportHandler?.handleActivityResult(requestCode, resultCode, data) == true) {
+            return
+        }
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+}

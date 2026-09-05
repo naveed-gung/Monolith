@@ -394,7 +394,7 @@ class _StreamMediaDownloader implements MediaDownloader {
     }
 
     try {
-      final response = await _httpClient.get(Uri.parse(_thumbnailUrl(video)));
+      final response = await _httpClient.get(Uri.parse(_thumbnailUrl(video))).timeout(const Duration(seconds: 15));
       if (response.statusCode < 200 || response.statusCode >= 300) {
         _log(
           processId,

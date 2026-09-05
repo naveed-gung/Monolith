@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -29,7 +28,7 @@ class MusicShell extends StatefulWidget {
 }
 
 class _MusicShellState extends State<MusicShell>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _visualizerController;
   late final AnimationController _artworkController;
   // Created once the controller is known so it can open on the correct tab
@@ -41,6 +40,7 @@ class _MusicShellState extends State<MusicShell>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _visualizerController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1300),
@@ -68,12 +68,17 @@ class _MusicShellState extends State<MusicShell>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller?.removeListener(_handleControllerChanged);
     _visualizerController.dispose();
     _artworkController.dispose();
     _pageController?.dispose();
     super.dispose();
   }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) =>
+      _handleControllerChanged();
 
   void _handleControllerChanged() {
     final controller = _controller;
@@ -83,7 +88,10 @@ class _MusicShellState extends State<MusicShell>
     // canvas is on. Leaving it running behind a closed sheet (or with the
     // toggle off) just pegged the CPU/GPU and cooked the phone for no visible
     // benefit.
-    final shouldAnimate = controller.isPlaying &&
+    final shouldAnimate =
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
+        !controller.reduceVisualEffects &&
+        controller.isPlaying &&
         controller.isPlayerOpen &&
         controller.immersiveCanvas;
     if (shouldAnimate) {
@@ -148,7 +156,8 @@ class _MusicShellState extends State<MusicShell>
                 Positioned(
                   left: AppSpacing.lg,
                   right: AppSpacing.lg,
-                  bottom: _kNavBarHeight +
+                  bottom:
+                      _kNavBarHeight +
                       MediaQuery.of(context).viewPadding.bottom +
                       _kMiniPlayerGap,
                   child: _MiniPlayer(controller: controller, track: miniTrack),
@@ -168,15 +177,16 @@ class _MusicShellState extends State<MusicShell>
                           curve: AppMotion.standard,
                         ),
                         child: SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0, 1),
-                            end: Offset.zero,
-                          ).animate(
-                            CurvedAnimation(
-                              parent: anim,
-                              curve: AppMotion.emphasized,
-                            ),
-                          ),
+                          position:
+                              Tween<Offset>(
+                                begin: const Offset(0, 1),
+                                end: Offset.zero,
+                              ).animate(
+                                CurvedAnimation(
+                                  parent: anim,
+                                  curve: AppMotion.emphasized,
+                                ),
+                              ),
                           child: child,
                         ),
                       );
@@ -242,16 +252,14 @@ class _MusicShellState extends State<MusicShell>
         // screen swipes back off to the right (iOS-style). "Open player" relies
         // on this reverse to glide Settings away as the player rises.
         transitionsBuilder: (_, animation, _, child) => SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(1, 0),
-            end: Offset.zero,
-          ).animate(
-            CurvedAnimation(
-              parent: animation,
-              curve: AppMotion.emphasized,
-              reverseCurve: AppMotion.exit,
-            ),
-          ),
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+              .animate(
+                CurvedAnimation(
+                  parent: animation,
+                  curve: AppMotion.emphasized,
+                  reverseCurve: AppMotion.exit,
+                ),
+              ),
           child: child,
         ),
       ),
@@ -312,17 +320,7 @@ class _BottomNav extends StatelessWidget {
     // mini-player tick) can't force the backdrop to re-rasterize every frame —
     // the always-on-screen blur was a primary heat source on A11.
     return RepaintBoundary(
-      child: ClipRect(
-        key: const Key('bottom-nav'),
-        child: reduceEffects
-            ? bar
-            // Sigma dropped from 28 → 14: blur cost scales with sigma and this
-            // is visually close but much cheaper on older GPUs.
-            : BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                child: bar,
-              ),
-      ),
+      child: ClipRect(key: const Key('bottom-nav'), child: bar),
     );
   }
 }
@@ -382,11 +380,11 @@ class _NavItem extends StatelessWidget {
                 AnimatedDefaultTextStyle(
                   duration: AppMotion.durFast,
                   style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                        color: isSelected
-                            ? scheme.primary
-                            : scheme.onSurfaceVariant,
-                        fontWeight: isSelected ? AppType.label : AppType.body,
-                      ),
+                    color: isSelected
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
+                    fontWeight: isSelected ? AppType.label : AppType.body,
+                  ),
                   child: Text(label),
                 ),
               ],
@@ -531,10 +529,12 @@ class _MiniPlayer extends StatelessWidget {
                       valueListenable: controller.progress,
                       builder: (_, value, _) => LinearProgressIndicator(
                         value: value,
-                        backgroundColor:
-                            scheme.outlineVariant.withValues(alpha: 0.3),
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(scheme.primary),
+                        backgroundColor: scheme.outlineVariant.withValues(
+                          alpha: 0.3,
+                        ),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          scheme.primary,
+                        ),
                         minHeight: 3,
                       ),
                     ),
@@ -570,13 +570,9 @@ class _MiniButton extends StatelessWidget {
     return IconButton(
       onPressed: onPressed,
       tooltip: tooltip,
-      icon: PhosphorIcon(
-        icon,
-        size: size,
-        color: color ?? scheme.onSurface,
-      ),
+      icon: PhosphorIcon(icon, size: size, color: color ?? scheme.onSurface),
       padding: const EdgeInsets.all(AppSpacing.xs),
-      constraints: BoxConstraints(minWidth: size + 8, minHeight: size + 8),
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
     );
   }
 }
@@ -608,14 +604,13 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
   @override
   void initState() {
     super.initState();
-    _settleController = AnimationController(
-      vsync: this,
-      duration: AppMotion.durMedium,
-    )..addListener(() {
-        final animation = _settleAnimation;
-        if (animation == null || !mounted) return;
-        setState(() => _dragOffset = animation.value);
-      });
+    _settleController =
+        AnimationController(vsync: this, duration: AppMotion.durMedium)
+          ..addListener(() {
+            final animation = _settleAnimation;
+            if (animation == null || !mounted) return;
+            setState(() => _dragOffset = animation.value);
+          });
   }
 
   @override
@@ -641,12 +636,10 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
       // Slide the sheet off screen along the drag direction, then close.
       final screenH = MediaQuery.sizeOf(context).height;
       _settleController.duration = const Duration(milliseconds: 220);
-      _settleAnimation = Tween<double>(
-        begin: _dragOffset,
-        end: screenH,
-      ).animate(
-        CurvedAnimation(parent: _settleController, curve: Curves.easeIn),
-      );
+      _settleAnimation = Tween<double>(begin: _dragOffset, end: screenH)
+          .animate(
+            CurvedAnimation(parent: _settleController, curve: Curves.easeIn),
+          );
       _settleController
         ..reset()
         ..forward().whenComplete(() {
@@ -658,10 +651,7 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
 
     // Spring back to resting position.
     _settleController.duration = AppMotion.durMedium;
-    _settleAnimation = Tween<double>(
-      begin: _dragOffset,
-      end: 0,
-    ).animate(
+    _settleAnimation = Tween<double>(begin: _dragOffset, end: 0).animate(
       CurvedAnimation(parent: _settleController, curve: AppMotion.emphasized),
     );
     _settleController
@@ -672,22 +662,19 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final brightness = Theme.of(context).brightness;
 
     return Transform.translate(
       offset: Offset(0, _dragOffset),
       child: Container(
         key: const Key('player-overlay-sheet'),
-        color: (brightness == Brightness.dark
-                ? AppSurfaces.dark.canvas
-                : AppSurfaces.light.canvas)
-            .withValues(alpha: 0.97),
+        color: scheme.surface,
         child: SafeArea(
           child: Column(
             children: [
               // Drag handle — follows your finger, then settles or closes.
               GestureDetector(
                 behavior: HitTestBehavior.translucent,
+                onTap: widget.controller.closePlayer,
                 onVerticalDragUpdate: _handleDragUpdate,
                 onVerticalDragEnd: _handleDragEnd,
                 child: Padding(

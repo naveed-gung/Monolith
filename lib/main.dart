@@ -6,6 +6,9 @@ import 'src/app/monolith_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  PaintingBinding.instance.imageCache
+    ..maximumSize = 96
+    ..maximumSizeBytes = 32 * 1024 * 1024;
   await JustAudioBackground.init(
     androidNotificationChannelId: 'dev.naveed_gung.monolith.playback',
     androidNotificationChannelName: 'Monolith playback',

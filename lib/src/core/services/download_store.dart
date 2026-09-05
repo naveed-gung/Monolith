@@ -8,11 +8,20 @@ import '../models/music_models.dart';
 
 class DownloadStore {
   static const _sep = '/';
+  Future<void> _pendingWrite = Future<void>.value();
 
   /// Audio container extensions we recognise when rebuilding the library from
   /// files found on disk (used by [loadTracksMergingDisk]).
   static const _audioExtensions = {
-    'mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'opus', 'webm', 'mp4',
+    'mp3',
+    'm4a',
+    'aac',
+    'flac',
+    'wav',
+    'ogg',
+    'opus',
+    'webm',
+    'mp4',
   };
 
   /// Monolith's own top-level folder. On iOS this lives in the app's Documents
@@ -47,6 +56,7 @@ class DownloadStore {
   }
 
   Future<List<Track>> loadTracks() async {
+    await _pendingWrite;
     final manifest = await _manifestFile();
     if (!await manifest.exists()) {
       return const [];
@@ -58,17 +68,34 @@ class DownloadStore {
     }
 
     final decoded = jsonDecode(rawContent) as List<dynamic>;
+    final root = await _rootDirectory();
+    String? recover(String? saved) {
+      if (saved == null) return null;
+      if (File(saved).existsSync()) return saved;
+      final normalized = saved.replaceAll('\\', '/');
+      final marker = normalized.lastIndexOf('/Monolith/');
+      if (marker < 0) return saved;
+      final relative = normalized.substring(marker + '/Monolith/'.length);
+      if (relative.split('/').any((part) => part == '..')) return saved;
+      final candidate = '${root.path}/$relative';
+      return File(candidate).existsSync() ? candidate : saved;
+    }
+
     final tracks = decoded
-        .map((item) => Track.fromJson(item as Map<String, dynamic>))
+        .map((item) {
+          final track = Track.fromJson(item as Map<String, dynamic>);
+          return track.copyWith(
+            filePath: recover(track.filePath),
+            artworkFilePath: recover(track.artworkFilePath),
+          );
+        })
         .where(
           (track) =>
               track.filePath != null && File(track.filePath!).existsSync(),
         )
         .toList();
-
-    if (tracks.length != decoded.length) {
-      await saveTracks(tracks);
-    }
+    // Missing files may be temporarily inaccessible; never prune the manifest
+    // during a read. The next explicit library write persists recovered paths.
 
     return tracks;
   }
@@ -105,9 +132,9 @@ class DownloadStore {
 
     if (orphans.isEmpty) return manifest;
 
-    orphans.sort((a, b) => (b.addedAt ?? DateTime(0)).compareTo(
-          a.addedAt ?? DateTime(0),
-        ));
+    orphans.sort(
+      (a, b) => (b.addedAt ?? DateTime(0)).compareTo(a.addedAt ?? DateTime(0)),
+    );
     final merged = [...manifest, ...orphans];
     // Persist so the re-discovered files become first-class manifest entries
     // (smart-playlist counts, ordering, etc.) on the next boot.
@@ -150,12 +177,19 @@ class DownloadStore {
     return path.substring(dot + 1).toLowerCase();
   }
 
-  Future<void> saveTracks(List<Track> tracks) async {
-    final manifest = await _manifestFile();
-    final payload = tracks.map((track) => track.toJson()).toList();
-    await manifest.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(payload),
-    );
+  Future<void> saveTracks(List<Track> tracks) {
+    final payload = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(tracks.map((track) => track.toJson()).toList());
+    final write = _pendingWrite.then((_) async {
+      final manifest = await _manifestFile();
+      final temporary = File('${manifest.path}.tmp');
+      await temporary.writeAsString(payload, flush: true);
+      await temporary.rename(manifest.path);
+    });
+    // Keep later writes usable after an error, while reporting this failure.
+    _pendingWrite = write.catchError((Object _) {});
+    return write;
   }
 
   Future<File> saveImportedAudio({

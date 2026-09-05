@@ -8,11 +8,7 @@ import '../models/music_models.dart';
 import 'artwork_painters.dart';
 
 class TrackArtwork extends StatelessWidget {
-  const TrackArtwork({
-    super.key,
-    required this.track,
-    this.borderRadius,
-  });
+  const TrackArtwork({super.key, required this.track, this.borderRadius});
 
   final Track track;
   final BorderRadius? borderRadius;
@@ -20,15 +16,28 @@ class TrackArtwork extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = borderRadius ?? AppRadii.all(AppRadii.lg);
-    return ClipRRect(borderRadius: r, child: _buildArtwork());
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : 256.0;
+        final pixels = (width * MediaQuery.devicePixelRatioOf(context))
+            .round()
+            .clamp(64, 1200);
+        return RepaintBoundary(
+          child: ClipRRect(borderRadius: r, child: _buildArtwork(pixels)),
+        );
+      },
+    );
   }
 
-  Widget _buildArtwork() {
+  Widget _buildArtwork(int pixels) {
     if (track.artworkFilePath != null) {
       final artworkFile = File(track.artworkFilePath!);
       if (artworkFile.existsSync()) {
         return Image.file(
           artworkFile,
+          cacheWidth: pixels,
           fit: BoxFit.cover,
           errorBuilder: (_, _, _) => _fallbackArtwork(),
         );
@@ -48,6 +57,7 @@ class TrackArtwork extends StatelessWidget {
     if (track.artworkUrl != null && track.artworkUrl!.isNotEmpty) {
       return Image.network(
         track.artworkUrl!,
+        cacheWidth: pixels,
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => _fallbackArtwork(),
       );

@@ -38,49 +38,77 @@ void main() {
   });
 
   Track seedTrack(String id, String filePath) => Track(
-        id: id,
-        title: id,
-        artist: 'A',
-        album: 'Downloads',
-        genre: 'g',
-        duration: Duration.zero,
-        colors: Track.paletteForSeed(id),
-        blurb: '',
-        source: TrackSource.downloaded,
-        filePath: filePath,
-      );
+    id: id,
+    title: id,
+    artist: 'A',
+    album: 'Downloads',
+    genre: 'g',
+    duration: Duration.zero,
+    colors: Track.paletteForSeed(id),
+    blurb: '',
+    source: TrackSource.downloaded,
+    filePath: filePath,
+  );
+
+  test('relocated container preserves metadata and artwork', () async {
+    final music = await store.getDownloadDirectory();
+    final audio = File('${music.path}/song.m4a')..writeAsBytesSync([1]);
+    final cover = File('${music.path}/song.jpg')..writeAsBytesSync([1]);
+    await store.saveTracks([
+      seedTrack(
+        'original-id',
+        '/old/container/Monolith/Music/song.m4a',
+      ).copyWith(
+        title: 'Original title',
+        playCount: 42,
+        artworkFilePath: '/old/container/Monolith/Music/song.jpg',
+      ),
+    ]);
+    final tracks = await store.loadTracks();
+    expect(tracks.single.id, 'original-id');
+    expect(tracks.single.title, 'Original title');
+    expect(tracks.single.playCount, 42);
+    expect(tracks.single.filePath, audio.path);
+    expect(tracks.single.artworkFilePath, cover.path);
+  });
 
   group('D1 — update keeps downloads', () {
-    test('seeded manifest + files survive a fresh boot, new download prepends',
-        () async {
-      final musicDir = await store.getDownloadDirectory();
-      final a = File('${musicDir.path}/old.mp3')..writeAsBytesSync([1]);
-      await store.saveTracks([seedTrack('old', a.path)]);
+    test(
+      'seeded manifest + files survive a fresh boot, new download prepends',
+      () async {
+        final musicDir = await store.getDownloadDirectory();
+        final a = File('${musicDir.path}/old.mp3')..writeAsBytesSync([1]);
+        await store.saveTracks([seedTrack('old', a.path)]);
 
-      // Fresh boot: a new store reads the existing manifest.
-      final booted = await DownloadStore().loadTracks();
-      expect(booted.map((t) => t.id), ['old']);
+        // Fresh boot: a new store reads the existing manifest.
+        final booted = await DownloadStore().loadTracks();
+        expect(booted.map((t) => t.id), ['old']);
 
-      // A new download prepends (newest-first), old one kept.
-      final b = File('${musicDir.path}/new.mp3')..writeAsBytesSync([1]);
-      final next = [seedTrack('new', b.path), ...booted];
-      await store.saveTracks(next);
+        // A new download prepends (newest-first), old one kept.
+        final b = File('${musicDir.path}/new.mp3')..writeAsBytesSync([1]);
+        final next = [seedTrack('new', b.path), ...booted];
+        await store.saveTracks(next);
 
-      final reloaded = await DownloadStore().loadTracks();
-      expect(reloaded.map((t) => t.id), ['new', 'old']);
-    });
+        final reloaded = await DownloadStore().loadTracks();
+        expect(reloaded.map((t) => t.id), ['new', 'old']);
+      },
+    );
 
-    test('manifest entries whose file is gone are pruned on load', () async {
-      final musicDir = await store.getDownloadDirectory();
-      final present = File('${musicDir.path}/here.mp3')..writeAsBytesSync([1]);
-      await store.saveTracks([
-        seedTrack('here', present.path),
-        seedTrack('gone', '${musicDir.path}/missing.mp3'),
-      ]);
+    test(
+      'missing files are hidden without destructive manifest pruning',
+      () async {
+        final musicDir = await store.getDownloadDirectory();
+        final present = File('${musicDir.path}/here.mp3')
+          ..writeAsBytesSync([1]);
+        await store.saveTracks([
+          seedTrack('here', present.path),
+          seedTrack('gone', '${musicDir.path}/missing.mp3'),
+        ]);
 
-      final loaded = await store.loadTracks();
-      expect(loaded.map((t) => t.id), ['here']);
-    });
+        final loaded = await store.loadTracks();
+        expect(loaded.map((t) => t.id), ['here']);
+      },
+    );
   });
 
   group('D2 — repopulate from surviving files on disk', () {
@@ -96,15 +124,20 @@ void main() {
       File('${musicDir.path}/cover.jpg').writeAsBytesSync([1]);
 
       final merged = await store.loadTracksMergingDisk();
-      final paths =
-          merged.map((t) => t.filePath!.split(RegExp(r'[\\/]')).last).toSet();
-      expect(paths, containsAll(['tracked.mp3', 'orphan1.m4a', 'orphan2.flac']));
+      final paths = merged
+          .map((t) => t.filePath!.split(RegExp(r'[\\/]')).last)
+          .toSet();
+      expect(
+        paths,
+        containsAll(['tracked.mp3', 'orphan1.m4a', 'orphan2.flac']),
+      );
       expect(paths.contains('cover.jpg'), isFalse);
 
       // Orphans are now persisted as manifest entries.
-      final raw = File('${(await store.getDownloadDirectory()).parent.path}'
-              '/manifest.json')
-          .readAsStringSync();
+      final raw = File(
+        '${(await store.getDownloadDirectory()).parent.path}'
+        '/manifest.json',
+      ).readAsStringSync();
       expect((jsonDecode(raw) as List).length, 3);
     });
 

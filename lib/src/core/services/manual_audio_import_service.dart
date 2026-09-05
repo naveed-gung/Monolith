@@ -34,6 +34,7 @@ class ManualAudioImportService {
         'webm',
       ],
       mimeTypes: ['audio/*'],
+      uniformTypeIdentifiers: ['public.audio', 'public.mpeg-4'],
     );
 
     final pickedFiles = await openFiles(

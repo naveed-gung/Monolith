@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../../app/theme/design_tokens.dart';
@@ -28,15 +26,12 @@ class GlassPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final radius = borderRadius ?? AppRadii.all(AppRadii.lg);
-    final surfaceColor = Theme.of(context).brightness == Brightness.dark
-        ? Colors.black
-        : Colors.white;
 
     final panel = DecoratedBox(
       decoration: BoxDecoration(
         // A flat fill needs more opacity to read as a panel without the blur
         // doing the visual lifting behind it.
-        color: surfaceColor.withValues(alpha: reduceEffects ? 0.92 : opacity),
+        color: scheme.surfaceContainerLow,
         borderRadius: radius,
         border: Border.all(
           color: scheme.outlineVariant.withValues(alpha: 0.45),
@@ -49,27 +44,11 @@ class GlassPanel extends StatelessWidget {
           ),
         ],
       ),
-      child: Padding(
-        padding: padding ?? EdgeInsets.zero,
-        child: child,
-      ),
+      child: Padding(padding: padding ?? EdgeInsets.zero, child: child),
     );
 
-    // Isolate the blurred layer so a repaint elsewhere can't dirty it and force
-    // an expensive re-rasterize; the cached layer stays put while its backdrop
-    // is static.
     return RepaintBoundary(
-      child: ClipRRect(
-        borderRadius: radius,
-        child: reduceEffects
-            ? panel
-            // Lower sigma (was 22) — blur cost scales with sigma and 12 is
-            // visually near-identical but far cheaper on A11.
-            : BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                child: panel,
-              ),
-      ),
+      child: ClipRRect(borderRadius: radius, child: panel),
     );
   }
 }

@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../../../data/platform_channels/media_import_channel.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/state/app_scope.dart';
@@ -32,16 +32,36 @@ class _StoragePageState extends State<StoragePage> {
   Future<void> _loadPath() async {
     final controller = AppScope.read(context);
     final path = await controller.getDownloadDirectoryPath();
-    if (mounted) setState(() { _directoryPath = path; _loadingPath = false; });
+    if (mounted) {
+      setState(() {
+        _directoryPath = path;
+        _loadingPath = false;
+      });
+    }
   }
 
   Future<void> _shareFile(Track track) async {
     final fp = track.filePath;
     if (fp == null || fp.isEmpty) return;
-    await Share.shareXFiles(
-      [XFile(fp)],
-      text: '${track.title} • ${track.artist}',
-    );
+    try {
+      final bridge = MediaImportChannel();
+      final result = Platform.isIOS
+          ? await bridge.exportToFiles([fp])
+          : await bridge.exportToSaf([fp], ['audio/*']);
+      if (mounted && !result.canceled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Saved to your chosen folder.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not export this file. Please try again.'),
+          ),
+        );
+      }
+    }
   }
 
   // On iOS the real path is an opaque /var/mobile/Containers/… container path
@@ -72,7 +92,10 @@ class _StoragePageState extends State<StoragePage> {
           Uri(
             scheme: 'content',
             host: 'com.android.externalstorage.documents',
-            pathSegments: ['document', 'primary:${path.substring(extRoot.length)}'],
+            pathSegments: [
+              'document',
+              'primary:${path.substring(extRoot.length)}',
+            ],
           ),
           mode: LaunchMode.externalApplication,
         );
@@ -116,13 +139,19 @@ class _StoragePageState extends State<StoragePage> {
   String _fmtBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
   int _fileSize(String? path) {
     if (path == null) return 0;
-    try { return File(path).lengthSync(); } catch (_) { return 0; }
+    try {
+      return File(path).lengthSync();
+    } catch (_) {
+      return 0;
+    }
   }
 
   @override
@@ -131,7 +160,10 @@ class _StoragePageState extends State<StoragePage> {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final tracks = controller.offlineTracks;
-    final totalBytes = tracks.fold<int>(0, (sum, t) => sum + _fileSize(t.filePath));
+    final totalBytes = tracks.fold<int>(
+      0,
+      (sum, t) => sum + _fileSize(t.filePath),
+    );
 
     return Scaffold(
       backgroundColor: scheme.surface,
@@ -141,7 +173,11 @@ class _StoragePageState extends State<StoragePage> {
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
-          icon: PhosphorIcon(PhosphorIcons.caretLeft(), size: 22, color: scheme.onSurface),
+          icon: PhosphorIcon(
+            PhosphorIcons.caretLeft(),
+            size: 22,
+            color: scheme.onSurface,
+          ),
           tooltip: 'Back',
         ),
       ),
@@ -152,21 +188,27 @@ class _StoragePageState extends State<StoragePage> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenInset, AppSpacing.md,
-                AppSpacing.screenInset, AppSpacing.xxl,
+                AppSpacing.screenInset,
+                AppSpacing.md,
+                AppSpacing.screenInset,
+                AppSpacing.xxl,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Storage',
+                  Text(
+                    'Storage',
                     style: textTheme.displaySmall?.copyWith(
                       fontWeight: AppType.display,
                       letterSpacing: AppType.trackTight,
-                    )),
+                    ),
+                  ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
                     '${tracks.length} file${tracks.length == 1 ? '' : 's'} · ${_fmtBytes(totalBytes)}',
-                    style: textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -177,14 +219,19 @@ class _StoragePageState extends State<StoragePage> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenInset, 0, AppSpacing.screenInset, AppSpacing.xl,
+                AppSpacing.screenInset,
+                0,
+                AppSpacing.screenInset,
+                AppSpacing.xl,
               ),
               child: Container(
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainerLow,
                   borderRadius: AppRadii.all(AppRadii.lg),
                   border: Border.all(
-                    color: scheme.outlineVariant.withValues(alpha: 0.5), width: 0.5),
+                    color: scheme.outlineVariant.withValues(alpha: 0.5),
+                    width: 0.5,
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -193,84 +240,121 @@ class _StoragePageState extends State<StoragePage> {
                       child: Row(
                         children: [
                           Container(
-                            width: 36, height: 36,
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
                               color: scheme.primaryContainer,
                               borderRadius: AppRadii.all(AppRadii.sm),
                             ),
-                            child: Center(child: PhosphorIcon(
-                              PhosphorIcons.folder(), size: 20,
-                              color: scheme.onPrimaryContainer,
-                            )),
+                            child: Center(
+                              child: PhosphorIcon(
+                                PhosphorIcons.folder(),
+                                size: 20,
+                                color: scheme.onPrimaryContainer,
+                              ),
+                            ),
                           ),
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Download folder',
-                                  style: textTheme.bodyLarge?.copyWith(fontWeight: AppType.body)),
+                                Text(
+                                  'Download folder',
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontWeight: AppType.body,
+                                  ),
+                                ),
                                 if (_directoryPath != null)
-                                  Text(_displayPath,
+                                  Text(
+                                    _displayPath,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: textTheme.bodySmall?.copyWith(
                                       color: scheme.onSurfaceVariant,
                                       fontFamily: 'monospace',
-                                    )),
+                                    ),
+                                  ),
                                 if (_loadingPath)
-                                  Text('Loading…',
+                                  Text(
+                                    'Loading…',
                                     style: textTheme.bodySmall?.copyWith(
-                                      color: scheme.onSurfaceVariant)),
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Divider(height: 1, color: scheme.outlineVariant.withValues(alpha: 0.4)),
+                    Divider(
+                      height: 1,
+                      color: scheme.outlineVariant.withValues(alpha: 0.4),
+                    ),
                     Row(
                       children: [
                         Expanded(
                           child: InkWell(
                             onTap: _directoryPath != null
                                 ? () => Clipboard.setData(
-                                    ClipboardData(text: _displayPath))
+                                    ClipboardData(text: _displayPath),
+                                  )
                                 : null,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.md, horizontal: AppSpacing.lg),
+                                vertical: AppSpacing.md,
+                                horizontal: AppSpacing.lg,
+                              ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  PhosphorIcon(PhosphorIcons.copy(), size: 16,
-                                    color: scheme.primary),
+                                  PhosphorIcon(
+                                    PhosphorIcons.copy(),
+                                    size: 16,
+                                    color: scheme.primary,
+                                  ),
                                   const SizedBox(width: AppSpacing.sm),
-                                  Text('Copy path',
+                                  Text(
+                                    'Copy path',
                                     style: textTheme.labelMedium?.copyWith(
-                                      color: scheme.primary, fontWeight: AppType.label)),
+                                      color: scheme.primary,
+                                      fontWeight: AppType.label,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                           ),
                         ),
                         VerticalDivider(
-                          width: 1, color: scheme.outlineVariant.withValues(alpha: 0.4)),
+                          width: 1,
+                          color: scheme.outlineVariant.withValues(alpha: 0.4),
+                        ),
                         Expanded(
                           child: InkWell(
                             onTap: _openDirectory,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.md, horizontal: AppSpacing.lg),
+                                vertical: AppSpacing.md,
+                                horizontal: AppSpacing.lg,
+                              ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  PhosphorIcon(PhosphorIcons.folderOpen(), size: 16,
-                                    color: scheme.primary),
+                                  PhosphorIcon(
+                                    PhosphorIcons.folderOpen(),
+                                    size: 16,
+                                    color: scheme.primary,
+                                  ),
                                   const SizedBox(width: AppSpacing.sm),
-                                  Text('Open in Files',
+                                  Text(
+                                    'Open in Files',
                                     style: textTheme.labelMedium?.copyWith(
-                                      color: scheme.primary, fontWeight: AppType.label)),
+                                      color: scheme.primary,
+                                      fontWeight: AppType.label,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -291,16 +375,25 @@ class _StoragePageState extends State<StoragePage> {
                 padding: const EdgeInsets.only(top: AppSpacing.xxxl),
                 child: Column(
                   children: [
-                    PhosphorIcon(PhosphorIcons.folderSimpleDashed(),
-                      size: 52, color: scheme.onSurfaceVariant),
+                    PhosphorIcon(
+                      PhosphorIcons.folderSimpleDashed(),
+                      size: 52,
+                      color: scheme.onSurfaceVariant,
+                    ),
                     const SizedBox(height: AppSpacing.md),
-                    Text('No downloaded files',
+                    Text(
+                      'No downloaded files',
                       style: textTheme.titleMedium?.copyWith(
-                        color: scheme.onSurfaceVariant)),
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.xs),
-                    Text('Files will appear here after you download music.',
+                    Text(
+                      'Files will appear here after you download music.',
                       style: textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant)),
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -308,32 +401,35 @@ class _StoragePageState extends State<StoragePage> {
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenInset, 0, AppSpacing.screenInset, 120),
+                AppSpacing.screenInset,
+                0,
+                AppSpacing.screenInset,
+                120,
+              ),
               sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    if (index == 0) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                        child: Text('Downloaded files',
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: AppType.title,
-                            letterSpacing: AppType.trackSnug,
-                          )),
-                      );
-                    }
-                    final track = tracks[index - 1];
-                    final size = _fileSize(track.filePath);
-                    final isLast = index == tracks.length;
-                    return _FileRow(
-                      track: track,
-                      sizeLabel: size > 0 ? _fmtBytes(size) : '—',
-                      onShare: () => _shareFile(track),
-                      showDivider: !isLast,
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  if (index == 0) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: Text(
+                        'Downloaded files',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: AppType.title,
+                          letterSpacing: AppType.trackSnug,
+                        ),
+                      ),
                     );
-                  },
-                  childCount: tracks.length + 1,
-                ),
+                  }
+                  final track = tracks[index - 1];
+                  final size = _fileSize(track.filePath);
+                  final isLast = index == tracks.length;
+                  return _FileRow(
+                    track: track,
+                    sizeLabel: size > 0 ? _fmtBytes(size) : '—',
+                    onShare: () => _shareFile(track),
+                    showDivider: !isLast,
+                  );
+                }, childCount: tracks.length + 1),
               ),
             ),
         ],
@@ -364,11 +460,14 @@ class _FileRow extends StatelessWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.sm + AppSpacing.xs,
+          ),
           child: Row(
             children: [
               SizedBox(
-                width: 48, height: 48,
+                width: 48,
+                height: 48,
                 child: TrackArtwork(
                   track: track,
                   borderRadius: AppRadii.all(AppRadii.sm),
@@ -379,30 +478,41 @@ class _FileRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(track.title,
+                    Text(
+                      track.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodyLarge?.copyWith(fontWeight: AppType.body)),
+                      style: textTheme.bodyLarge?.copyWith(
+                        fontWeight: AppType.body,
+                      ),
+                    ),
                     Row(
                       children: [
                         if (ext.isNotEmpty)
                           Container(
                             margin: const EdgeInsets.only(right: AppSpacing.xs),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 1),
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
                             decoration: BoxDecoration(
                               color: scheme.surfaceContainerHigh,
                               borderRadius: AppRadii.all(AppRadii.sm),
                             ),
-                            child: Text(ext,
+                            child: Text(
+                              ext,
                               style: textTheme.labelSmall?.copyWith(
                                 color: scheme.onSurfaceVariant,
                                 fontWeight: AppType.label,
-                              )),
+                              ),
+                            ),
                           ),
-                        Text(sizeLabel,
+                        Text(
+                          sizeLabel,
                           style: textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant)),
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -410,18 +520,23 @@ class _FileRow extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onShare,
-                tooltip: 'Share / Open in Files',
+                tooltip: 'Save to Files',
                 icon: PhosphorIcon(
-                  AppIcons.share, size: 20,
-                  color: scheme.onSurfaceVariant),
+                  AppIcons.share,
+                  size: 20,
+                  color: scheme.onSurfaceVariant,
+                ),
                 padding: const EdgeInsets.all(AppSpacing.sm),
               ),
             ],
           ),
         ),
         if (showDivider)
-          Divider(height: 1, indent: 64,
-            color: scheme.outlineVariant.withValues(alpha: 0.35)),
+          Divider(
+            height: 1,
+            indent: 64,
+            color: scheme.outlineVariant.withValues(alpha: 0.35),
+          ),
       ],
     );
   }

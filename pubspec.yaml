@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.4+5
+version: 1.1.0+6
 
 environment:
   sdk: ^3.10.1
@@ -47,7 +47,15 @@ dependencies:
   youtube_explode_dart: ^2.5.3
   phosphor_flutter: ^2.1.0
   shared_preferences: ^2.5.5
-  connectivity_plus: '>=6.0.0 <6.1.3'
+  connectivity_plus: ">=6.0.0 <6.1.3"
+
+  # Monolith 2.0 rebuild (P0 foundations): state/DI + collection helpers.
+  flutter_riverpod: ^3.0.0
+  collection: ^1.19.0
+
+  # Monolith 2.0 rebuild (P2): zip backup archives for one-tap library
+  # backup/restore.
+  archive: ^4.0.0
 
 dev_dependencies:
   flutter_test:
@@ -64,11 +72,24 @@ dev_dependencies:
   path_provider_platform_interface: ^2.1.2
   plugin_platform_interface: ^2.1.8
 
+# TEMPORARILY DISABLED for rebuild - restore if pub.dev versions conflict
+# Original overrides pointed at vendored packages that are NOT present in this
+# checkout (third_party/ is empty), which made `flutter pub get` fail:
+#
+# dependency_overrides:
+#   file_selector_android:
+#     path: third_party/file_selector_android
+#   on_audio_query_android:
+#     path: third_party/on_audio_query_android
+
 dependency_overrides:
-  file_selector_android:
-    path: third_party/file_selector_android
-  on_audio_query_android:
-    path: third_party/on_audio_query_android
+  # Vendored compatibility shim: phosphor_flutter 2.1.0 (latest on pub.dev)
+  # extends IconData, which became a final class in Flutter 3.44+ and can no
+  # longer be subclassed outside the Flutter SDK. The vendored copy at
+  # third_party/phosphor_flutter re-implements IconData instead; remove this
+  # override once an upstream release supports current Flutter.
+  phosphor_flutter:
+    path: third_party/phosphor_flutter
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

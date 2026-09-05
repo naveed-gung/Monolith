@@ -1,0 +1,20 @@
+name: icons_catalog
+description: Catalog of icons showing a preview of them.
+publish_to: "none"
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  phosphor_flutter:
+    path: ../
+    
+dev_dependencies:
+  flutter_lints: ^2.0.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/phosphor-mark-tight-yellow.png

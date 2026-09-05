@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import '../../../data/platform_channels/media_import_channel.dart';
 
 import 'package:audio_session/audio_session.dart';
@@ -366,6 +367,7 @@ class MonolithController extends ChangeNotifier {
         _selectedCategory == LibraryCategory.playlists
             ? LibraryCategory.tracks
             : _selectedCategory,
+      AppTab.songs => LibraryCategory.tracks,
       AppTab.search => _selectedCategory,
     };
 
@@ -382,7 +384,7 @@ class MonolithController extends ChangeNotifier {
   }
 
   void selectLibraryCategory(LibraryCategory category) {
-    final nextTab = _currentTab == AppTab.downloads
+    final nextTab = (_currentTab == AppTab.downloads || _currentTab == AppTab.songs)
         ? AppTab.library
         : _currentTab;
 
@@ -702,6 +704,11 @@ class MonolithController extends ChangeNotifier {
     }
   }
 
+  void clearLibraryError() {
+    _libraryError = null;
+    notifyListeners();
+  }
+
   Future<String?> importAudioFiles() async {
     if (_isImportingAudio) {
       return null;
@@ -834,6 +841,9 @@ class MonolithController extends ChangeNotifier {
             addedAt: DateTime.now(),
           ),
         );
+      }
+      if (imported.isNotEmpty) {
+        _selectedCategory = LibraryCategory.tracks;
       }
       _downloadedTracks = [...imported, ..._downloadedTracks];
       await _downloadStore.saveTracks(_downloadedTracks);
@@ -1086,6 +1096,16 @@ class MonolithController extends ChangeNotifier {
         ),
       ),
     );
+  }
+
+  void dismissDownloadTask(String processId) {
+    _downloadTasks = _downloadTasks.where((t) => t.processId != processId).toList();
+    notifyListeners();
+  }
+
+  void clearRecentDownloadTasks() {
+    _downloadTasks = _downloadTasks.where((t) => t.isActive || t.status == DownloadTaskStatus.paused).toList();
+    notifyListeners();
   }
 
   Future<void> _startManagedDownload(DownloadTaskInfo task) async {
@@ -1740,10 +1760,22 @@ class MonolithController extends ChangeNotifier {
       // Smooth fade-out before loading new source
       if (_isPlaying) await _fadeVolume(to: 0);
 
+      var effectivePath = track.filePath;
+      if (effectivePath != null) {
+        final resolved = await _downloadStore.resolveTrackPath(effectivePath);
+        if (resolved != null && File(resolved).existsSync()) {
+          effectivePath = resolved;
+        }
+      }
+
+      if (effectivePath == null || !File(effectivePath).existsSync()) {
+        throw StateError('Audio file not found on device');
+      }
+
       await _audioPlayer.setAudioSource(
         AudioSource.uri(
-          Uri.file(track.filePath!),
-          tag: _mediaItemForTrack(track),
+          Uri.file(effectivePath),
+          tag: _mediaItemForTrack(track.copyWith(filePath: effectivePath)),
         ),
       );
       _currentTrackDuration = _audioPlayer.duration ?? track.duration;
@@ -1760,10 +1792,21 @@ class MonolithController extends ChangeNotifier {
     } catch (error) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
       try {
+        var effectivePath = track.filePath;
+        if (effectivePath != null) {
+          final resolved = await _downloadStore.resolveTrackPath(effectivePath);
+          if (resolved != null && File(resolved).existsSync()) {
+            effectivePath = resolved;
+          }
+        }
+        if (effectivePath == null || !File(effectivePath).existsSync()) {
+          throw StateError('Audio file not found on device');
+        }
+
         await _audioPlayer.setAudioSource(
           AudioSource.uri(
-            Uri.file(track.filePath!),
-            tag: _mediaItemForTrack(track),
+            Uri.file(effectivePath),
+            tag: _mediaItemForTrack(track.copyWith(filePath: effectivePath)),
           ),
         );
         _currentTrackDuration = _audioPlayer.duration ?? track.duration;

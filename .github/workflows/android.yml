@@ -80,7 +80,15 @@ jobs:
           fi
 
       - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk monolith.apk
+        run: |
+          APK=$(find build/app/outputs -name "*.apk" -type f | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "No APK found in build/app/outputs"
+            find build -name "*.apk" || true
+            exit 1
+          fi
+          echo "Found APK: $APK"
+          cp "$APK" monolith.apk
 
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4

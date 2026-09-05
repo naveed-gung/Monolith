@@ -55,6 +55,29 @@ class DownloadStore {
     return dir;
   }
 
+  Future<String?> resolveTrackPath(String? saved) async {
+    if (saved == null) return null;
+    if (File(saved).existsSync()) return saved;
+    final root = await _rootDirectory();
+    final normalized = saved.replaceAll('\\', '/');
+    final marker = normalized.lastIndexOf('/Monolith/');
+    if (marker >= 0) {
+      final relative = normalized.substring(marker + '/Monolith/'.length);
+      if (!relative.split('/').any((part) => part == '..')) {
+        final candidate = '${root.path}/$relative';
+        if (File(candidate).existsSync()) return candidate;
+      }
+    }
+    final filename = normalized.split('/').last;
+    if (filename.isNotEmpty) {
+      final inMusic = '${root.path}/Music/$filename';
+      if (File(inMusic).existsSync()) return inMusic;
+      final inImports = '${root.path}/Music/Imports/$filename';
+      if (File(inImports).existsSync()) return inImports;
+    }
+    return saved;
+  }
+
   Future<List<Track>> loadTracks() async {
     await _pendingWrite;
     final manifest = await _manifestFile();
@@ -74,11 +97,21 @@ class DownloadStore {
       if (File(saved).existsSync()) return saved;
       final normalized = saved.replaceAll('\\', '/');
       final marker = normalized.lastIndexOf('/Monolith/');
-      if (marker < 0) return saved;
-      final relative = normalized.substring(marker + '/Monolith/'.length);
-      if (relative.split('/').any((part) => part == '..')) return saved;
-      final candidate = '${root.path}/$relative';
-      return File(candidate).existsSync() ? candidate : saved;
+      if (marker >= 0) {
+        final relative = normalized.substring(marker + '/Monolith/'.length);
+        if (!relative.split('/').any((part) => part == '..')) {
+          final candidate = '${root.path}/$relative';
+          if (File(candidate).existsSync()) return candidate;
+        }
+      }
+      final filename = normalized.split('/').last;
+      if (filename.isNotEmpty) {
+        final inMusic = '${root.path}/Music/$filename';
+        if (File(inMusic).existsSync()) return inMusic;
+        final inImports = '${root.path}/Music/Imports/$filename';
+        if (File(inImports).existsSync()) return inImports;
+      }
+      return saved;
     }
 
     final tracks = decoded

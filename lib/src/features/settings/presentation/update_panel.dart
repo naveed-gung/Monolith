@@ -7,10 +7,35 @@ import '../../../core/services/app_update_service.dart';
 
 class UpdatePanel extends StatelessWidget {
   const UpdatePanel({super.key});
+
+  Future<void> _showRestartDialog(BuildContext context) async {
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Update installed'),
+        content: const Text(
+          'Monolith has been updated. Would you like to restart the app now or continue and restart later?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Later'),
+          ),
+          FilledButton(
+            onPressed: () => exit(0),
+            child: const Text('Restart now'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _install(BuildContext context, AppUpdateService service) async {
     try {
       if (Platform.isIOS) {
-        final opened = await launchUrl(
+        var opened = await launchUrl(
           Uri(
             scheme: 'apple-magnifier',
             host: 'install',
@@ -19,12 +44,31 @@ class UpdatePanel extends StatelessWidget {
           mode: LaunchMode.externalApplication,
         );
         if (!opened) {
-          throw StateError('Enable URL Scheme in TrollStore settings.');
+          // Try AltStore URL scheme
+          opened = await launchUrl(
+            Uri.parse('altstore://install?url=${service.release!.url}'),
+            mode: LaunchMode.externalApplication,
+          );
+        }
+        if (!opened && service.downloaded != null) {
+          // Open or share downloaded IPA
+          await Share.shareXFiles(
+            [XFile(service.downloaded!.path)],
+            text: 'Monolith update IPA',
+          );
+        } else if (!opened) {
+          throw StateError(
+            'Could not open installer. Open TrollStore, AltStore, or share the IPA.',
+          );
         }
       } else {
         await const MethodChannel(
           'monolith/updates',
         ).invokeMethod<void>('install', {'path': service.downloaded!.path});
+      }
+
+      if (context.mounted) {
+        await _showRestartDialog(context);
       }
     } catch (error) {
       if (context.mounted) {
@@ -100,6 +144,23 @@ class UpdatePanel extends StatelessWidget {
                     },
                     child: const Text('Open downloaded IPA…'),
                   ),
+                TextButton.icon(
+                  icon: const Icon(Icons.cleaning_services_outlined, size: 16),
+                  onPressed: () async {
+                    final freed = await service.clearStaleAppCache();
+                    if (context.mounted) {
+                      final mb = (freed / (1024 * 1024)).toStringAsFixed(1);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Freed $mb MB of cache. Your music & custom settings remain intact.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  label: const Text('Clean app cache'),
+                ),
               ],
             ),
             Text(

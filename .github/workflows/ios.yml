@@ -1,8 +1,9 @@
 name: iOS Build & Release
 
-# Temporarily disabled on push while fixing Android CI; triggered via workflow_dispatch or v* tags.
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:

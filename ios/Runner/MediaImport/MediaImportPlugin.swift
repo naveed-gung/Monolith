@@ -142,9 +142,20 @@ final class MediaImportPlugin: NSObject {
           throw exporter.error ?? NSError(domain: "Monolith", code: 2, userInfo: [NSLocalizedDescriptionKey: "Music export did not complete."])
         }
       }
+      // Ensure file exists, is non-empty, and has FileProtectionType.none so AVPlayer
+      // can always read it even if screen is locked or across app sessions without (-11829) error.
+      let attrs = try FileManager.default.attributesOfItem(atPath: destination.path)
+      let fileSize = (attrs[.size] as? NSNumber)?.int64Value ?? 0
+      guard fileSize > 1024 else {
+        try? FileManager.default.removeItem(at: destination)
+        throw NSError(domain: "Monolith", code: 3, userInfo: [NSLocalizedDescriptionKey: "Imported audio file is empty or unreadable."])
+      }
+      try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.none], ofItemAtPath: destination.path)
       if let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
          let data = image.jpegData(compressionQuality: 0.85) {
-        try? data.write(to: destination.deletingPathExtension().appendingPathExtension("jpg"), options: .atomic)
+        let artURL = destination.deletingPathExtension().appendingPathExtension("jpg")
+        try? data.write(to: artURL, options: .atomic)
+        try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.none], ofItemAtPath: artURL.path)
       }
       payload["status"] = "copied"
       payload["path"] = destination.path
@@ -211,6 +222,7 @@ final class MediaImportPlugin: NSObject {
     let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     let dir = documents.appendingPathComponent("Monolith/Music/Imports", isDirectory: true)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.none], ofItemAtPath: dir.path)
     return dir
   }
 
@@ -222,13 +234,15 @@ final class MediaImportPlugin: NSObject {
   }
 
   static func sanitizedFileName(_ raw: String) -> String {
-    let invalidCharacters = CharacterSet(charactersIn: "/\\:*?\"<>|")
+    let invalidCharacters = CharacterSet(charactersIn: "/\\:*?\"<>|'`’[]{}()^%#@!&$+=;")
     let scalars = raw.unicodeScalars.map { scalar -> Character in
-      (invalidCharacters.contains(scalar) || scalar.value < 32) ? "_" : Character(scalar)
+      (invalidCharacters.contains(scalar) || scalar.value < 32 || scalar.value > 126) ? "_" : Character(scalar)
     }
-    var name = String(scalars).trimmingCharacters(in: .whitespacesAndNewlines)
+    var name = String(scalars)
+      .replacingOccurrences(of: "_+", with: "_", options: .regularExpression)
+      .trimmingCharacters(in: CharacterSet(charactersIn: "_ ").union(.whitespacesAndNewlines))
     if name.isEmpty { name = "audio" }
-    if name.count > 80 { name = String(name.prefix(80)) }
+    if name.count > 60 { name = String(name.prefix(60)) }
     return name
   }
 }

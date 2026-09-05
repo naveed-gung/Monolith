@@ -16,6 +16,7 @@ import '../../library/presentation/library_page.dart';
 import '../../player/presentation/player_page.dart';
 import '../../search/presentation/search_page.dart';
 import '../../settings/presentation/settings_page.dart';
+import '../../songs/presentation/songs_page.dart';
 
 const _kNavBarHeight = 84.0;
 const _kMiniPlayerGap = AppSpacing.sm;
@@ -36,6 +37,8 @@ class _MusicShellState extends State<MusicShell>
   PageController? _pageController;
   int? _lastSyncedTabIndex;
   MonolithController? _controller;
+  bool _isMiniPlayerDismissed = false;
+  String? _lastTrackId;
 
   @override
   void initState() {
@@ -85,9 +88,7 @@ class _MusicShellState extends State<MusicShell>
     if (controller == null || !mounted) return;
     // Only spin the reactive visualizer when it can actually be seen and the
     // user wants it: the player sheet is open, audio is playing, and immersive
-    // canvas is on. Leaving it running behind a closed sheet (or with the
-    // toggle off) just pegged the CPU/GPU and cooked the phone for no visible
-    // benefit.
+    // canvas is on.
     final shouldAnimate =
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
         !controller.reduceVisualEffects &&
@@ -99,21 +100,12 @@ class _MusicShellState extends State<MusicShell>
     } else if (_visualizerController.isAnimating) {
       _visualizerController.stop();
     }
-    // The slow artwork rotation is unused for visuals; keep it parked.
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.watch(context);
 
-    // Keep the swipeable PageView aligned with tab changes that originate from
-    // the bottom nav (a tap) instead of a swipe. We skip this while the view is
-    // actively scrolling so a programmatic animation never fights the finger.
-    // Only schedule a page sync when the tab actually changed. build() runs on
-    // every controller notify (≈1–4×/sec during playback), and scheduling a
-    // post-frame callback every time kept the engine doing continuous frame
-    // work — denying the SoC idle gaps and cooking the phone. Guarding on the
-    // tab index makes this fire only on real tab changes.
     final tabIndex = AppTab.values.indexOf(controller.currentTab);
     if (tabIndex != _lastSyncedTabIndex) {
       _lastSyncedTabIndex = tabIndex;
@@ -121,8 +113,6 @@ class _MusicShellState extends State<MusicShell>
         final pc = _pageController;
         if (!mounted || pc == null || !pc.hasClients) return;
         if (pc.page?.round() == tabIndex) return;
-        // Skip while a finger drag or an in-flight animation owns the view, so
-        // a programmatic jump never fights the user's swipe.
         if (pc.position.isScrollingNotifier.value) return;
         pc.animateToPage(
           tabIndex,
@@ -132,27 +122,27 @@ class _MusicShellState extends State<MusicShell>
       });
     }
 
+    final miniTrack = controller.currentTrack;
+    if (miniTrack?.id != _lastTrackId) {
+      _lastTrackId = miniTrack?.id;
+      _isMiniPlayerDismissed = false;
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final wideLayout = constraints.maxWidth > 880;
         final currentPage = _buildPage(controller);
 
-        final miniTrack = controller.currentTrack;
-
         return Scaffold(
           extendBody: true,
-          // Keep the body (and its bottom-anchored mini player + nav bar) put
-          // when the keyboard opens. Without this the body shrinks above the
-          // keyboard and the mini player jumps up with it. All text inputs sit
-          // in the upper portion of each screen, so they stay visible.
           resizeToAvoidBottomInset: false,
           body: Stack(
             children: [
               const Positioned.fill(child: Atmosphere()),
               currentPage,
               // Mini player — above page content, below player overlay.
-              // Hidden when nothing is loaded.
-              if (!controller.isPlayerOpen && miniTrack != null)
+              // Gesture down hides it; gesture up opens full player.
+              if (!controller.isPlayerOpen && miniTrack != null && !_isMiniPlayerDismissed)
                 Positioned(
                   left: AppSpacing.lg,
                   right: AppSpacing.lg,
@@ -160,7 +150,95 @@ class _MusicShellState extends State<MusicShell>
                       _kNavBarHeight +
                       MediaQuery.of(context).viewPadding.bottom +
                       _kMiniPlayerGap,
-                  child: _MiniPlayer(controller: controller, track: miniTrack),
+                  child: GestureDetector(
+                    onVerticalDragEnd: (details) {
+                      final velocity = details.primaryVelocity ?? 0;
+                      if (velocity > 200) {
+                        // Swiped down -> dismiss mini player
+                        controller.hapticLight();
+                        setState(() => _isMiniPlayerDismissed = true);
+                      } else if (velocity < -200) {
+                        // Swiped up -> open full player
+                        controller.hapticMedium();
+                        controller.openPlayer();
+                      }
+                    },
+                    child: _MiniPlayer(controller: controller, track: miniTrack),
+                  ),
+                ),
+              // If mini player was dismissed, show subtle floating pill to reshow
+              if (!controller.isPlayerOpen && miniTrack != null && _isMiniPlayerDismissed)
+                Positioned(
+                  bottom: _kNavBarHeight +
+                      MediaQuery.of(context).viewPadding.bottom +
+                      4,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () {
+                        controller.hapticLight();
+                        setState(() => _isMiniPlayerDismissed = false);
+                      },
+                      onVerticalDragEnd: (details) {
+                        if ((details.primaryVelocity ?? 0) < -150) {
+                          controller.hapticLight();
+                          setState(() => _isMiniPlayerDismissed = false);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(AppRadii.pill),
+                          border: Border.all(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .outlineVariant
+                                .withValues(alpha: 0.5),
+                            width: 0.5,
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 8,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            PhosphorIcon(
+                              PhosphorIcons.caretUp(),
+                              size: 14,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              miniTrack.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               // Player overlay
               Positioned.fill(
@@ -177,16 +255,15 @@ class _MusicShellState extends State<MusicShell>
                           curve: AppMotion.standard,
                         ),
                         child: SlideTransition(
-                          position:
-                              Tween<Offset>(
-                                begin: const Offset(0, 1),
-                                end: Offset.zero,
-                              ).animate(
-                                CurvedAnimation(
-                                  parent: anim,
-                                  curve: AppMotion.emphasized,
-                                ),
-                              ),
+                          position: Tween<Offset>(
+                            begin: const Offset(0, 1),
+                            end: Offset.zero,
+                          ).animate(
+                            CurvedAnimation(
+                              parent: anim,
+                              curve: AppMotion.emphasized,
+                            ),
+                          ),
                           child: child,
                         ),
                       );
@@ -208,16 +285,21 @@ class _MusicShellState extends State<MusicShell>
           ),
           bottomNavigationBar: wideLayout
               ? null
-              : _BottomNav(controller: controller),
+              : _BottomNav(
+                  controller: controller,
+                  onSwipeUp: () {
+                    if (_isMiniPlayerDismissed) {
+                      controller.hapticLight();
+                      setState(() => _isMiniPlayerDismissed = false);
+                    }
+                  },
+                ),
         );
       },
     );
   }
 
   Widget _buildPage(MonolithController controller) {
-    // Horizontally swipeable tabs. Child order MUST match AppTab.values so a
-    // settled page maps back to the right tab. A hard left→right swipe moves to
-    // the previous tab (e.g. Downloads → Library); right→left to the next.
     return PageView(
       controller: _pageController,
       physics: const BouncingScrollPhysics(),
@@ -228,11 +310,20 @@ class _MusicShellState extends State<MusicShell>
           child: LibraryPage(
             key: const ValueKey('library'),
             onOpenSettings: _openSettings,
+            onSwipeToNextTab: () => _pageController?.animateToPage(
+              1,
+              duration: AppMotion.durMedium,
+              curve: AppMotion.emphasized,
+            ),
           ),
         ),
         const SafeArea(
           bottom: false,
           child: DownloadsPage(key: ValueKey('downloads'), embedded: true),
+        ),
+        const SafeArea(
+          bottom: false,
+          child: SongsPage(key: ValueKey('songs')),
         ),
         const SafeArea(
           bottom: false,
@@ -270,8 +361,9 @@ class _MusicShellState extends State<MusicShell>
 // ── Bottom navigation bar ──────────────────────────────────────────────────
 
 class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.controller});
+  const _BottomNav({required this.controller, this.onSwipeUp});
   final MonolithController controller;
+  final VoidCallback? onSwipeUp;
 
   @override
   Widget build(BuildContext context) {
@@ -316,11 +408,16 @@ class _BottomNav extends StatelessWidget {
       ),
     );
 
-    // RepaintBoundary caches the blurred nav so a repaint above it (page swipe,
-    // mini-player tick) can't force the backdrop to re-rasterize every frame —
-    // the always-on-screen blur was a primary heat source on A11.
     return RepaintBoundary(
-      child: ClipRect(key: const Key('bottom-nav'), child: bar),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onVerticalDragEnd: (details) {
+          if ((details.primaryVelocity ?? 0) < -150) {
+            onSwipeUp?.call();
+          }
+        },
+        child: ClipRect(key: const Key('bottom-nav'), child: bar),
+      ),
     );
   }
 }
@@ -342,11 +439,13 @@ class _NavItem extends StatelessWidget {
     final label = switch (tab) {
       AppTab.library => 'Library',
       AppTab.downloads => 'Downloads',
+      AppTab.songs => 'Songs',
       AppTab.search => 'Search',
     };
     final icon = switch (tab) {
       AppTab.library => AppIcons.navLibrary(isSelected),
       AppTab.downloads => AppIcons.navDownloads(isSelected),
+      AppTab.songs => AppIcons.navSongs(isSelected),
       AppTab.search => AppIcons.navSearch(isSelected),
     };
 

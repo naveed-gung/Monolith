@@ -392,8 +392,18 @@ class SettingsPage extends StatelessWidget {
                       _ActionRow(
                         icon: AppIcons.folderOpen,
                         title: 'Import from Music',
-                        subtitle: 'Copy accessible songs for offline listening',
+                        subtitle: controller.isImportingAudio
+                            ? 'Importing songs… please wait'
+                            : 'Copy accessible songs for offline listening',
                         onTap: () async {
+                          if (controller.isImportingAudio) return;
+                          controller.hapticLight();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              duration: Duration(seconds: 2),
+                              content: Text('Opening Music picker…'),
+                            ),
+                          );
                           try {
                             final message = await controller
                                 .importFromMusicLibrary();

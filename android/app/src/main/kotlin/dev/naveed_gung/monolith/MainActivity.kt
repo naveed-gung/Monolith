@@ -23,13 +23,17 @@ class MainActivity : AudioServiceActivity() {
                 result.notImplemented()
             } else try {
                 val file = File(call.argument<String>("path") ?: "").canonicalFile
-                val allowed = File(filesDir, "Updates").canonicalFile
-                require(file.parentFile == allowed && file.extension == "apk" && file.isFile) { "Invalid update path" }
+                val allowed1 = File(filesDir, "Updates").canonicalFile
+                val allowed2 = File(filesDir.parentFile, "app_flutter/Updates").canonicalFile
+                val parent = file.parentFile
+                require((parent == allowed1 || parent == allowed2 || file.path.contains("/Updates/")) && file.extension == "apk" && file.isFile) { "Invalid update path" }
                 val info = packageManager.getPackageArchiveInfo(file.path, 0)
                 require(info?.packageName == packageName) { "This update belongs to another app" }
                 val uri = FileProvider.getUriForFile(this, "$packageName.updates", file)
-                startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                val intent = Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
                 result.success(null)
             } catch (error: Exception) {
                 result.error("install_failed", error.message, null)

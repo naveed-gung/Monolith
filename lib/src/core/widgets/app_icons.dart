@@ -10,6 +10,9 @@ class AppIcons {
   static PhosphorIconData navDownloads(bool selected) => selected
       ? PhosphorIcons.downloadSimple(PhosphorIconsStyle.fill)
       : PhosphorIcons.downloadSimple();
+  static PhosphorIconData navSongs(bool selected) => selected
+      ? PhosphorIcons.musicNotes(PhosphorIconsStyle.fill)
+      : PhosphorIcons.musicNotes();
   static PhosphorIconData navSearch(bool selected) => selected
       ? PhosphorIcons.magnifyingGlass(PhosphorIconsStyle.fill)
       : PhosphorIcons.magnifyingGlass();

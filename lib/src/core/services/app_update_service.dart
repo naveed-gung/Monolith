@@ -48,19 +48,63 @@ class AppRelease {
 
 class AppUpdateService extends ChangeNotifier {
   static final instance = AppUpdateService();
-  static const currentVersion = '1.1.0';
+  static const currentVersion = '1.2.0';
   bool autoDownload = true;
   bool busy = false;
   double? progress;
   String status = 'Updates from GitHub';
   AppRelease? release;
   File? downloaded;
+  bool updateInstalled = false;
 
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
     autoDownload = prefs.getBool('updates_wifi_auto') ?? true;
+
+    // Check if new version was installed and clear old temporary cache
+    final lastVersion = prefs.getString('last_run_version');
+    if (lastVersion != null && lastVersion != currentVersion) {
+      await clearStaleAppCache();
+    }
+    await prefs.setString('last_run_version', currentVersion);
+
     notifyListeners();
     if (autoDownload) await check(automatic: true);
+  }
+
+  /// Removes stale temporary chunks, old update packages, and engine caches,
+  /// strictly leaving the user's custom settings and downloaded music files intact.
+  Future<int> clearStaleAppCache() async {
+    var bytesFreed = 0;
+    try {
+      final tempDir = await getTemporaryDirectory();
+      if (await tempDir.exists()) {
+        await for (final entity in tempDir.list(recursive: false)) {
+          try {
+            if (entity is File) {
+              bytesFreed += await entity.length();
+              await entity.delete();
+            } else if (entity is Directory) {
+              await entity.delete(recursive: true);
+            }
+          } catch (_) {}
+        }
+      }
+
+      final root = await getApplicationSupportDirectory();
+      final updatesDir = Directory('${root.path}/Updates');
+      if (await updatesDir.exists()) {
+        await for (final entity in updatesDir.list(recursive: false)) {
+          try {
+            if (entity is File && entity.path != downloaded?.path) {
+              bytesFreed += await entity.length();
+              await entity.delete();
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+    return bytesFreed;
   }
 
   Future<void> setAutomatic(bool value) async {

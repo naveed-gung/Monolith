@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum AppTab { library, downloads, search }
+enum AppTab { library, downloads, songs, search }
 
 enum LibraryCategory { tracks, artists, albums, playlists }
 

@@ -16,8 +16,9 @@ enum _SortOrder { aToZ, zToA, newest, oldest }
 enum _TrackAction { edit, delete, addToPlaylist, share, removeFromPlaylist }
 
 class LibraryPage extends StatefulWidget {
-  const LibraryPage({super.key, this.onOpenSettings});
+  const LibraryPage({super.key, this.onOpenSettings, this.onSwipeToNextTab});
   final VoidCallback? onOpenSettings;
+  final VoidCallback? onSwipeToNextTab;
 
   @override
   State<LibraryPage> createState() => _LibraryPageState();
@@ -474,9 +475,39 @@ class _LibraryPageState extends State<LibraryPage> {
       };
     }
 
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
+    final categories = LibraryCategory.values;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity < -250) {
+          // Swiped left -> advance sub-tab, or at end switch to next screen
+          final curIndex = categories.indexOf(controller.selectedCategory);
+          if (curIndex < categories.length - 1) {
+            controller.hapticLight();
+            setState(() => _drillItem = null);
+            controller.selectLibraryCategory(categories[curIndex + 1]);
+          } else {
+            widget.onSwipeToNextTab?.call();
+          }
+        } else if (velocity > 250) {
+          // Swiped right -> reverse sub-tab or exit drill-in
+          if (_drillItem != null) {
+            controller.hapticLight();
+            setState(() => _drillItem = null);
+          } else {
+            final curIndex = categories.indexOf(controller.selectedCategory);
+            if (curIndex > 0) {
+              controller.hapticLight();
+              controller.selectLibraryCategory(categories[curIndex - 1]);
+            }
+          }
+        }
+      },
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
         // ── Large header ─────────────────────────────────────────────
         SliverToBoxAdapter(
           child: Padding(
@@ -593,6 +624,12 @@ class _LibraryPageState extends State<LibraryPage> {
                       ),
                       child: const Text('Retry'),
                     ),
+                    IconButton(
+                      icon: PhosphorIcon(AppIcons.close, size: 16),
+                      color: scheme.onErrorContainer,
+                      tooltip: 'Dismiss',
+                      onPressed: () => controller.clearLibraryError(),
+                    ),
                   ],
                 ),
               ),
@@ -643,6 +680,7 @@ class _LibraryPageState extends State<LibraryPage> {
           sliver: contentSliver,
         ),
       ],
+    ),
     );
   }
 }

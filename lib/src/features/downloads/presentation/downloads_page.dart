@@ -387,14 +387,23 @@ class _DownloadsPageState extends State<DownloadsPage> {
                 AppSpacing.screenInset,
                 AppSpacing.xxl,
                 AppSpacing.screenInset,
-                AppSpacing.md,
+                AppSpacing.sm,
               ),
-              child: Text(
-                'Recent activity',
-                style: textTheme.titleSmall?.copyWith(
-                  fontWeight: AppType.label,
-                  letterSpacing: AppType.trackSnug,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Recent activity',
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: AppType.label,
+                      letterSpacing: AppType.trackSnug,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => controller.clearRecentDownloadTasks(),
+                    child: const Text('Clear'),
+                  ),
+                ],
               ),
             ),
           ),
@@ -414,6 +423,8 @@ class _DownloadsPageState extends State<DownloadsPage> {
                     onRetry: task.canRetry
                         ? () => controller.retryDownload(task.processId)
                         : null,
+                    onDismiss: () =>
+                        controller.dismissDownloadTask(task.processId),
                   );
                 },
                 childCount: recentTasks.length,
@@ -963,9 +974,10 @@ class _StatusDot extends StatelessWidget {
 // ── Recent task row ─────────────────────────────────────────────────────────
 
 class _RecentTaskRow extends StatelessWidget {
-  const _RecentTaskRow({required this.task, this.onRetry});
+  const _RecentTaskRow({required this.task, this.onRetry, this.onDismiss});
   final DownloadTaskInfo task;
   final VoidCallback? onRetry;
+  final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -973,58 +985,84 @@ class _RecentTaskRow extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final isOk = task.status == DownloadTaskStatus.completed;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: isOk
-                  ? scheme.primaryContainer
-                  : scheme.errorContainer,
+    return Dismissible(
+      key: ValueKey('recent-task-${task.processId}'),
+      direction: DismissDirection.horizontal,
+      onDismissed: (_) => onDismiss?.call(),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: scheme.errorContainer,
+          borderRadius: AppRadii.all(AppRadii.sm),
+        ),
+        child: PhosphorIcon(AppIcons.close, color: scheme.onErrorContainer),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+        child: Row(
+          children: [
+            InkWell(
+              onTap: isOk ? null : onDismiss,
               borderRadius: AppRadii.all(AppRadii.sm),
-            ),
-            child: Center(
-              child: PhosphorIcon(
-                isOk ? AppIcons.downloadFill : AppIcons.close,
-                size: 18,
-                color: isOk
-                    ? scheme.onPrimaryContainer
-                    : scheme.onErrorContainer,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodyMedium?.copyWith(fontWeight: AppType.body),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isOk ? scheme.primaryContainer : scheme.errorContainer,
+                  borderRadius: AppRadii.all(AppRadii.sm),
                 ),
-                Text(
-                  task.statusLabel,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
+                child: Center(
+                  child: PhosphorIcon(
+                    isOk ? AppIcons.downloadFill : AppIcons.close,
+                    size: 18,
+                    color: isOk
+                        ? scheme.onPrimaryContainer
+                        : scheme.onErrorContainer,
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-          if (onRetry != null)
-            IconButton(
-              onPressed: onRetry,
-              icon: PhosphorIcon(AppIcons.refresh, size: 18),
-              color: scheme.onSurfaceVariant,
-              tooltip: 'Retry',
-              padding: const EdgeInsets.all(AppSpacing.xs),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontWeight: AppType.body,
+                    ),
+                  ),
+                  Text(
+                    task.statusLabel,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-        ],
+            if (onRetry != null)
+              IconButton(
+                onPressed: onRetry,
+                icon: PhosphorIcon(AppIcons.refresh, size: 18),
+                color: scheme.onSurfaceVariant,
+                tooltip: 'Retry',
+                padding: const EdgeInsets.all(AppSpacing.xs),
+              ),
+            if (onDismiss != null)
+              IconButton(
+                onPressed: onDismiss,
+                icon: PhosphorIcon(AppIcons.close, size: 18),
+                color: scheme.onSurfaceVariant,
+                tooltip: 'Dismiss',
+                padding: const EdgeInsets.all(AppSpacing.xs),
+              ),
+          ],
+        ),
       ),
     );
   }

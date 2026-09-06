@@ -2,6 +2,31 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.3.0] — 2026-09-06
+
+### Fixed / Reliability
+- **Audible playback start** — eliminated volume zero race before `AudioPlayer.play()` completion; stale source loads are safely ignored.
+- **Duration inspection** — Swift AVFoundation and Android MediaMetadataRetriever inspect track duration without initiating playback; persisted known durations avoid 0:00 display.
+- **Download resilience** — immediate queued job lifecycle, cancellation guards, per-job clients, and upgrade to `youtube_explode_dart 3.1.0`.
+- **Atomic file writes** — in-progress downloads write to unique `.part` files and rename only on complete transfer; failed downloads never pollute the library.
+- **Source isolation** — Downloads view filters strictly for downloaded audio (`source=downloaded`); imported audio remains in Library/Songs.
+
+### Changed / UI
+- **Refined aesthetics** — light canvas, compact headers, artwork shelf, underlined category tabs, readable song durations, and square covers.
+- **Visual stability** — reserved bottom navigation area and compact player above it.
+
+## [1.2.0] — 2026-09-05
+
+### Added
+- **Dedicated Songs tab** — added fourth core navigation destination with real-time search, sorting, shuffle, and track action menus.
+- **Mini-player gestures** — swipe down to dock into discreet floating pill; tap/swipe up to restore or expand to full deck.
+- **Horizontal Library navigation** — smooth swipe gesture cycles between Tracks, Artists, Albums, and Playlists.
+- **Dismissible downloads & banners** — swipe/tap dismiss on failed tasks and close button on error banners.
+
+### Fixed
+- **iOS Music Library import** — URL-safe filename sanitization, `FileProtectionType.none` attributes, and dynamic container migration recovery.
+- **CI/CD Automation** — upgraded Gradle wrapper to 8.14.5 and automated dual Android/iOS release publishing.
+
 ## [1.0.4] — 2026-06-04
 
 ### Fixed / Performance

@@ -858,6 +858,56 @@ class MonolithController extends ChangeNotifier {
     }
   }
 
+  Future<String?> importAllFromMusicLibrary() async {
+    if (_isImportingAudio) return null;
+    _isImportingAudio = true;
+    notifyListeners();
+    try {
+      final items = await MediaImportChannel().importAllFromMusicLibrary();
+      if (items.isEmpty) return 'No accessible local tracks found in Music library.';
+      final previousId = currentTrack?.id;
+      final imported = <Track>[];
+      for (final item in items) {
+        if (item.status != ImportedItemStatus.copied || item.path == null) {
+          continue;
+        }
+        imported.add(
+          Track(
+            id: 'music-${DateTime.now().microsecondsSinceEpoch}-${imported.length}',
+            title: item.title,
+            artist: item.artist,
+            album: 'Music library',
+            genre: 'Imported audio',
+            duration: Duration(milliseconds: item.durationMs),
+            colors: Track.paletteForSeed(item.path!),
+            blurb: 'Saved from your Music library for offline listening.',
+            source: TrackSource.imported,
+            filePath: item.path,
+            artworkFilePath: await _downloadStore.findArtworkForAudio(
+              item.path!,
+            ),
+            addedAt: DateTime.now(),
+          ),
+        );
+      }
+      if (imported.isNotEmpty) {
+        _selectedCategory = LibraryCategory.tracks;
+      }
+      _downloadedTracks = [...imported, ..._downloadedTracks];
+      await _downloadStore.saveTracks(_downloadedTracks);
+      _rebuildTracks(preferredTrackId: previousId);
+      if (previousId == null && imported.isNotEmpty) {
+        await _syncSelectedTrack(autoplay: false);
+      }
+      final skipped = items.length - imported.length;
+      return 'Imported ${imported.length} tracks.'
+          '${skipped == 0 ? '' : ' $skipped unavailable or protected tracks skipped. Import original audio files for protected songs.'}';
+    } finally {
+      _isImportingAudio = false;
+      notifyListeners();
+    }
+  }
+
   Future<String> renameTrackMetadata({
     required Track track,
     required String title,

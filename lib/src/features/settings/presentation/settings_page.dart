@@ -226,8 +226,8 @@ class SettingsPage extends StatelessWidget {
                     ),
                     _Divider(),
                     _ToggleRow(
-                      title: 'Immersive canvas',
-                      subtitle: 'Reactive backdrop behind album art',
+                      title: 'Artwork tint',
+                      subtitle: 'Soft color behind the current cover',
                       value: controller.immersiveCanvas,
                       onChanged: controller.setImmersiveCanvas,
                     ),

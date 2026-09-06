@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:monolith/src/core/models/music_models.dart';
 import 'package:monolith/src/core/services/download_store.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -71,6 +72,72 @@ void main() {
     expect(tracks.single.filePath, audio.path);
     expect(tracks.single.artworkFilePath, cover.path);
   });
+
+  test(
+    'recovery reads durations without playback and distinguishes imports from partial downloads',
+    () async {
+      var probes = 0;
+      const channel = MethodChannel('monolith/media_import');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            probes++;
+            return {'durationMs': 123000};
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+      final music = await store.getDownloadDirectory();
+      final imports = await Directory('${music.path}/Imports').create();
+      File('${imports.path}/song.m4a').writeAsBytesSync([1]);
+      File('${music.path}/incomplete.m4a.part').writeAsBytesSync([1]);
+      final recovered = await store.loadTracksMergingDisk();
+      expect(recovered.length, 1);
+      expect(recovered.single.source, TrackSource.imported);
+      expect(recovered.single.duration, const Duration(seconds: 123));
+      await DownloadStore().loadTracksMergingDisk();
+      expect(
+        probes,
+        1,
+        reason: 'Known duration is persisted, not probed on every launch.',
+      );
+    },
+  );
+
+  test(
+    'schema v2 preserves artwork and dates and supplies fallback artwork colors',
+    () async {
+      final music = await store.getDownloadDirectory();
+      final audio = File('${music.path}/v2.m4a')..writeAsBytesSync([1]);
+      final art = File('${music.path}/v2.jpg')..writeAsBytesSync([1]);
+      final manifest = File('${music.parent.path}/manifest.json');
+      await manifest.writeAsString(
+        jsonEncode({
+          'schemaVersion': 2,
+          'tracks': [
+            {
+              'id': 'v2',
+              'title': 'Song',
+              'artist': 'Artist',
+              'album': 'Album',
+              'source': 'imported',
+              'filePath': audio.path,
+              'artworkPath': art.path,
+              'durationMs': 90000,
+              'addedAt': '2026-09-01T00:00:00.000',
+              'playCount': 4,
+            },
+          ],
+        }),
+      );
+      final track = (await store.loadTracks()).single;
+      expect(track.colors, isNotEmpty);
+      expect(track.artworkFilePath, art.path);
+      expect(track.addedAt, DateTime(2026, 9, 1));
+      expect(track.duration.inSeconds, 90);
+      expect(track.playCount, 4);
+    },
+  );
 
   group('D1 — update keeps downloads', () {
     test(

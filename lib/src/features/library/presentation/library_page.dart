@@ -9,6 +9,7 @@ import '../../../core/models/music_models.dart';
 import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
+import '../../../shared/widgets/app_download_indicator.dart';
 
 enum _SortOrder { aToZ, zToA, newest, oldest }
 
@@ -379,6 +380,7 @@ class _LibraryPageState extends State<LibraryPage> {
     final controller = AppScope.watch(context);
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     // When drilling into a category item, compute which tracks to show
     Widget contentSliver;
@@ -543,26 +545,128 @@ class _LibraryPageState extends State<LibraryPage> {
                       ],
                     ),
                   ),
-                  PopupMenuButton<String>(
-                    tooltip: 'Import music',
-                    icon: const Icon(Icons.add_rounded),
-                    onSelected: (source) async {
-                      final message = source == 'music'
-                          ? await controller.importFromMusicLibrary()
-                          : await controller.importAudioFiles();
-                      if (message != null) _showMsg(message);
-                    },
-                    itemBuilder: (_) => [
-                      if (controller.supportsAppleMusicImportPrompt)
-                        const PopupMenuItem(
-                          value: 'music',
-                          child: Text('From Music'),
+                  const AppDownloadIndicator(),
+                  Theme(
+                    data: Theme.of(context).copyWith(
+                      popupMenuTheme: PopupMenuThemeData(
+                        color: isLight ? Colors.white : const Color(0xFF161A24),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: isLight
+                                ? Colors.black.withValues(alpha: 0.08)
+                                : Colors.white.withValues(alpha: 0.12),
+                          ),
                         ),
-                      const PopupMenuItem(
-                        value: 'files',
-                        child: Text('From Files'),
+                        elevation: 12,
                       ),
-                    ],
+                    ),
+                    child: PopupMenuButton<String>(
+                      tooltip: 'Import music',
+                      offset: const Offset(0, 42),
+                      elevation: 8,
+                      icon: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: isLight
+                              ? Colors.black.withValues(alpha: 0.04)
+                              : Colors.white.withValues(alpha: 0.06),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isLight
+                                ? Colors.black.withValues(alpha: 0.06)
+                                : Colors.white.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.add_rounded,
+                          size: 20,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                      onSelected: (source) async {
+                        final String? message;
+                        if (source == 'music_all') {
+                          message = await controller.importAllFromMusicLibrary();
+                        } else if (source == 'music') {
+                          message = await controller.importFromMusicLibrary();
+                        } else {
+                          message = await controller.importAudioFiles();
+                        }
+                        if (message != null) _showMsg(message);
+                      },
+                      itemBuilder: (_) => [
+                        if (controller.supportsAppleMusicImportPrompt) ...[
+                          PopupMenuItem(
+                            value: 'music_all',
+                            height: 44,
+                            child: Row(
+                              children: [
+                                PhosphorIcon(
+                                  PhosphorIcons.musicNotesSimple(),
+                                  size: 18,
+                                  color: scheme.primary,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Import All from Music',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'music',
+                            height: 44,
+                            child: Row(
+                              children: [
+                                PhosphorIcon(
+                                  PhosphorIcons.checkSquareOffset(),
+                                  size: 18,
+                                  color: scheme.primary,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Select from Music…',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        PopupMenuItem(
+                          value: 'files',
+                          height: 44,
+                          child: Row(
+                            children: [
+                              PhosphorIcon(
+                                PhosphorIcons.folderSimple(),
+                                size: 18,
+                                color: scheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'From Files',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: scheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   IconButton(
                     key: const Key('settings-button'),

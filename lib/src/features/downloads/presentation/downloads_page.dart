@@ -28,7 +28,11 @@ String _fmtBytes(int b) {
     v /= 1024;
     i++;
   }
-  final p = v >= 100 ? 0 : v >= 10 ? 1 : 2;
+  final p = v >= 100
+      ? 0
+      : v >= 10
+      ? 1
+      : 2;
   return '${v.toStringAsFixed(p)} ${u[i]}';
 }
 
@@ -64,11 +68,14 @@ class _DownloadsPageState extends State<DownloadsPage> {
   List<Track> _filtered(MonolithController controller) {
     final q = _filterC.text.trim().toLowerCase();
     final list = q.isEmpty
-        ? List<Track>.of(controller.offlineTracks)
-        : controller.offlineTracks
-            .where((t) =>
-                '${t.title} ${t.artist} ${t.album}'.toLowerCase().contains(q))
-            .toList(growable: false);
+        ? List<Track>.of(controller.downloadedTracks)
+        : controller.downloadedTracks
+              .where(
+                (t) => '${t.title} ${t.artist} ${t.album}'
+                    .toLowerCase()
+                    .contains(q),
+              )
+              .toList(growable: false);
     return list;
   }
 
@@ -114,7 +121,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        '${controller.offlineTracks.length} saved offline',
+                        '${controller.downloadedTracks.length} ${controller.downloadedTracks.length == 1 ? 'download' : 'downloads'}',
                         style: textTheme.bodyLarge?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
@@ -224,12 +231,13 @@ class _DownloadsPageState extends State<DownloadsPage> {
                   child: _ActiveTaskCard(
                     task: activeTasks[i],
                     onPause: activeTasks[i].canPause
-                        ? () => controller
-                            .pauseDownload(activeTasks[i].processId)
+                        ? () =>
+                              controller.pauseDownload(activeTasks[i].processId)
                         : null,
                     onResume: activeTasks[i].canResume
-                        ? () => controller
-                            .resumeDownload(activeTasks[i].processId)
+                        ? () => controller.resumeDownload(
+                            activeTasks[i].processId,
+                          )
                         : null,
                     onCancel: () =>
                         controller.cancelDownload(activeTasks[i].processId),
@@ -254,7 +262,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
               children: [
                 Expanded(
                   child: Text(
-                    'Saved offline',
+                    'Downloaded songs',
                     style: textTheme.titleSmall?.copyWith(
                       fontWeight: AppType.label,
                       letterSpacing: AppType.trackSnug,
@@ -327,7 +335,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    controller.offlineTracks.isEmpty
+                    controller.downloadedTracks.isEmpty
                         ? 'Nothing saved yet'
                         : 'No matches',
                     style: textTheme.titleMedium?.copyWith(
@@ -336,8 +344,8 @@ class _DownloadsPageState extends State<DownloadsPage> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    controller.offlineTracks.isEmpty
-                        ? 'Tap Add to download audio from any supported URL'
+                    controller.downloadedTracks.isEmpty
+                        ? 'Save a song from a link. Music and Files imports live in your library.'
                         : 'Try a different search term',
                     style: textTheme.bodyMedium?.copyWith(
                       color: scheme.onSurfaceVariant,
@@ -354,28 +362,25 @@ class _DownloadsPageState extends State<DownloadsPage> {
               horizontal: AppSpacing.screenInset,
             ),
             sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, i) {
-                  final track = filtered[i];
-                  final isLast = i == filtered.length - 1;
-                  return Column(
-                    children: [
-                      _OfflineTrackRow(
-                        track: track,
-                        onTap: () =>
-                            controller.selectTrack(track, openPlayer: true),
+              delegate: SliverChildBuilderDelegate((context, i) {
+                final track = filtered[i];
+                final isLast = i == filtered.length - 1;
+                return Column(
+                  children: [
+                    _OfflineTrackRow(
+                      track: track,
+                      onTap: () =>
+                          controller.selectTrack(track, openPlayer: true),
+                    ),
+                    if (!isLast)
+                      Divider(
+                        height: 1,
+                        indent: 72,
+                        color: scheme.outlineVariant.withValues(alpha: 0.35),
                       ),
-                      if (!isLast)
-                        Divider(
-                          height: 1,
-                          indent: 72,
-                          color: scheme.outlineVariant.withValues(alpha: 0.35),
-                        ),
-                    ],
-                  );
-                },
-                childCount: filtered.length,
-              ),
+                  ],
+                );
+              }, childCount: filtered.length),
             ),
           ),
 
@@ -415,27 +420,22 @@ class _DownloadsPageState extends State<DownloadsPage> {
               0,
             ),
             sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, i) {
-                  final task = recentTasks[i];
-                  return _RecentTaskRow(
-                    task: task,
-                    onRetry: task.canRetry
-                        ? () => controller.retryDownload(task.processId)
-                        : null,
-                    onDismiss: () =>
-                        controller.dismissDownloadTask(task.processId),
-                  );
-                },
-                childCount: recentTasks.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, i) {
+                final task = recentTasks[i];
+                return _RecentTaskRow(
+                  task: task,
+                  onRetry: task.canRetry
+                      ? () => controller.retryDownload(task.processId)
+                      : null,
+                  onDismiss: () =>
+                      controller.dismissDownloadTask(task.processId),
+                );
+              }, childCount: recentTasks.length),
             ),
           ),
         ],
 
-        const SliverToBoxAdapter(
-          child: SizedBox(height: 180),
-        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 180)),
       ],
     );
 
@@ -453,12 +453,13 @@ class _DownloadsPageState extends State<DownloadsPage> {
     });
     try {
       final p = await controller.inspectDownload(_urlC.text);
+      if (!mounted) return;
       setState(() {
         _preview = p;
         _nameC.text = p.suggestedFileName;
       });
     } catch (e) {
-      setState(() => _error = _friendlyError(e));
+      if (mounted) setState(() => _error = _friendlyError(e));
     } finally {
       if (mounted) setState(() => _inspecting = false);
     }
@@ -466,6 +467,9 @@ class _DownloadsPageState extends State<DownloadsPage> {
 
   static String _friendlyError(Object e) {
     final msg = e.toString();
+    if (msg.contains('TimeoutException')) {
+      return 'YouTube took too long to respond. Check your connection and try again.';
+    }
     if (msg.contains('SocketException') ||
         msg.contains('Failed host lookup') ||
         msg.contains('ClientException')) {
@@ -493,10 +497,13 @@ class _DownloadsPageState extends State<DownloadsPage> {
         preview: _preview!,
         fileName: _nameC.text,
       );
+      if (!mounted) return;
       setState(() => _showAdder = false);
       _clearPreview();
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Bad state: ', ''));
+      if (mounted) {
+        setState(() => _error = e.toString().replaceFirst('Bad state: ', ''));
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -651,7 +658,9 @@ class _AdderCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: isOnline && hasUrl && !inspecting ? onInspect : null,
+                  onPressed: isOnline && hasUrl && !inspecting
+                      ? onInspect
+                      : null,
                   icon: inspecting
                       ? const SizedBox(
                           width: 16,
@@ -688,8 +697,9 @@ class _AdderCard extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: FilledButton.icon(
-                      onPressed:
-                          isOnline && hasUrl && hasName && !submitting ? onDownload : null,
+                      onPressed: isOnline && hasUrl && hasName && !submitting
+                          ? onDownload
+                          : null,
                       icon: submitting
                           ? const SizedBox(
                               width: 16,
@@ -748,7 +758,10 @@ class _PreviewRow extends StatelessWidget {
             child: preview.thumbnailUrl == null
                 ? Container(
                     color: scheme.surfaceContainerHigh,
-                    child: PhosphorIcon(AppIcons.musicNote, color: scheme.primary),
+                    child: PhosphorIcon(
+                      AppIcons.musicNote,
+                      color: scheme.primary,
+                    ),
                   )
                 : Image.network(
                     preview.thumbnailUrl!,
@@ -768,7 +781,10 @@ class _PreviewRow extends StatelessWidget {
                     },
                     errorBuilder: (_, _, _) => Container(
                       color: scheme.surfaceContainerHigh,
-                      child: PhosphorIcon(AppIcons.musicNote, color: scheme.primary),
+                      child: PhosphorIcon(
+                        AppIcons.musicNote,
+                        color: scheme.primary,
+                      ),
                     ),
                   ),
           ),
@@ -782,7 +798,9 @@ class _PreviewRow extends StatelessWidget {
                 preview.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: textTheme.bodyMedium?.copyWith(fontWeight: AppType.label),
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: AppType.label,
+                ),
               ),
               Text(
                 [
@@ -959,8 +977,8 @@ class _StatusDot extends StatelessWidget {
     final color = switch (status) {
       DownloadTaskStatus.completed => scheme.primary,
       DownloadTaskStatus.failed => scheme.error,
-      DownloadTaskStatus.paused || DownloadTaskStatus.cancelled =>
-        scheme.onSurfaceVariant,
+      DownloadTaskStatus.paused ||
+      DownloadTaskStatus.cancelled => scheme.onSurfaceVariant,
       _ => scheme.primary,
     };
     return Container(
@@ -1105,7 +1123,9 @@ class _OfflineTrackRow extends StatelessWidget {
                     track.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyLarge?.copyWith(fontWeight: AppType.body),
+                    style: textTheme.bodyLarge?.copyWith(
+                      fontWeight: AppType.body,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(

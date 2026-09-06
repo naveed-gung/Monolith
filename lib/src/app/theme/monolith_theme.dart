@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'design_tokens.dart';
 
@@ -73,7 +74,8 @@ class MonolithTheme {
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
       displaySmall: base.textTheme.displaySmall?.copyWith(
-        fontWeight: AppType.display,
+        fontSize: 30,
+        fontWeight: FontWeight.w600,
         letterSpacing: AppType.trackTight,
       ),
       headlineMedium: base.textTheme.headlineMedium?.copyWith(
@@ -108,6 +110,9 @@ class MonolithTheme {
       scaffoldBackgroundColor: s.canvas,
       textTheme: textTheme,
       appBarTheme: AppBarTheme(
+        systemOverlayStyle: isLight
+            ? SystemUiOverlayStyle.dark
+            : SystemUiOverlayStyle.light,
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,

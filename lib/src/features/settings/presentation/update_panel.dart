@@ -35,6 +35,34 @@ class UpdatePanel extends StatelessWidget {
   Future<void> _install(BuildContext context, AppUpdateService service) async {
     try {
       if (Platform.isIOS) {
+        if (service.downloaded != null) {
+          final box = context.findRenderObject() as RenderBox?;
+          await Share.shareXFiles(
+            [XFile(service.downloaded!.path)],
+            text: 'Install Monolith update',
+            sharePositionOrigin: box == null
+                ? null
+                : box.localToGlobal(Offset.zero) & box.size,
+          );
+          return;
+        }
+
+        // If update not downloaded yet, trigger download first
+        if (service.release != null) {
+          await service.download();
+          if (service.downloaded != null && context.mounted) {
+            final box = context.findRenderObject() as RenderBox?;
+            await Share.shareXFiles(
+              [XFile(service.downloaded!.path)],
+              text: 'Install Monolith update',
+              sharePositionOrigin: box == null
+                  ? null
+                  : box.localToGlobal(Offset.zero) & box.size,
+            );
+            return;
+          }
+        }
+
         var opened = await launchUrl(
           Uri(
             scheme: 'apple-magnifier',
@@ -50,13 +78,7 @@ class UpdatePanel extends StatelessWidget {
             mode: LaunchMode.externalApplication,
           );
         }
-        if (!opened && service.downloaded != null) {
-          // Open or share downloaded IPA
-          await Share.shareXFiles(
-            [XFile(service.downloaded!.path)],
-            text: 'Monolith update IPA',
-          );
-        } else if (!opened) {
+        if (!opened) {
           throw StateError(
             'Could not open installer. Open TrollStore, AltStore, or share the IPA.',
           );

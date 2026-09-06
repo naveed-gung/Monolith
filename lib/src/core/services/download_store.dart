@@ -154,8 +154,17 @@ class DownloadStore {
           );
         })
         .where(
-          (track) =>
-              track.filePath != null && File(track.filePath!).existsSync(),
+          (track) {
+            if (track.filePath == null) return false;
+            final file = File(track.filePath!);
+            if (!file.existsSync()) return false;
+            try {
+              if (file.lengthSync() == 0) return false;
+            } catch (_) {
+              return false;
+            }
+            return true;
+          },
         )
         .toList();
     // Missing files may be temporarily inaccessible; never prune the manifest
@@ -191,7 +200,7 @@ class DownloadStore {
         if (!_audioExtensions.contains(ext)) continue;
         if (known.contains(_canonical(entity.path))) continue;
         try {
-          if (await entity.length() < 4096) continue;
+          if (await entity.length() == 0) continue;
         } catch (_) {
           continue;
         }

@@ -8,12 +8,73 @@ import 'package:flutter/services.dart';
 /// canceled exports) so a native hiccup never crashes the app;
 /// [MissingPluginException] is deliberately rethrown so callers can fall back
 /// to share-sheet based export on platforms without the native module.
+typedef ImportProgressCallback = void Function(int current, int total, String title);
+
 class MediaImportChannel {
   /// Injectable for tests; defaults to the production channel.
   MediaImportChannel({MethodChannel? channel})
-    : channel = channel ?? const MethodChannel('monolith/media_import');
+    : channel = channel ?? const MethodChannel('monolith/media_import') {
+    this.channel.setMethodCallHandler(_handleNativeCall);
+  }
 
   final MethodChannel channel;
+  ImportProgressCallback? onProgress;
+
+  Future<void> _handleNativeCall(MethodCall call) async {
+    if (call.method == 'onImportProgress') {
+      final args = call.arguments as Map?;
+      if (args != null) {
+        final current = (args['current'] as num?)?.toInt() ?? 0;
+        final total = (args['total'] as num?)?.toInt() ?? 0;
+        final title = args['title'] as String? ?? '';
+        onProgress?.call(current, total, title);
+      }
+    }
+  }
+
+  Future<void> cancelImport() async {
+    try {
+      await channel.invokeMethod<void>('cancelMusicImport');
+    } on PlatformException {
+      // Ignore if not supported on platform
+    }
+  }
+
+  Future<bool> requestNotificationPermission() async {
+    try {
+      return await channel.invokeMethod<bool>('requestNotificationPermission') ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  Future<void> updateDownloadNotification({
+    required String id,
+    required String title,
+    required String body,
+    bool isComplete = false,
+  }) async {
+    try {
+      await channel.invokeMethod<void>('updateDownloadNotification', <String, dynamic>{
+        'id': id,
+        'title': title,
+        'body': body,
+        'isComplete': isComplete,
+      });
+    } on PlatformException {
+      // Ignore
+    }
+  }
+
+  Future<void> cancelDownloadNotification(String id) async {
+    try {
+      await channel.invokeMethod<void>('cancelDownloadNotification', <String, dynamic>{
+        'id': id,
+      });
+    } on PlatformException {
+      // Ignore
+    }
+  }
 
   /// Presents the iOS music-library picker and copies readable items into
   /// the app sandbox. Returns one result per picked item.

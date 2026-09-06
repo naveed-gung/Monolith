@@ -8,6 +8,7 @@ import '../../../core/models/music_models.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/track_artwork.dart';
+import '../../../shared/widgets/app_download_indicator.dart';
 
 // ── Formatters ─────────────────────────────────────────────────────────────
 
@@ -36,6 +37,14 @@ String _fmtBytes(int b) {
   return '${v.toStringAsFixed(p)} ${u[i]}';
 }
 
+String _fmtSpeed(int bps) {
+  if (bps <= 0) return '0 KB/s';
+  if (bps >= 1024 * 1024) {
+    return '${(bps / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+  }
+  return '${(bps / 1024).toStringAsFixed(0)} KB/s';
+}
+
 // ── Page ────────────────────────────────────────────────────────────────────
 
 class DownloadsPage extends StatefulWidget {
@@ -46,7 +55,8 @@ class DownloadsPage extends StatefulWidget {
   State<DownloadsPage> createState() => _DownloadsPageState();
 }
 
-class _DownloadsPageState extends State<DownloadsPage> {
+class _DownloadsPageState extends State<DownloadsPage>
+    with AutomaticKeepAliveClientMixin {
   final _urlC = TextEditingController();
   final _nameC = TextEditingController();
   final _filterC = TextEditingController();
@@ -56,6 +66,9 @@ class _DownloadsPageState extends State<DownloadsPage> {
   bool _submitting = false;
   String? _error;
   bool _showAdder = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -81,6 +94,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final controller = AppScope.watch(context);
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -129,7 +143,9 @@ class _DownloadsPageState extends State<DownloadsPage> {
                     ],
                   ),
                 ),
-                // Add new download button
+                // App morphing download indicator & Add button
+                const AppDownloadIndicator(),
+                const SizedBox(width: AppSpacing.xs),
                 FilledButton.icon(
                   onPressed: () => setState(() => _showAdder = !_showAdder),
                   icon: PhosphorIcon(
@@ -918,33 +934,78 @@ class _ActiveTaskCard extends StatelessWidget {
             children: [
               _StatusDot(status: task.status),
               const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  task.statusLabel,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: _statusColor(scheme, task.status),
-                    fontWeight: AppType.label,
-                  ),
+              Text(
+                task.statusLabel,
+                style: textTheme.labelSmall?.copyWith(
+                  color: _statusColor(scheme, task.status),
+                  fontWeight: AppType.label,
                 ),
               ),
-              if (task.totalBytes != null)
+              if (task.status == DownloadTaskStatus.downloading && pct > 0) ...[
+                const SizedBox(width: AppSpacing.xs),
                 Text(
-                  '${pct > 0 ? '${(pct * 100).round()}% · ' : ''}${_fmtBytes(task.totalBytes!)}',
+                  '· ${(pct * 100).round()}%',
                   style: textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              if (task.eta > Duration.zero) ...[
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  _fmtEta(task.eta),
-                  style: textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
+                    color: scheme.primary,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
+              const Spacer(),
+              if (task.downloadedBytes != null && task.totalBytes != null && task.totalBytes! > 0)
+                Text(
+                  '${_fmtBytes(task.downloadedBytes!)} / ${_fmtBytes(task.totalBytes!)}',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                )
+              else if (task.totalBytes != null && task.totalBytes! > 0)
+                Text(
+                  _fmtBytes(task.totalBytes!),
+                  style: textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
             ],
           ),
+          if (task.status == DownloadTaskStatus.downloading) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                if (task.downloadSpeedBytesPerSecond != null && task.downloadSpeedBytesPerSecond! > 0) ...[
+                  PhosphorIcon(
+                    PhosphorIcons.lightning(),
+                    size: 13,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _fmtSpeed(task.downloadSpeedBytesPerSecond!),
+                    style: textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                if (task.eta > Duration.zero) ...[
+                  PhosphorIcon(
+                    PhosphorIcons.timer(),
+                    size: 13,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${_fmtEta(task.eta)} left',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
           if (task.errorMessage != null) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(

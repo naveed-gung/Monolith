@@ -2,6 +2,7 @@ import AVFoundation
 import Flutter
 import MediaPlayer
 import UIKit
+import UserNotifications
 
 /// Native import/export bridge for Monolith 2.0.
 ///
@@ -32,6 +33,8 @@ final class MediaImportPlugin: NSObject {
   private var pendingImportResult: FlutterResult?
   private var pendingExportResult: FlutterResult?
 
+  private var isImportCancelled = false
+
   private init(messenger: FlutterBinaryMessenger, presenter: UIViewController?) {
     channel = FlutterMethodChannel(name: Self.channelName, binaryMessenger: messenger)
     self.presenter = presenter
@@ -45,12 +48,54 @@ final class MediaImportPlugin: NSObject {
   static func register(messenger: FlutterBinaryMessenger, presenter: UIViewController?) {
     guard activeInstance == nil else { return }
     activeInstance = MediaImportPlugin(messenger: messenger, presenter: presenter)
+    DispatchQueue.global(qos: .background).async {
+      Self.cleanupTempFiles()
+    }
+  }
+
+  private static func cleanupTempFiles() {
+    guard let dir = try? importsDirectory() else { return }
+    let fileManager = FileManager.default
+    if let files = try? fileManager.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+      for file in files where file.pathExtension.lowercased() == "tmp" {
+        try? fileManager.removeItem(at: file)
+      }
+    }
   }
 
   // MARK: - Method dispatch
 
   private func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "cancelMusicImport":
+      isImportCancelled = true
+      result(nil)
+    case "requestNotificationPermission":
+      UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+        DispatchQueue.main.async { result(granted) }
+      }
+    case "updateDownloadNotification":
+      guard let args = call.arguments as? [String: Any],
+            let id = args["id"] as? String,
+            let title = args["title"] as? String,
+            let body = args["body"] as? String else {
+        result(nil)
+        return
+      }
+      let content = UNMutableNotificationContent()
+      content.title = title
+      content.body = body
+      content.sound = (args["isComplete"] as? Bool ?? false) ? .default : nil
+      let request = UNNotificationRequest(identifier: "download_\(id)", content: content, trigger: nil)
+      UNUserNotificationCenter.current().add(request) { _ in
+        DispatchQueue.main.async { result(nil) }
+      }
+    case "cancelDownloadNotification":
+      if let args = call.arguments as? [String: Any], let id = args["id"] as? String {
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["download_\(id)"])
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["download_\(id)"])
+      }
+      result(nil)
     case "readAudioMetadata":
       guard let args = call.arguments as? [String: Any], let path = args["path"] as? String else {
         result(FlutterError(code: "invalid_path", message: "Missing audio path", details: nil)); return
@@ -113,16 +158,29 @@ final class MediaImportPlugin: NSObject {
               }
               return
             }
-            Task { @MainActor in
-              guard let currentResult = self.pendingImportResult else { return }
-              self.pendingImportResult = nil
-              var payloads: [[String: Any]] = []
-              payloads.reserveCapacity(items.count)
-              for item in items {
-                payloads.append(await MediaImportPlugin.process(item: item))
+              self.isImportCancelled = false
+              Task { @MainActor in
+                guard let currentResult = self.pendingImportResult else { return }
+                self.pendingImportResult = nil
+                var payloads: [[String: Any]] = []
+                payloads.reserveCapacity(items.count)
+                for (index, item) in items.enumerated() {
+                  if self.isImportCancelled {
+                    break
+                  }
+                  let payload = await MediaImportPlugin.process(item: item)
+                  payloads.append(payload)
+                  self.channel.invokeMethod(
+                    "onImportProgress",
+                    arguments: [
+                      "current": index + 1,
+                      "total": items.count,
+                      "title": item.title ?? "Song"
+                    ]
+                  )
+                }
+                currentResult(payloads)
               }
-              currentResult(payloads)
-            }
           }
         }
       }
@@ -194,37 +252,42 @@ final class MediaImportPlugin: NSObject {
       } else {
         // ipod-library URLs are AVFoundation assets, not filesystem paths.
         destination = try importsDirectory().appendingPathComponent("\(sanitizedFileName(title))-\(UUID().uuidString).m4a")
+        let tempDestination = destination.deletingPathExtension().appendingPathExtension("tmp")
+        try? FileManager.default.removeItem(at: tempDestination)
         guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
           throw NSError(domain: "Monolith", code: 1, userInfo: [NSLocalizedDescriptionKey: "This library asset cannot be exported."])
         }
-        exporter.outputURL = destination
+        exporter.outputURL = tempDestination
         exporter.outputFileType = .m4a
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
           exporter.exportAsynchronously { continuation.resume() }
         }
         guard exporter.status == .completed else {
-          try? FileManager.default.removeItem(at: destination)
+          try? FileManager.default.removeItem(at: tempDestination)
           throw exporter.error ?? NSError(domain: "Monolith", code: 2, userInfo: [NSLocalizedDescriptionKey: "Music export did not complete."])
         }
-      }
-      // Ensure file exists, is non-empty, and has FileProtectionType.none so AVPlayer
-      // can always read it even if screen is locked or across app sessions without (-11829) error.
-      let attrs = try FileManager.default.attributesOfItem(atPath: destination.path)
-      let fileSize = (attrs[.size] as? NSNumber)?.int64Value ?? 0
-      guard fileSize > 1024 else {
+        // Ensure file exists, is non-empty, and has FileProtectionType.none so AVPlayer
+        // can always read it even if screen is locked or across app sessions without (-11829) error.
+        let attrs = try FileManager.default.attributesOfItem(atPath: tempDestination.path)
+        let fileSize = (attrs[.size] as? NSNumber)?.int64Value ?? 0
+        guard fileSize > 4096 else {
+          try? FileManager.default.removeItem(at: tempDestination)
+          throw NSError(domain: "Monolith", code: 3, userInfo: [NSLocalizedDescriptionKey: "Imported audio file is empty or unreadable."])
+        }
+        let exportedAsset = AVURLAsset(url: tempDestination)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+          exportedAsset.loadValuesAsynchronously(forKeys: ["tracks", "duration", "playable"]) { continuation.resume() }
+        }
+        guard exportedAsset.isPlayable, !exportedAsset.tracks(withMediaType: .audio).isEmpty else {
+          try? FileManager.default.removeItem(at: tempDestination)
+          throw NSError(domain: "Monolith", code: 3, userInfo: [NSLocalizedDescriptionKey: "Music returned an unreadable audio file. Download the original in Music and import it again."])
+        }
+        let verifiedSeconds = CMTimeGetSeconds(exportedAsset.duration)
+        if verifiedSeconds.isFinite && verifiedSeconds > 0 { payload["durationMs"] = Int(verifiedSeconds * 1000) }
+        try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.none], ofItemAtPath: tempDestination.path)
         try? FileManager.default.removeItem(at: destination)
-        throw NSError(domain: "Monolith", code: 3, userInfo: [NSLocalizedDescriptionKey: "Imported audio file is empty or unreadable."])
+        try FileManager.default.moveItem(at: tempDestination, to: destination)
       }
-      let exportedAsset = AVURLAsset(url: destination)
-      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-        exportedAsset.loadValuesAsynchronously(forKeys: ["tracks", "duration", "playable"]) { continuation.resume() }
-      }
-      guard exportedAsset.isPlayable, !exportedAsset.tracks(withMediaType: .audio).isEmpty else {
-        try? FileManager.default.removeItem(at: destination)
-        throw NSError(domain: "Monolith", code: 3, userInfo: [NSLocalizedDescriptionKey: "Music returned an unreadable audio file. Download the original in Music and import it again."])
-      }
-      let verifiedSeconds = CMTimeGetSeconds(exportedAsset.duration)
-      if verifiedSeconds.isFinite && verifiedSeconds > 0 { payload["durationMs"] = Int(verifiedSeconds * 1000) }
       try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.none], ofItemAtPath: destination.path)
       if let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
          let data = image.jpegData(compressionQuality: 0.85) {

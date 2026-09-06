@@ -111,6 +111,10 @@ class MonolithController extends ChangeNotifier {
   bool _hasLibraryPermission = false;
   String? _libraryError;
   bool _isImportingAudio = false;
+  double? _importProgress;
+  int _importCurrent = 0;
+  int _importTotal = 0;
+  String? _importStatus;
   bool _isDownloaderReady = false;
   String? _downloaderError;
 
@@ -212,6 +216,20 @@ class MonolithController extends ChangeNotifier {
   bool get hasLibraryPermission => _hasLibraryPermission;
   String? get libraryError => _libraryError;
   bool get isImportingAudio => _isImportingAudio;
+  double? get importProgress => _importProgress;
+  int get importCurrent => _importCurrent;
+  int get importTotal => _importTotal;
+  String? get importStatus => _importStatus;
+
+  Future<void> cancelImport() async {
+    await MediaImportChannel().cancelImport();
+    _isImportingAudio = false;
+    _importProgress = null;
+    _importCurrent = 0;
+    _importTotal = 0;
+    _importStatus = null;
+    notifyListeners();
+  }
   bool get isDownloaderReady => _isDownloaderReady;
   String? get downloaderError => _downloaderError;
   List<DownloadTaskInfo> get downloadTasks => _downloadTasks;
@@ -861,9 +879,21 @@ class MonolithController extends ChangeNotifier {
   Future<String?> importAllFromMusicLibrary() async {
     if (_isImportingAudio) return null;
     _isImportingAudio = true;
+    _importProgress = 0.0;
+    _importCurrent = 0;
+    _importTotal = 0;
+    _importStatus = 'Scanning Music library…';
     notifyListeners();
     try {
-      final items = await MediaImportChannel().importAllFromMusicLibrary();
+      final channel = MediaImportChannel();
+      channel.onProgress = (current, total, title) {
+        _importCurrent = current;
+        _importTotal = total;
+        _importProgress = total > 0 ? (current / total) : 0.0;
+        _importStatus = 'Importing ($current/$total)';
+        notifyListeners();
+      };
+      final items = await channel.importAllFromMusicLibrary();
       if (items.isEmpty) return 'No accessible local tracks found in Music library.';
       final previousId = currentTrack?.id;
       final imported = <Track>[];
@@ -904,6 +934,10 @@ class MonolithController extends ChangeNotifier {
           '${skipped == 0 ? '' : ' $skipped unavailable or protected tracks skipped. Import original audio files for protected songs.'}';
     } finally {
       _isImportingAudio = false;
+      _importProgress = null;
+      _importCurrent = 0;
+      _importTotal = 0;
+      _importStatus = null;
       notifyListeners();
     }
   }
@@ -1048,6 +1082,9 @@ class MonolithController extends ChangeNotifier {
     required String fileName,
   }) async {
     await _checkConnectivity();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      unawaited(MediaImportChannel().requestNotificationPermission());
+    }
     final sanitizedName = _sanitizeFileName(
       fileName.trim().isEmpty ? preview.suggestedFileName : fileName.trim(),
     );
@@ -1301,6 +1338,16 @@ class MonolithController extends ChangeNotifier {
         errorMessage: null,
       ),
     );
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      unawaited(
+        MediaImportChannel().updateDownloadNotification(
+          id: task.processId,
+          title: 'Download complete',
+          body: '${track.title} is ready to play in Monolith',
+          isComplete: true,
+        ),
+      );
+    }
     notifyListeners();
   }
 
@@ -1312,6 +1359,9 @@ class MonolithController extends ChangeNotifier {
         processId,
       ).copyWith(status: DownloadTaskStatus.cancelled, errorMessage: null),
     );
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      unawaited(MediaImportChannel().cancelDownloadNotification(processId));
+    }
     await _youtubeDL.cancelDownload(processId);
   }
 
@@ -1494,8 +1544,27 @@ class MonolithController extends ChangeNotifier {
           status: DownloadTaskStatus.downloading,
           progress: progress.progressFraction,
           eta: progress.eta,
+          totalBytes: progress.totalBytes ?? existingTask.totalBytes,
+          downloadSpeedBytesPerSecond: progress.speedBytesPerSecond,
         ),
       );
+
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        final pct = (progress.progressFraction * 100).round();
+        final speed = progress.speedBytesPerSecond;
+        final speedStr = (speed != null && speed > 0)
+            ? (speed >= 1024 * 1024
+                ? ' · ${(speed / (1024 * 1024)).toStringAsFixed(1)} MB/s'
+                : ' · ${(speed / 1024).toStringAsFixed(0)} KB/s')
+            : '';
+        unawaited(
+          MediaImportChannel().updateDownloadNotification(
+            id: progress.processId,
+            title: 'Downloading: ${existingTask.title}',
+            body: '$pct%$speedStr',
+          ),
+        );
+      }
     });
 
     _downloadStateSubscription = _youtubeDL.onStateChanged.listen((state) {

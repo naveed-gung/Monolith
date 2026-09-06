@@ -247,6 +247,15 @@ class _StreamMediaDownloader implements MediaDownloader {
                   totalBytes: selectedStream.size.totalBytes,
                   elapsed: stopwatch.elapsed,
                 );
+                if (!await outputFile.exists() || await outputFile.length() < 4096) {
+                  await _deletePartialFiles(activeDownload);
+                  const msg = 'Download produced an incomplete or unreadable audio file.';
+                  _emitError(processId, msg);
+                  activeDownload.complete(
+                    DownloadResult(status: OperationStatus.error, errorMessage: msg),
+                  );
+                  return;
+                }
                 await outputFile.rename(finalFile.path);
                 activeDownload.outputFile = finalFile;
                 _emitState(processId, DownloadStateType.completed);
@@ -457,11 +466,19 @@ class _StreamMediaDownloader implements MediaDownloader {
       totalBytes: normalizedTotal,
       elapsed: elapsed,
     );
+    final elapsedSeconds = elapsed.inMilliseconds / 1000.0;
+    final speed = elapsedSeconds > 0
+        ? (downloadedBytes / elapsedSeconds).round()
+        : 0;
+
     _progressController.add(
       DownloadProgress(
         processId: processId,
         progress: progress,
         etaInSeconds: eta,
+        totalBytes: totalBytes > 0 ? totalBytes : null,
+        downloadedBytes: downloadedBytes,
+        speedBytesPerSecond: speed > 0 ? speed : null,
       ),
     );
   }

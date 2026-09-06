@@ -3,11 +3,17 @@ class DownloadProgress {
     required this.processId,
     required this.progress,
     required this.etaInSeconds,
+    this.totalBytes,
+    this.downloadedBytes,
+    this.speedBytesPerSecond,
   });
 
   final String processId;
   final double progress;
   final int etaInSeconds;
+  final int? totalBytes;
+  final int? downloadedBytes;
+  final int? speedBytesPerSecond;
 
   double get progressFraction => progress / 100.0;
 

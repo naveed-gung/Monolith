@@ -2,6 +2,20 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.4.1] — 2026-09-06
+
+### Added
+- **Detailed download metrics** — active download cards now display real-time downloaded MBs / total MBs, live internet speed (MB/s or KB/s), percentage %, and remaining ETA.
+- **Input swipe protection & keyboard dismissal** — swiping horizontally while typing in the link adder or any search field now dismisses the software keyboard instead of switching tabs. The download adder state and typed URLs are preserved across tab switches.
+- **Universal Apple download indicator** — Apple App Store & Apple Music morphing indicator is now embedded in the Downloads page header and tracks active song downloads with live MB/percentage stats, user accent color theming, and stop-square cancellation.
+- **iOS Notification Center integration** — native iOS notifications stream download progress and alert upon completion.
+- **Instant TrollStore installation** — update installer passes the local `.ipa` directly to TrollStore Lite via iOS share sheet, prompting the native install confirmation in under 3 seconds without remote re-download delays.
+- **Live streaming Music import** — "Import All from Music" streams real-time progress song-by-song to the Apple indicator (`67 of 330 · 20%`) with full cancel support.
+
+### Fixed
+- **Library header layout squeeze** — fixed title word-wrapping (`"You r lib rar y"`) by enforcing single-line ellipsis and non-intrusive indicator sizing.
+- **Corrupt audio export protection** — native Music exports write to `.tmp` files and atomically move to `.m4a` only when verified complete and playable, preventing `"This audio could not be opened"` playback errors. Corrupt files under 4KB are automatically filtered out.
+
 ## [1.4.0] — 2026-09-06
 
 ### Added

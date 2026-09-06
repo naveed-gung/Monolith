@@ -20,6 +20,22 @@ class AppDownloadIndicator extends StatefulWidget {
   State<AppDownloadIndicator> createState() => _AppDownloadIndicatorState();
 }
 
+String _fmtBytes(int b) {
+  const u = ['B', 'KB', 'MB', 'GB'];
+  var v = b.toDouble();
+  var i = 0;
+  while (v >= 1024 && i < u.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  final p = v >= 100
+      ? 0
+      : v >= 10
+      ? 1
+      : 2;
+  return '${v.toStringAsFixed(p)} ${u[i]}';
+}
+
 class _AppDownloadIndicatorState extends State<AppDownloadIndicator>
     with SingleTickerProviderStateMixin {
   bool _isPillMode = true;
@@ -43,34 +59,14 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator>
   }
 
   void _onUpdateServiceChanged() {
-    final service = AppUpdateService.instance;
-    final isActive = service.busy && service.progress != null;
-    final isDone = service.progress != null && service.progress! >= 1.0;
+    if (mounted) setState(() {});
+  }
 
-    if (isActive && !_wasActive) {
-      // New download started: show pill for 2 seconds then shrink
-      setState(() {
-        _isPillMode = true;
-        _wasActive = true;
-        _isComplete = false;
-      });
-      _shrinkTimer?.cancel();
-      _shrinkTimer = Timer(const Duration(milliseconds: 2000), () {
-        if (mounted) setState(() => _isPillMode = false);
-      });
-    } else if (isDone && !_isComplete) {
-      setState(() => _isComplete = true);
-      _dismissTimer?.cancel();
-      _dismissTimer = Timer(const Duration(milliseconds: 3000), () {
-        if (mounted) {
-          setState(() {
-            _wasActive = false;
-            _isComplete = false;
-            _isPillMode = true;
-          });
-        }
-      });
-    }
+  void _triggerShrinkTimer() {
+    _shrinkTimer?.cancel();
+    _shrinkTimer = Timer(const Duration(milliseconds: 2000), () {
+      if (mounted) setState(() => _isPillMode = false);
+    });
   }
 
   void _toggleMode() {
@@ -89,27 +85,77 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator>
   Widget build(BuildContext context) {
     final updateService = AppUpdateService.instance;
     final controller = AppScope.watch(context);
+    final activeTask = controller.downloadTasks
+        .where((t) => t.isActive)
+        .firstOrNull;
+    final isSongDownloading = activeTask != null;
     final isImporting = controller.isImportingAudio;
 
     final isUpdateDownloading =
         updateService.busy && updateService.progress != null;
-    final isActive = isUpdateDownloading || isImporting || _isComplete;
+    final isAnyActive = isUpdateDownloading || isImporting || isSongDownloading;
+    final isJustCompleted = updateService.progress != null &&
+        updateService.progress! >= 1.0;
 
+    if (isAnyActive && !_wasActive) {
+      _wasActive = true;
+      _isPillMode = true;
+      _isComplete = false;
+      _triggerShrinkTimer();
+    } else if (!isAnyActive && _wasActive && !_isComplete) {
+      _wasActive = false;
+    } else if (isJustCompleted && !_isComplete) {
+      _isComplete = true;
+      _dismissTimer?.cancel();
+      _dismissTimer = Timer(const Duration(milliseconds: 3000), () {
+        if (mounted) {
+          setState(() {
+            _wasActive = false;
+            _isComplete = false;
+            _isPillMode = true;
+          });
+        }
+      });
+    }
+
+    final isActive = isAnyActive || _isComplete;
     if (!isActive) {
       return const SizedBox.shrink();
     }
 
     final double rawProgress = isUpdateDownloading
         ? (updateService.progress ?? 0.0).clamp(0.0, 1.0)
-        : (isImporting ? 0.45 : (_isComplete ? 1.0 : 0.0));
+        : (isSongDownloading
+            ? activeTask.progress.clamp(0.0, 1.0)
+            : (isImporting
+                ? (controller.importProgress ?? 0.15).clamp(0.0, 1.0)
+                : (_isComplete ? 1.0 : 0.0)));
 
     final pctStr = '${(rawProgress * 100).round()}%';
-    final titleText = isUpdateDownloading
-        ? (_isComplete ? 'Download complete' : 'Downloading update')
-        : (isImporting ? 'Importing library' : 'Download complete');
-    final subText = isUpdateDownloading
-        ? (_isComplete ? 'Ready to install' : 'v${updateService.release?.version ?? '1.4.0'} · $pctStr')
-        : (isImporting ? 'Processing audio…' : 'Ready to play');
+    final String titleText;
+    final String subText;
+
+    if (isSongDownloading) {
+      titleText = _isComplete ? 'Download complete' : activeTask.title;
+      final curBytes = activeTask.downloadedBytes;
+      final totBytes = activeTask.totalBytes;
+      final bytesStr = (curBytes != null && totBytes != null && totBytes > 0)
+          ? '${_fmtBytes(curBytes)} / ${_fmtBytes(totBytes)} · '
+          : '';
+      subText = _isComplete ? 'Saved to downloads' : '$bytesStr$pctStr';
+    } else if (isImporting) {
+      titleText = 'Importing library';
+      subText = controller.importStatus ?? 'Processing audio…';
+    } else {
+      titleText = isUpdateDownloading
+          ? (_isComplete ? 'Download complete' : 'Downloading update')
+          : 'Download complete';
+      subText = isUpdateDownloading
+          ? (_isComplete
+              ? 'Ready to install'
+              : 'v${updateService.release?.version ?? '1.4.1'} · $pctStr')
+          : 'Ready to play';
+    }
 
     final accentColor = Theme.of(context).colorScheme.primary;
     const greenColor = Color(0xFF22C55E);
@@ -201,12 +247,28 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator>
                                 color: greenColor,
                               )
                             // Apple HIG Rounded Stop Square
-                            : Container(
-                                width: 9,
-                                height: 9,
-                                decoration: BoxDecoration(
-                                  color: accentColor,
-                                  borderRadius: BorderRadius.circular(2.2),
+                            : GestureDetector(
+                                onTap: () {
+                                  if (isSongDownloading) {
+                                    controller.cancelDownload(activeTask.processId);
+                                  } else if (isImporting) {
+                                    controller.cancelImport();
+                                  } else {
+                                    _toggleMode();
+                                  }
+                                },
+                                child: Container(
+                                  width: 14,
+                                  height: 14,
+                                  alignment: Alignment.center,
+                                  child: Container(
+                                    width: 9,
+                                    height: 9,
+                                    decoration: BoxDecoration(
+                                      color: accentColor,
+                                      borderRadius: BorderRadius.circular(2.2),
+                                    ),
+                                  ),
                                 ),
                               ),
                       ),

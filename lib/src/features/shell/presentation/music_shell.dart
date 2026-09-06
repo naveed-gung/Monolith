@@ -291,33 +291,48 @@ class _MusicShellState extends State<MusicShell>
   }
 
   Widget _buildPage(MonolithController controller) {
-    return PageView(
-      controller: _pageController,
-      physics: const BouncingScrollPhysics(),
-      onPageChanged: (index) => controller.selectTab(AppTab.values[index]),
-      children: [
-        SafeArea(
-          bottom: false,
-          child: LibraryPage(
-            key: const ValueKey('library'),
-            onOpenSettings: _openSettings,
-            onSwipeToNextTab: () => _pageController?.animateToPage(
-              1,
-              duration: AppMotion.durMedium,
-              curve: AppMotion.emphasized,
+    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragEnd: (details) {
+        if (isKeyboardOpen ||
+            FocusManager.instance.primaryFocus?.hasFocus == true) {
+          final velocity = details.primaryVelocity ?? 0;
+          if (velocity.abs() > 80) {
+            FocusScope.of(context).unfocus();
+          }
+        }
+      },
+      child: PageView(
+        controller: _pageController,
+        physics: isKeyboardOpen
+            ? const NeverScrollableScrollPhysics()
+            : const BouncingScrollPhysics(),
+        onPageChanged: (index) => controller.selectTab(AppTab.values[index]),
+        children: [
+          SafeArea(
+            bottom: false,
+            child: LibraryPage(
+              key: const ValueKey('library'),
+              onOpenSettings: _openSettings,
+              onSwipeToNextTab: () => _pageController?.animateToPage(
+                1,
+                duration: AppMotion.durMedium,
+                curve: AppMotion.emphasized,
+              ),
             ),
           ),
-        ),
-        const SafeArea(
-          bottom: false,
-          child: DownloadsPage(key: ValueKey('downloads'), embedded: true),
-        ),
-        const SafeArea(bottom: false, child: SongsPage(key: ValueKey('songs'))),
-        const SafeArea(
-          bottom: false,
-          child: SearchPage(key: ValueKey('search')),
-        ),
-      ],
+          const SafeArea(
+            bottom: false,
+            child: DownloadsPage(key: ValueKey('downloads'), embedded: true),
+          ),
+          const SafeArea(bottom: false, child: SongsPage(key: ValueKey('songs'))),
+          const SafeArea(
+            bottom: false,
+            child: SearchPage(key: ValueKey('search')),
+          ),
+        ],
+      ),
     );
   }
 

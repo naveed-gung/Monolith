@@ -52,8 +52,8 @@ void main() {
       expect(controller.currentTab, AppTab.songs);
     });
 
-    test('AppUpdateService version is bumped to 1.4.0', () {
-      expect(AppUpdateService.currentVersion, '1.4.0');
+    test('AppUpdateService version is bumped to 1.4.1', () {
+      expect(AppUpdateService.currentVersion, '1.4.1');
     });
 
     test('clearStaleAppCache runs without errors', () async {

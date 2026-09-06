@@ -528,6 +528,8 @@ class _LibraryPageState extends State<LibraryPage> {
                         const SizedBox(height: 8),
                         Text(
                           'Your library',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: textTheme.headlineLarge?.copyWith(
                             fontWeight: FontWeight.w600,
                             letterSpacing: -1,
@@ -538,6 +540,8 @@ class _LibraryPageState extends State<LibraryPage> {
                           controller.isLibraryLoading
                               ? 'Finding your music…'
                               : '${controller.tracks.length} ${controller.tracks.length == 1 ? 'song' : 'songs'} · On this device',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: textTheme.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),

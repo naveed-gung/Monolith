@@ -30,6 +30,22 @@ class MediaImportChannel {
     }
   }
 
+  /// Programmatically queries all accessible offline songs in the iOS music
+  /// library without opening the manual selection picker, copying them into the
+  /// app sandbox.
+  Future<List<ImportedItemResult>> importAllFromMusicLibrary() async {
+    try {
+      final raw = await channel.invokeMethod<Object?>('importAllFromMusicLibrary');
+      if (raw is! List) return const [];
+      return [
+        for (final entry in raw)
+          if (entry is Map) ImportedItemResult.fromMap(entry),
+      ];
+    } on PlatformException {
+      rethrow;
+    }
+  }
+
   /// Save-to-Files export (iOS document picker, asCopy). The native side only
   /// reports whether the flow was canceled.
   Future<ExportResult> exportToFiles(List<String> paths) async {

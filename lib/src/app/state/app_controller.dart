@@ -91,6 +91,12 @@ class MonolithController extends ChangeNotifier {
   AccentPreset _accentPreset = AccentSwatch.fallback;
   RepeatMode _repeatMode = RepeatMode.all;
 
+  bool _isDisposed = false;
+  String? _loadedTrackId;
+  int _sourceGeneration = 0;
+  final Set<String> _dismissedDownloadIds = {};
+  final Set<String> _cancelledDownloadIds = {};
+  int _refreshGeneration = 0;
   int _selectedTrackIndex = 0;
   bool _isPlaying = false;
   bool _shuffleEnabled = false;
@@ -107,7 +113,6 @@ class MonolithController extends ChangeNotifier {
   bool _isImportingAudio = false;
   bool _isDownloaderReady = false;
   String? _downloaderError;
-  bool _hasAttemptedYoutubeDlRefresh = false;
 
   Duration _currentPosition = Duration.zero;
   Duration? _currentTrackDuration;
@@ -211,6 +216,9 @@ class MonolithController extends ChangeNotifier {
   String? get downloaderError => _downloaderError;
   List<DownloadTaskInfo> get downloadTasks => _downloadTasks;
   List<Track> get offlineTracks => _downloadedTracks;
+  List<Track> get downloadedTracks => _downloadedTracks
+      .where((track) => track.source == TrackSource.downloaded)
+      .toList();
 
   // ── Smart playlists (computed; no storage of their own) ──────────────────
   static final DateTime _epoch = DateTime.fromMillisecondsSinceEpoch(0);
@@ -384,7 +392,8 @@ class MonolithController extends ChangeNotifier {
   }
 
   void selectLibraryCategory(LibraryCategory category) {
-    final nextTab = (_currentTab == AppTab.downloads || _currentTab == AppTab.songs)
+    final nextTab =
+        (_currentTab == AppTab.downloads || _currentTab == AppTab.songs)
         ? AppTab.library
         : _currentTab;
 
@@ -437,7 +446,7 @@ class MonolithController extends ChangeNotifier {
     if (_audioPlayer.playing) {
       await _audioPlayer.pause();
     } else {
-      await _audioPlayer.play();
+      await _syncSelectedTrack(autoplay: true);
     }
   }
 
@@ -622,21 +631,6 @@ class MonolithController extends ChangeNotifier {
     await _audioPlayer.setVolume(_normalizeAudio ? 0.84 : 1.0);
   }
 
-  Future<void> _fadeVolume({required double to, int ms = 220}) async {
-    if (!_smoothTransitions) {
-      await _audioPlayer.setVolume(to);
-      return;
-    }
-    const steps = 12;
-    final from = _audioPlayer.volume;
-    final diff = (to - from) / steps;
-    final stepMs = ms ~/ steps;
-    for (var i = 1; i <= steps; i++) {
-      await Future.delayed(Duration(milliseconds: stepMs));
-      await _audioPlayer.setVolume((from + diff * i).clamp(0.0, 1.0));
-    }
-  }
-
   Future<void> _checkConnectivity() async {
     if (!_downloadsOnWifi) return;
     final results = await Connectivity().checkConnectivity();
@@ -671,24 +665,24 @@ class MonolithController extends ChangeNotifier {
   }
 
   Future<void> refreshLibrary({bool retryPermissionRequest = false}) async {
+    final refreshGeneration = ++_refreshGeneration;
     _isLibraryLoading = true;
     notifyListeners();
 
     final previousTrackId = currentTrack?.id;
     try {
-      final shouldLoadDeviceLibrary =
-          !supportsAppleMusicImportPrompt ||
-          _iosAppleMusicImportEnabled ||
-          retryPermissionRequest;
+      final shouldLoadDeviceLibrary = !supportsAppleMusicImportPrompt;
 
       // Merge in any audio files found on disk that aren't in the manifest, so
       // the library repopulates from surviving files after a reinstall (Task D).
-      _downloadedTracks = await _downloadStore.loadTracksMergingDisk();
+      final storedTracks = await _downloadStore.loadTracksMergingDisk();
       final mediaSnapshot = await _localMediaService.loadTracks(
         retryRequest: retryPermissionRequest,
         requestPermission: shouldLoadDeviceLibrary,
       );
 
+      if (refreshGeneration != _refreshGeneration) return;
+      _downloadedTracks = storedTracks;
       _hasLibraryPermission =
           shouldLoadDeviceLibrary && mediaSnapshot.permissionGranted;
       _libraryError = shouldLoadDeviceLibrary ? mediaSnapshot.error : null;
@@ -699,8 +693,10 @@ class MonolithController extends ChangeNotifier {
     } catch (error) {
       _libraryError = 'Unable to refresh your library: $error';
     } finally {
-      _isLibraryLoading = false;
-      notifyListeners();
+      if (refreshGeneration == _refreshGeneration) {
+        _isLibraryLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -747,19 +743,21 @@ class MonolithController extends ChangeNotifier {
           final displayTitle = _titleFromFileName(safeFileName);
 
           importedTracks.add(
-            Track(
-              id: 'import-${DateTime.now().microsecondsSinceEpoch}-$index',
-              title: displayTitle,
-              artist: 'Files import',
-              album: 'Imported audio',
-              genre: 'Imported audio',
-              duration: Duration.zero,
-              colors: Track.paletteForSeed(storedFile.path),
-              blurb: 'Imported from Files for offline playback.',
-              source: TrackSource.imported,
-              filePath: storedFile.path,
-              artworkFilePath: artworkFilePath,
-              addedAt: DateTime.now(),
+            await _downloadStore.resolveMetadata(
+              Track(
+                id: 'import-${DateTime.now().microsecondsSinceEpoch}-$index',
+                title: displayTitle,
+                artist: 'Files import',
+                album: 'Imported audio',
+                genre: 'Imported audio',
+                duration: Duration.zero,
+                colors: Track.paletteForSeed(storedFile.path),
+                blurb: 'Imported from Files for offline playback.',
+                source: TrackSource.imported,
+                filePath: storedFile.path,
+                artworkFilePath: artworkFilePath,
+                addedAt: DateTime.now(),
+              ),
             ),
           );
         } catch (_) {
@@ -1003,21 +1001,37 @@ class MonolithController extends ChangeNotifier {
     final sanitizedName = _sanitizeFileName(
       fileName.trim().isEmpty ? preview.suggestedFileName : fileName.trim(),
     );
-    final processId = 'audio_${DateTime.now().millisecondsSinceEpoch}';
+    final processId = 'audio_${DateTime.now().microsecondsSinceEpoch}';
 
-    await _startManagedDownload(
-      DownloadTaskInfo(
-        processId: processId,
-        url: preview.url,
-        title: preview.title,
-        fileName: sanitizedName,
-        uploader: preview.uploader,
-        thumbnailUrl: preview.thumbnailUrl,
-        status: DownloadTaskStatus.ready,
-        mediaDuration: preview.duration,
-        totalBytes: preview.estimatedSizeBytes,
+    unawaited(
+      _runQueuedDownload(
+        DownloadTaskInfo(
+          processId: processId,
+          url: preview.url,
+          title: preview.title,
+          fileName: sanitizedName,
+          uploader: preview.uploader,
+          thumbnailUrl: preview.thumbnailUrl,
+          status: DownloadTaskStatus.ready,
+          mediaDuration: preview.duration,
+          totalBytes: preview.estimatedSizeBytes,
+        ),
       ),
     );
+  }
+
+  Future<void> _runQueuedDownload(DownloadTaskInfo task) async {
+    try {
+      await _startManagedDownload(task);
+    } catch (error) {
+      _upsertDownloadTask(
+        task.copyWith(
+          status: DownloadTaskStatus.failed,
+          errorMessage:
+              'Download could not start. Check your connection and try again.',
+        ),
+      );
+    }
   }
 
   Future<void> pauseDownload(String processId) async {
@@ -1099,22 +1113,32 @@ class MonolithController extends ChangeNotifier {
   }
 
   void dismissDownloadTask(String processId) {
-    _downloadTasks = _downloadTasks.where((t) => t.processId != processId).toList();
+    _dismissedDownloadIds.add(processId);
+    unawaited(cancelDownload(processId));
+    _downloadTasks = _downloadTasks
+        .where((t) => t.processId != processId)
+        .toList();
     notifyListeners();
   }
 
   void clearRecentDownloadTasks() {
-    _downloadTasks = _downloadTasks.where((t) => t.isActive || t.status == DownloadTaskStatus.paused).toList();
+    _downloadTasks = _downloadTasks
+        .where((t) => t.isActive || t.status == DownloadTaskStatus.paused)
+        .toList();
     notifyListeners();
   }
 
   Future<void> _startManagedDownload(DownloadTaskInfo task) async {
-    await _ensureDownloaderReady();
+    _dismissedDownloadIds.remove(task.processId);
+    _cancelledDownloadIds.remove(task.processId);
     _pauseRequestedProcessIds.remove(task.processId);
     _fatalDownloadErrors.remove(task.processId);
     _upsertDownloadTask(task);
 
+    await _ensureDownloaderReady();
+    if (_cancelledDownloadIds.contains(task.processId)) return;
     final outputDirectory = await _downloadStore.getDownloadDirectory();
+    if (_cancelledDownloadIds.contains(task.processId)) return;
     final request = _buildAudioDownloadRequest(
       processId: task.processId,
       url: task.url,
@@ -1136,6 +1160,7 @@ class MonolithController extends ChangeNotifier {
       preview: preview,
       processId: task.processId,
     );
+    if (_isDisposed || _cancelledDownloadIds.contains(task.processId)) return;
     final fatalError = _fatalDownloadErrors.remove(task.processId);
     final wasPauseRequested = _pauseRequestedProcessIds.remove(task.processId);
     if (result.status != OperationStatus.success || result.outputPath == null) {
@@ -1147,10 +1172,6 @@ class MonolithController extends ChangeNotifier {
           : result.status == OperationStatus.cancelled
           ? DownloadTaskStatus.cancelled
           : DownloadTaskStatus.failed;
-
-      if (nextStatus != DownloadTaskStatus.paused) {
-        await _cleanupIncompleteDownload(task);
-      }
 
       _upsertDownloadTask(
         failedTask.copyWith(
@@ -1170,7 +1191,6 @@ class MonolithController extends ChangeNotifier {
       result.outputPath!,
     );
     if (!hasValidAudioFile) {
-      await _cleanupIncompleteDownload(task);
       _upsertDownloadTask(
         _downloadTaskById(task.processId).copyWith(
           status: DownloadTaskStatus.failed,
@@ -1210,7 +1230,7 @@ class MonolithController extends ChangeNotifier {
     await _downloadStore.saveTracks(_downloadedTracks);
     await _localMediaService.scanMedia(result.outputPath!);
 
-    _rebuildTracks(preferredTrackId: track.id);
+    _rebuildTracks(preferredTrackId: currentTrack?.id ?? track.id);
 
     // INVARIANT: the download path has ZERO lyric dependency. Lyrics (.lrc
     // sidecar / embedded USLT) are read lazily at display time in the player,
@@ -1220,12 +1240,7 @@ class MonolithController extends ChangeNotifier {
     // fail or delay the audio. See test/lyrics_download_independence_test.dart
     // and TASK C in MONOLITH_1.0.4.
 
-    // Load the just-downloaded file into the player engine NOW so the first tap
-    // on Play works without a relaunch. Without this the track is selected but
-    // no AudioSource is set, and togglePlayback() has nothing to play — the iOS
-    // "won't play until the app is killed and reopened" bug. autoplay:false so a
-    // finished download doesn't start blasting on its own. Every other path
-    // (refreshLibrary, import, delete, bulk-remove) already does this.
+    // Initialize an empty player; keep an existing source and listening position.
     await _syncSelectedTrack(autoplay: false);
 
     _upsertDownloadTask(
@@ -1240,23 +1255,14 @@ class MonolithController extends ChangeNotifier {
   }
 
   Future<void> cancelDownload(String processId) async {
+    _cancelledDownloadIds.add(processId);
     _pauseRequestedProcessIds.remove(processId);
-    final cancelled = await _youtubeDL.cancelDownload(processId);
-    if (!cancelled) {
-      return;
-    }
-
     _upsertDownloadTask(
-      _downloadTaskById(processId).copyWith(
-        status: DownloadTaskStatus.cancelled,
-        errorMessage: null,
-        detailLog: _appendTaskLog(
-          _downloadTaskById(processId).detailLog,
-          'Download cancelled.',
-          LogLevel.info,
-        ),
-      ),
+      _downloadTaskById(
+        processId,
+      ).copyWith(status: DownloadTaskStatus.cancelled, errorMessage: null),
     );
+    await _youtubeDL.cancelDownload(processId);
   }
 
   Future<void> _moveQueue(
@@ -1304,8 +1310,8 @@ class MonolithController extends ChangeNotifier {
   Future<void> _bootstrap() async {
     await _loadPrefs();
     await _configureAudioSession();
-    await _initializeDownloader();
     await refreshLibrary();
+    await _initializeDownloader();
   }
 
   Future<void> _loadPrefs() async {
@@ -1315,6 +1321,11 @@ class MonolithController extends ChangeNotifier {
       (e) => e.name == (p.getString(_kTheme) ?? ''),
       orElse: () => ThemePreference.system,
     );
+    if (p.getInt('design_revision') != 3) {
+      _themePreference = ThemePreference.light;
+      await p.setString(_kTheme, 'light');
+      await p.setInt('design_revision', 3);
+    }
     _accentPreset = AccentPreset.values.firstWhere(
       (e) => e.name == (p.getString(_kAccent) ?? ''),
       orElse: () => AccentSwatch.fallback,
@@ -1441,7 +1452,7 @@ class MonolithController extends ChangeNotifier {
       final existingTask = _downloadTaskById(state.processId);
       final hasFatalFailure = _fatalDownloadErrors.containsKey(state.processId);
       final status = switch (state.state) {
-        DownloadStateType.completed => DownloadTaskStatus.completed,
+        DownloadStateType.completed => DownloadTaskStatus.downloading,
         DownloadStateType.cancelled =>
           hasFatalFailure
               ? DownloadTaskStatus.failed
@@ -1603,58 +1614,14 @@ class MonolithController extends ChangeNotifier {
     required DownloadPreview preview,
     required String processId,
   }) async {
-    var result = await _youtubeDL.download(request);
-
-    final fatalError = _fatalDownloadErrors[processId];
-    if (fatalError != null) {
+    try {
+      return await _youtubeDL.download(request);
+    } catch (error) {
       return DownloadResult(
         status: OperationStatus.error,
-        errorMessage: fatalError,
+        errorMessage: 'Download could not start: $error',
       );
     }
-
-    final directError = result.errorMessage;
-    if (_looksLikeFatalDownloadFailure(directError)) {
-      final message = _captureFatalDownloadError(processId, directError!);
-      return DownloadResult(
-        status: OperationStatus.error,
-        errorMessage: message,
-      );
-    }
-
-    if (result.status == OperationStatus.success ||
-        !_isYoutubeUrl(preview.url) ||
-        !_looksLikeYoutubeExtractionFailure(
-          result.errorMessage ?? _downloadTaskById(processId).detailLog,
-        )) {
-      return result;
-    }
-
-    final updated = await _refreshYoutubeDlBinary();
-    if (!updated) {
-      return result;
-    }
-
-    final task = _downloadTaskById(processId);
-    _upsertDownloadTask(
-      task.copyWith(
-        detailLog: _appendTaskLog(
-          task.detailLog,
-          'Refreshing yt-dlp and retrying this YouTube download once.',
-          LogLevel.warning,
-        ),
-      ),
-    );
-
-    result = await _youtubeDL.download(request);
-    final retryFatalError = _fatalDownloadErrors[processId];
-    if (retryFatalError != null) {
-      return DownloadResult(
-        status: OperationStatus.error,
-        errorMessage: retryFatalError,
-      );
-    }
-    return result;
   }
 
   Future<void> _abortFailedDownload(String processId) async {
@@ -1667,44 +1634,6 @@ class MonolithController extends ChangeNotifier {
     } catch (_) {
       // Ignore cancellation failures for already-terminating processes.
     }
-  }
-
-  Future<void> _cleanupIncompleteDownload(DownloadTaskInfo task) async {
-    await _downloadStore.deleteArtifactsForBaseName(task.fileName);
-
-    final matchingTracks = _downloadedTracks
-        .where((track) {
-          final filePath = track.filePath;
-          if (filePath == null || filePath.trim().isEmpty) {
-            return false;
-          }
-
-          final segments = Uri.file(filePath).pathSegments;
-          final fileName = segments.isEmpty ? filePath : segments.last;
-          return fileName.startsWith('${task.fileName}.');
-        })
-        .toList(growable: false);
-
-    if (matchingTracks.isEmpty) {
-      return;
-    }
-
-    final removedIds = matchingTracks.map((track) => track.id).toSet();
-    final currentId = currentTrack?.id;
-    final preferredTrackId = currentId == null || removedIds.contains(currentId)
-        ? null
-        : currentId;
-
-    _downloadedTracks = _downloadedTracks
-        .where((track) => !removedIds.contains(track.id))
-        .toList(growable: false);
-    await _downloadStore.saveTracks(_downloadedTracks);
-    for (final track in matchingTracks) {
-      _removeTrackFromPlaylists(track.id);
-    }
-
-    _rebuildTracks(preferredTrackId: preferredTrackId);
-    await _syncSelectedTrack(autoplay: false);
   }
 
   void _removeTrackFromPlaylists(String trackId) {
@@ -1732,99 +1661,91 @@ class MonolithController extends ChangeNotifier {
     }
     notifyListeners();
 
+    if (autoplay && _loadedTrackId == currentTrack?.id) {
+      await _audioPlayer.seek(Duration.zero);
+    }
     await _syncSelectedTrack(autoplay: autoplay);
   }
 
   Future<void> _syncSelectedTrack({required bool autoplay}) async {
     final track = currentTrack;
-
-    if (track == null) {
-      _isPlaying = false;
-      _currentPosition = Duration.zero;
-      _currentTrackDuration = Duration.zero;
-      await _audioPlayer.stop();
-      notifyListeners();
+    if (track != null && _loadedTrackId == track.id) {
+      if (autoplay) _playLoadedTrack();
       return;
     }
-
-    if (!track.canPlay) {
-      _isPlaying = false;
-      _currentPosition = Duration.zero;
-      _currentTrackDuration = track.duration;
+    final generation = ++_sourceGeneration;
+    _loadedTrackId = null;
+    _currentPosition = Duration.zero;
+    _currentTrackDuration = track?.duration ?? Duration.zero;
+    if (track == null || !track.canPlay) {
       await _audioPlayer.stop();
-      notifyListeners();
       return;
     }
-
     try {
-      // Smooth fade-out before loading new source
-      if (_isPlaying) await _fadeVolume(to: 0);
-
-      var effectivePath = track.filePath;
-      if (effectivePath != null) {
-        final resolved = await _downloadStore.resolveTrackPath(effectivePath);
-        if (resolved != null && File(resolved).existsSync()) {
-          effectivePath = resolved;
-        }
+      final path = await _downloadStore.resolveTrackPath(track.filePath);
+      if (generation != _sourceGeneration) return;
+      final uri = path == null ? null : Uri.tryParse(path);
+      final isMediaUri =
+          uri?.scheme == 'content' || uri?.scheme == 'ipod-library';
+      if (path == null || (!isMediaUri && !await File(path).exists())) {
+        throw StateError(
+          'The original audio file is missing. Import it again from Music or Files.',
+        );
       }
-
-      if (effectivePath == null || !File(effectivePath).existsSync()) {
-        throw StateError('Audio file not found on device');
-      }
-
+      if (!isMediaUri) await _downloadStore.readAudioMetadata(path);
+      if (generation != _sourceGeneration) return;
       await _audioPlayer.setAudioSource(
         AudioSource.uri(
-          Uri.file(effectivePath),
-          tag: _mediaItemForTrack(track.copyWith(filePath: effectivePath)),
+          isMediaUri ? uri! : Uri.file(path),
+          tag: _mediaItemForTrack(track.copyWith(filePath: path)),
         ),
       );
+      if (generation != _sourceGeneration) return;
+      _loadedTrackId = track.id;
+      _libraryError = null;
       _currentTrackDuration = _audioPlayer.duration ?? track.duration;
-
+      if (_currentTrackDuration! > Duration.zero) {
+        _persistResolvedCurrentTrackDuration(_currentTrackDuration!);
+      }
       final targetVolume = _normalizeAudio ? 0.84 : 1.0;
+      await _audioPlayer.setVolume(
+        autoplay && _smoothTransitions ? targetVolume * 0.6 : targetVolume,
+      );
       if (autoplay) {
-        await _audioPlayer.setVolume(0);
-        await _audioPlayer.play();
-        await _fadeVolume(to: targetVolume);
-      } else {
-        await _audioPlayer.setVolume(targetVolume);
-        await _audioPlayer.pause();
+        _playLoadedTrack();
+        if (_smoothTransitions) {
+          unawaited(_finishVolumeTransition(generation, targetVolume));
+        }
       }
     } catch (error) {
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      try {
-        var effectivePath = track.filePath;
-        if (effectivePath != null) {
-          final resolved = await _downloadStore.resolveTrackPath(effectivePath);
-          if (resolved != null && File(resolved).existsSync()) {
-            effectivePath = resolved;
-          }
-        }
-        if (effectivePath == null || !File(effectivePath).existsSync()) {
-          throw StateError('Audio file not found on device');
-        }
-
-        await _audioPlayer.setAudioSource(
-          AudioSource.uri(
-            Uri.file(effectivePath),
-            tag: _mediaItemForTrack(track.copyWith(filePath: effectivePath)),
-          ),
-        );
-        _currentTrackDuration = _audioPlayer.duration ?? track.duration;
-        final targetVolume = _normalizeAudio ? 0.84 : 1.0;
-        if (autoplay) {
-          await _audioPlayer.setVolume(0);
-          await _audioPlayer.play();
-          await _fadeVolume(to: targetVolume);
-        } else {
-          await _audioPlayer.setVolume(targetVolume);
-          await _audioPlayer.pause();
-        }
-      } catch (retryError) {
-        _isPlaying = false;
-        _libraryError = 'Unable to open ${track.title}: $retryError';
-        notifyListeners();
-      }
+      if (generation != _sourceGeneration) return;
+      _isPlaying = false;
+      _libraryError =
+          'This audio could not be opened. Try importing it again from Music or Files.';
+      debugPrint('Playback load failed for ${track.id}: $error');
     }
+    notifyListeners();
+  }
+
+  Future<void> _finishVolumeTransition(int generation, double target) async {
+    for (var step = 1; step <= 6; step++) {
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      if (generation != _sourceGeneration) return;
+      await _audioPlayer.setVolume(target * (0.6 + 0.4 * step / 6));
+    }
+  }
+
+  void _playLoadedTrack() {
+    // play() completes when playback stops, NOT when sound starts.
+    unawaited(
+      _audioPlayer.play().catchError((Object error) {
+        if (_isDisposed) return;
+        _isPlaying = false;
+        _libraryError = 'Playback stopped. Select the song to try again.';
+        _loadedTrackId = null;
+        notifyListeners();
+      }),
+    );
   }
 
   MediaItem _mediaItemForTrack(Track track) {
@@ -1859,7 +1780,9 @@ class MonolithController extends ChangeNotifier {
 
   void _persistResolvedCurrentTrackDuration(Duration duration) {
     final track = currentTrack;
-    if (track == null || track.duration == duration) {
+    if (track == null ||
+        track.id != _loadedTrackId ||
+        track.duration == duration) {
       return;
     }
 
@@ -1883,7 +1806,7 @@ class MonolithController extends ChangeNotifier {
   Future<void> _handleTrackCompletion() async {
     if (_repeatMode == RepeatMode.one) {
       await _audioPlayer.seek(Duration.zero);
-      await _audioPlayer.play();
+      _playLoadedTrack();
       return;
     }
 
@@ -1906,7 +1829,14 @@ class MonolithController extends ChangeNotifier {
     // downloads are prepended at the source (see _startManagedDownload), and
     // disk-recovered orphans are appended after the known manifest entries by
     // loadTracksMergingDisk. This is intentional, not incidental.
-    final nextTracks = [..._downloadedTracks, ..._deviceTracks];
+    final localPaths = _downloadedTracks
+        .map((t) => t.filePath)
+        .whereType<String>()
+        .toSet();
+    final nextTracks = [
+      ..._downloadedTracks,
+      ..._deviceTracks.where((t) => !localPaths.contains(t.filePath)),
+    ];
     final oldTrackId =
         preferredTrackId ??
         (_tracks.isNotEmpty
@@ -1934,6 +1864,11 @@ class MonolithController extends ChangeNotifier {
   }
 
   void _upsertDownloadTask(DownloadTaskInfo task) {
+    if (_isDisposed || _dismissedDownloadIds.contains(task.processId)) return;
+    if (_cancelledDownloadIds.contains(task.processId) &&
+        task.status != DownloadTaskStatus.cancelled) {
+      return;
+    }
     final nextTasks = [..._downloadTasks];
     final existingIndex = nextTasks.indexWhere(
       (candidate) => candidate.processId == task.processId,
@@ -1976,26 +1911,6 @@ class MonolithController extends ChangeNotifier {
     return (totalBits / 8).round();
   }
 
-  bool _isYoutubeUrl(String rawUrl) {
-    final host = Uri.tryParse(rawUrl)?.host.toLowerCase();
-    if (host == null) {
-      return false;
-    }
-    return host.contains('youtube.com') || host.contains('youtu.be');
-  }
-
-  bool _looksLikeYoutubeExtractionFailure(String? message) {
-    if (message == null || message.trim().isEmpty) {
-      return false;
-    }
-
-    final lower = message.toLowerCase();
-    return lower.contains('sabr') ||
-        lower.contains('missing a url') ||
-        lower.contains('http error 403') ||
-        lower.contains('unable to download video data');
-  }
-
   bool _looksLikeFatalDownloadFailure(String? message) {
     if (message == null || message.trim().isEmpty) {
       return false;
@@ -2036,21 +1951,6 @@ class MonolithController extends ChangeNotifier {
     }
 
     return message.trim();
-  }
-
-  Future<bool> _refreshYoutubeDlBinary() async {
-    if (_hasAttemptedYoutubeDlRefresh) {
-      return false;
-    }
-
-    _hasAttemptedYoutubeDlRefresh = true;
-
-    try {
-      final updateResult = await _youtubeDL.updateYoutubeDL();
-      return updateResult.status == OperationStatus.success;
-    } catch (_) {
-      return false;
-    }
   }
 
   _ParsedDownloadMetrics _parseDownloadMetrics(String line) {
@@ -2156,6 +2056,9 @@ class MonolithController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
+    _sourceGeneration++;
+    _refreshGeneration++;
     positionListenable.dispose();
     progress.dispose();
     unawaited(_audioPlayer.dispose());

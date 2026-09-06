@@ -70,6 +70,8 @@ final class MediaImportPlugin: NSObject {
       }
     case "pickFromMusicLibrary":
       pickFromMusicLibrary(result: result)
+    case "importAllFromMusicLibrary":
+      importAllFromMusicLibrary(result: result)
     case "exportToFiles":
       exportToFiles(arguments: call.arguments, result: result)
     case "getDocumentsMusicPath":
@@ -80,6 +82,52 @@ final class MediaImportPlugin: NSObject {
   }
 
   // MARK: - Music-app import
+
+  private func importAllFromMusicLibrary(result: @escaping FlutterResult) {
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self else {
+        result([])
+        return
+      }
+      guard self.pendingImportResult == nil && self.pendingExportResult == nil else {
+        result(FlutterError(code: "busy", message: "An import is already in progress.", details: nil))
+        return
+      }
+      self.pendingImportResult = result
+      MPMediaLibrary.requestAuthorization { [weak self] status in
+        DispatchQueue.main.async {
+          guard let self = self else { return }
+          guard status == .authorized else {
+            self.pendingImportResult = nil
+            result(FlutterError(code: "permission_denied", message: "Allow Music access in iPhone Settings, then try again.", details: nil))
+            return
+          }
+          DispatchQueue.global(qos: .userInitiated).async {
+            let query = MPMediaQuery.songs()
+            query.addFilterPredicate(MPMediaPropertyPredicate(value: false, forProperty: MPMediaItemPropertyIsCloudItem))
+            let items = query.items ?? []
+            guard !items.isEmpty else {
+              DispatchQueue.main.async {
+                self.pendingImportResult = nil
+                result([])
+              }
+              return
+            }
+            Task { @MainActor in
+              guard let currentResult = self.pendingImportResult else { return }
+              self.pendingImportResult = nil
+              var payloads: [[String: Any]] = []
+              payloads.reserveCapacity(items.count)
+              for item in items {
+                payloads.append(await MediaImportPlugin.process(item: item))
+              }
+              currentResult(payloads)
+            }
+          }
+        }
+      }
+    }
+  }
 
   private func pickFromMusicLibrary(result: @escaping FlutterResult) {
     DispatchQueue.main.async { [weak self] in

@@ -39,8 +39,8 @@ class PlayerPage extends StatelessWidget {
           child: Text(
             'Nothing playing',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       );
@@ -89,81 +89,18 @@ class _ArtworkSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final track = controller.currentTrack!;
-    final maxSize = math.min(
-      MediaQuery.sizeOf(context).width - AppSpacing.screenInset * 2,
-      360.0,
-    );
-
-    // Play/pause scale handled here — NOT bass-driven.
+    final size = math.min(MediaQuery.sizeOf(context).width - 64, 320.0);
     return Center(
-      child: AnimatedScale(
-        scale: controller.isPlaying ? 1.0 : 0.94,
-        duration: AppMotion.durMedium,
-        curve: AppMotion.standard,
-        child: RepaintBoundary(
-          child: AnimatedBuilder(
-            animation: animation,
-            builder: (context, child) {
-              final t = animation.value;
-              // Immersive canvas drives the reactive pulse. When it's off — or
-              // "Reduce visual effects" is on — the glow stays calm and static
-              // instead of breathing with the bass.
-              final reactive = controller.isPlaying &&
-                  controller.immersiveCanvas &&
-                  !controller.reduceVisualEffects;
-              var bass = reactive
-                  ? ((math.sin(t * math.pi * 2) *
-                              math.sin(t * math.pi * 3.1) *
-                              0.6 +
-                          math.sin(t * math.pi * 5.7).abs() * 0.4)
-                      .abs()
-                      .clamp(0.0, 1.0))
-                  : 0.0;
-              // Quantise to 0.1 steps so the blurred shadow only re-rasterises
-              // ~10 distinct times per cycle instead of every 60/120Hz frame.
-              // Re-blurring a BoxShadow every frame is heavy on the A11 GPU; the
-              // step makes most frames a no-op repaint.
-              bass = (bass * 10).round() / 10;
-
-              // Only the glow pulses — image/thumbnail stays at fixed size.
-              // Ceiling capped low (max blur ~36, was ~54) so the animated blur
-              // stays cheap to re-rasterise on older GPUs.
-              final glowRadius = 18 + bass * 18;
-              final glowAlpha = 0.14 + bass * 0.20;
-
-              return Container(
-                width: maxSize,
-                height: maxSize,
-                decoration: BoxDecoration(
-                  borderRadius: AppRadii.all(AppRadii.xl),
-                  boxShadow: [
-                    BoxShadow(
-                      color: scheme.primary.withValues(alpha: glowAlpha),
-                      blurRadius: glowRadius,
-                      spreadRadius: bass * 3,
-                      offset: const Offset(0, 16),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: child,
-              );
-            },
-            child: Hero(
-              tag: 'player-artwork-${track.id}',
-              child: ClipRRect(
-                borderRadius: AppRadii.all(AppRadii.xl),
-                child: TrackArtwork(
-                  track: track,
-                  borderRadius: AppRadii.all(AppRadii.xl),
-                ),
-              ),
+      child: Padding(
+        padding: const EdgeInsets.only(top: 20),
+        child: SizedBox.square(
+          dimension: size,
+          child: Hero(
+            tag: 'player-artwork-${track.id}',
+            child: TrackArtwork(
+              track: track,
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
         ),
@@ -254,12 +191,16 @@ class _LyricsButton extends StatelessWidget {
           ),
         );
       },
-      icon: Icon(Icons.lyrics_outlined, size: 16, color: scheme.onSurfaceVariant),
+      icon: Icon(
+        Icons.lyrics_outlined,
+        size: 16,
+        color: scheme.onSurfaceVariant,
+      ),
       label: Text(
         'Lyrics',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
       ),
       style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(
@@ -303,10 +244,10 @@ class _SourceBadge extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-              fontWeight: AppType.label,
-              letterSpacing: AppType.trackWide,
-            ),
+          color: scheme.onSurfaceVariant,
+          fontWeight: AppType.label,
+          letterSpacing: AppType.trackWide,
+        ),
       ),
     );
   }
@@ -360,10 +301,8 @@ class _ProgressSection extends StatelessWidget {
               RepaintBoundary(
                 child: ValueListenableBuilder<Duration>(
                   valueListenable: controller.positionListenable,
-                  builder: (_, pos, _) => Text(
-                    PlayerPage.formatDuration(pos),
-                    style: timeStyle,
-                  ),
+                  builder: (_, pos, _) =>
+                      Text(PlayerPage.formatDuration(pos), style: timeStyle),
                 ),
               ),
               Text(total, style: timeStyle),
@@ -478,10 +417,10 @@ class _TransportControls extends StatelessWidget {
   }
 
   static PhosphorIconData _repeatIcon(RepeatMode mode) => switch (mode) {
-        RepeatMode.off => AppIcons.repeat,
-        RepeatMode.all => AppIcons.repeatFill,
-        RepeatMode.one => AppIcons.repeatOne,
-      };
+    RepeatMode.off => AppIcons.repeat,
+    RepeatMode.all => AppIcons.repeatFill,
+    RepeatMode.one => AppIcons.repeatOne,
+  };
 }
 
 class _TransportButton extends StatelessWidget {
@@ -621,17 +560,17 @@ class _QueueTile extends StatelessWidget {
                     track.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: AppType.label,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(fontWeight: AppType.label),
                   ),
                   Text(
                     track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),

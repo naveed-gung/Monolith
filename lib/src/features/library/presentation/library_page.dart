@@ -6,7 +6,6 @@ import '../../../app/state/app_controller.dart';
 import '../../../app/state/app_scope.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
-import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
@@ -508,254 +507,276 @@ class _LibraryPageState extends State<LibraryPage> {
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-        // ── Large header ─────────────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.screenInset,
-              AppSpacing.xl,
-              AppSpacing.screenInset,
-              0,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // Brand mark — the "m" tile follows the selected accent
-                // (colorScheme.primary == the accent) on both platforms.
-                Container(
-                  width: 38,
-                  height: 38,
-                  margin: const EdgeInsets.only(
-                    right: AppSpacing.md,
-                    bottom: 4,
-                  ),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: scheme.primary,
-                    borderRadius: AppRadii.all(AppRadii.md),
-                  ),
-                  child: Text(
-                    'm',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontFamilyFallback: const ['Times New Roman', 'serif'],
-                      fontWeight: FontWeight.bold,
-                      fontSize: 24,
-                      height: 1.0,
-                      color: scheme.onPrimary,
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 16, 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'MONOLITH',
+                          style: textTheme.labelSmall?.copyWith(
+                            letterSpacing: 2.4,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Your library',
+                          style: textTheme.headlineLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -1,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          controller.isLibraryLoading
+                              ? 'Finding your music…'
+                              : '${controller.tracks.length} ${controller.tracks.length == 1 ? 'song' : 'songs'} · On this device',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Import music',
+                    icon: const Icon(Icons.add_rounded),
+                    onSelected: (source) async {
+                      final message = source == 'music'
+                          ? await controller.importFromMusicLibrary()
+                          : await controller.importAudioFiles();
+                      if (message != null) _showMsg(message);
+                    },
+                    itemBuilder: (_) => [
+                      if (controller.supportsAppleMusicImportPrompt)
+                        const PopupMenuItem(
+                          value: 'music',
+                          child: Text('From Music'),
+                        ),
+                      const PopupMenuItem(
+                        value: 'files',
+                        child: Text('From Files'),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    key: const Key('settings-button'),
+                    onPressed: widget.onOpenSettings,
+                    tooltip: 'Settings',
+                    icon: PhosphorIcon(AppIcons.settings, size: 22),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // ── Library error banner ─────────────────────────────────────
+          if (controller.libraryError != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screenInset,
+                  AppSpacing.lg,
+                  AppSpacing.screenInset,
+                  0,
                 ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.sm,
+                    AppSpacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.errorContainer,
+                    borderRadius: AppRadii.all(AppRadii.md),
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        'Library',
-                        style: textTheme.displaySmall?.copyWith(
-                          fontWeight: AppType.display,
-                          letterSpacing: AppType.trackTight,
+                      PhosphorIcon(
+                        PhosphorIcons.warning(),
+                        size: 18,
+                        color: scheme.error,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          controller.libraryError!,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: scheme.onErrorContainer,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        controller.isLibraryLoading
-                            ? 'Loading…'
-                            : '${controller.tracks.length} ${controller.tracks.length == 1 ? 'track' : 'tracks'}',
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: scheme.onSurfaceVariant,
+                      TextButton(
+                        onPressed: () => controller.refreshLibrary(
+                          retryPermissionRequest: true,
                         ),
+                        child: const Text('Retry'),
+                      ),
+                      IconButton(
+                        icon: PhosphorIcon(AppIcons.close, size: 16),
+                        color: scheme.onErrorContainer,
+                        tooltip: 'Dismiss',
+                        onPressed: () => controller.clearLibraryError(),
                       ),
                     ],
                   ),
                 ),
-                IconButton(
-                  key: const Key('settings-button'),
-                  onPressed: widget.onOpenSettings,
-                  icon: PhosphorIcon(AppIcons.settings, size: 22),
-                  color: scheme.onSurfaceVariant,
-                  tooltip: 'Settings',
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // ── Library error banner ─────────────────────────────────────
-        if (controller.libraryError != null)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenInset,
-                AppSpacing.lg,
-                AppSpacing.screenInset,
-                0,
               ),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                  AppSpacing.sm,
-                  AppSpacing.sm,
+            ),
+
+          if (controller.tracks.isNotEmpty && _drillItem == null)
+            SliverToBoxAdapter(child: _RecentShelf(controller: controller)),
+          if (controller.tracks.isEmpty && !controller.isLibraryLoading)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 32,
                 ),
-                decoration: BoxDecoration(
-                  color: scheme.errorContainer,
-                  borderRadius: AppRadii.all(AppRadii.md),
-                ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    PhosphorIcon(
-                      PhosphorIcons.warning(),
-                      size: 18,
-                      color: scheme.error,
+                    Icon(
+                      Icons.library_music_outlined,
+                      size: 40,
+                      color: scheme.onSurfaceVariant,
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        controller.libraryError!,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: scheme.onErrorContainer,
-                        ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Make room for your favorites.',
+                      style: textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Bring songs from Music or Files. Your collection stays on your phone.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
-                    TextButton(
-                      onPressed: () => controller.refreshLibrary(
-                        retryPermissionRequest: true,
-                      ),
-                      child: const Text('Retry'),
-                    ),
-                    IconButton(
-                      icon: PhosphorIcon(AppIcons.close, size: 16),
-                      color: scheme.onErrorContainer,
-                      tooltip: 'Dismiss',
-                      onPressed: () => controller.clearLibraryError(),
+                    const SizedBox(height: 16),
+                    TextButton.icon(
+                      onPressed: () async {
+                        final message = await controller.importAudioFiles();
+                        if (message != null) _showMsg(message);
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Import songs'),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
-
-        // ── Now playing hero (only when something is loaded) ──────────
-        if (controller.currentTrack != null)
+          // ── Category selector ─────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.screenInset,
-                AppSpacing.xl,
+                AppSpacing.xxl,
                 AppSpacing.screenInset,
                 0,
               ),
-              child: _NowPlayingHero(controller: controller),
+              child: _CategoryTabs(
+                selected: controller.selectedCategory,
+                onSelected: (cat) {
+                  setState(() => _drillItem = null);
+                  controller.selectLibraryCategory(cat);
+                },
+              ),
             ),
           ),
 
-        // ── Category selector ─────────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
+          // ── Content ───────────────────────────────────────────────────
+          SliverPadding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.screenInset,
-              AppSpacing.xxl,
+              AppSpacing.md,
               AppSpacing.screenInset,
-              0,
+              180,
             ),
-            child: _CategoryTabs(
-              selected: controller.selectedCategory,
-              onSelected: (cat) {
-                setState(() => _drillItem = null);
-                controller.selectLibraryCategory(cat);
-              },
-            ),
+            sliver: contentSliver,
           ),
-        ),
-
-        // ── Content ───────────────────────────────────────────────────
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenInset,
-            AppSpacing.md,
-            AppSpacing.screenInset,
-            180,
-          ),
-          sliver: contentSliver,
-        ),
-      ],
-    ),
+        ],
+      ),
     );
   }
 }
 
 // ── Now Playing Hero ────────────────────────────────────────────────────────
 
-class _NowPlayingHero extends StatelessWidget {
-  const _NowPlayingHero({required this.controller});
+class _RecentShelf extends StatelessWidget {
+  const _RecentShelf({required this.controller});
   final MonolithController controller;
   @override
   Widget build(BuildContext context) {
-    final track = controller.currentTrack!;
-    final scheme = Theme.of(context).colorScheme;
-    final type = Theme.of(context).textTheme;
-    return AppCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      borderRadius: AppRadii.all(AppRadii.xl),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: MediaQuery.sizeOf(context).width < 380 ? 96 : 120,
-            height: 144,
-            child: TrackArtwork(
-              track: track,
-              borderRadius: AppRadii.all(AppRadii.md),
-            ),
+    final tracks = [...controller.tracks]
+      ..sort(
+        (a, b) =>
+            (b.addedAt ?? DateTime(0)).compareTo(a.addedAt ?? DateTime(0)),
+      );
+    final recent = tracks.take(8).toList();
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text('Recently added', style: theme.textTheme.titleMedium),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 160 + MediaQuery.textScalerOf(context).scale(30),
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            scrollDirection: Axis.horizontal,
+            itemCount: recent.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 16),
+            itemBuilder: (context, i) {
+              final track = recent[i];
+              return SizedBox(
+                width: 132,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => controller.selectTrack(track, openPlayer: true),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox.square(
+                        dimension: 132,
+                        child: TrackArtwork(
+                          track: track,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        track.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        track.artist,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  controller.isPlaying ? 'ON REPEAT' : 'YOUR NEXT LISTEN',
-                  style: type.labelSmall?.copyWith(
-                    color: scheme.primary,
-                    letterSpacing: 1.6,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  track.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: type.titleLarge?.copyWith(
-                    fontWeight: AppType.title,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  track.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: type.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                FilledButton.icon(
-                  onPressed: track.canPlay ? controller.togglePlayback : null,
-                  icon: Icon(
-                    controller.isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    size: 20,
-                  ),
-                  label: Text(controller.isPlaying ? 'Pause' : 'Listen'),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -776,50 +797,40 @@ class _CategoryTabs extends StatelessWidget {
       LibraryCategory.playlists: 'Playlists',
     };
 
-    return SizedBox(
-      height: 40,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
         children: [
           for (final entry in labels.entries)
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.sm),
-              child: AnimatedContainer(
-                duration: AppMotion.durFast,
-                curve: AppMotion.standard,
-                decoration: BoxDecoration(
-                  color: entry.key == selected
-                      ? scheme.primary
-                      : scheme.surfaceContainerLow,
-                  borderRadius: AppRadii.all(AppRadii.pill),
-                  border: Border.all(
-                    color: entry.key == selected
-                        ? Colors.transparent
-                        : scheme.outlineVariant.withValues(alpha: 0.5),
-                    width: 0.5,
+            Semantics(
+              selected: entry.key == selected,
+              child: InkWell(
+                onTap: () => onSelected(entry.key),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 13,
                   ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => onSelected(entry.key),
-                    borderRadius: AppRadii.all(AppRadii.pill),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.lg,
-                        vertical: AppSpacing.sm,
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: entry.key == selected
+                            ? scheme.onSurface
+                            : Colors.transparent,
+                        width: 2,
                       ),
-                      child: Text(
-                        entry.value,
-                        style: textTheme.labelMedium?.copyWith(
-                          color: entry.key == selected
-                              ? scheme.onPrimary
-                              : scheme.onSurfaceVariant,
-                          fontWeight: entry.key == selected
-                              ? AppType.label
-                              : AppType.body,
-                        ),
-                      ),
+                    ),
+                  ),
+                  child: Text(
+                    entry.value,
+                    style: textTheme.titleSmall?.copyWith(
+                      color: entry.key == selected
+                          ? scheme.onSurface
+                          : scheme.onSurfaceVariant,
+                      fontWeight: entry.key == selected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                     ),
                   ),
                 ),
@@ -957,7 +968,6 @@ class _TracksSilver extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final gridRows = (sortedHighlights.length / 2).ceil();
 
     if (controller.isLibraryLoading) {
       return const SliverToBoxAdapter(
@@ -968,7 +978,7 @@ class _TracksSilver extends StatelessWidget {
       );
     }
 
-    final totalCount = 1 + sortedTracks.length + 1 + gridRows;
+    final totalCount = 1 + sortedTracks.length;
 
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
@@ -976,7 +986,7 @@ class _TracksSilver extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.md),
             child: SectionHeader(
-              title: 'Tracks',
+              title: 'All songs',
               actionLabel: '${sortedTracks.length} total',
               trailing: sortButton,
             ),
@@ -1002,46 +1012,7 @@ class _TracksSilver extends StatelessWidget {
             ],
           );
         }
-        if (index == sortedTracks.length + 1) {
-          return Padding(
-            padding: const EdgeInsets.only(
-              top: AppSpacing.xxl,
-              bottom: AppSpacing.lg,
-            ),
-            child: const SectionHeader(title: 'Recent additions'),
-          );
-        }
-        final row = index - sortedTracks.length - 2;
-        final aIdx = row * 2;
-        if (aIdx >= sortedHighlights.length) return const SizedBox.shrink();
-        final a = sortedHighlights[aIdx];
-        final b = aIdx + 1 < sortedHighlights.length
-            ? sortedHighlights[aIdx + 1]
-            : null;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _AlbumCard(
-                  track: a,
-                  onTap: () => controller.selectTrack(a, openPlayer: true),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: b != null
-                    ? _AlbumCard(
-                        track: b,
-                        onTap: () =>
-                            controller.selectTrack(b, openPlayer: true),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
-          ),
-        );
+        return const SizedBox.shrink();
       }, childCount: totalCount),
     );
   }
@@ -1104,6 +1075,14 @@ class _TrackRow extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+            Text(
+              track.duration > Duration.zero
+                  ? '${track.duration.inMinutes}:${track.duration.inSeconds.remainder(60).toString().padLeft(2, '0')}'
+                  : '—',
+              style: textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
               ),
             ),
             IconButton(
@@ -1476,8 +1455,8 @@ class _PlaylistSliver extends StatelessWidget {
                 child: Row(
                   children: [
                     SizedBox(
-                      width: 56,
-                      height: 56,
+                      width: 48,
+                      height: 48,
                       child: lead == null
                           ? Container(
                               decoration: BoxDecoration(

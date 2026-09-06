@@ -51,6 +51,23 @@ final class MediaImportPlugin: NSObject {
 
   private func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "readAudioMetadata":
+      guard let args = call.arguments as? [String: Any], let path = args["path"] as? String else {
+        result(FlutterError(code: "invalid_path", message: "Missing audio path", details: nil)); return
+      }
+      DispatchQueue.global(qos: .utility).async {
+        let url = URL(fileURLWithPath: path)
+        // Existing imports may have inherited protection incompatible with locked playback.
+        try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.none], ofItemAtPath: path)
+        let asset = AVURLAsset(url: url)
+        asset.loadValuesAsynchronously(forKeys: ["duration", "tracks", "playable"]) {
+          let seconds = CMTimeGetSeconds(asset.duration)
+          let duration = seconds.isFinite && seconds > 0 ? Int(seconds * 1000) : 0
+          DispatchQueue.main.async {
+            result(["durationMs": duration, "playable": asset.isPlayable && !asset.tracks(withMediaType: .audio).isEmpty])
+          }
+        }
+      }
     case "pickFromMusicLibrary":
       pickFromMusicLibrary(result: result)
     case "exportToFiles":
@@ -150,6 +167,16 @@ final class MediaImportPlugin: NSObject {
         try? FileManager.default.removeItem(at: destination)
         throw NSError(domain: "Monolith", code: 3, userInfo: [NSLocalizedDescriptionKey: "Imported audio file is empty or unreadable."])
       }
+      let exportedAsset = AVURLAsset(url: destination)
+      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        exportedAsset.loadValuesAsynchronously(forKeys: ["tracks", "duration", "playable"]) { continuation.resume() }
+      }
+      guard exportedAsset.isPlayable, !exportedAsset.tracks(withMediaType: .audio).isEmpty else {
+        try? FileManager.default.removeItem(at: destination)
+        throw NSError(domain: "Monolith", code: 3, userInfo: [NSLocalizedDescriptionKey: "Music returned an unreadable audio file. Download the original in Music and import it again."])
+      }
+      let verifiedSeconds = CMTimeGetSeconds(exportedAsset.duration)
+      if verifiedSeconds.isFinite && verifiedSeconds > 0 { payload["durationMs"] = Int(verifiedSeconds * 1000) }
       try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.none], ofItemAtPath: destination.path)
       if let image = item.artwork?.image(at: CGSize(width: 600, height: 600)),
          let data = image.jpegData(compressionQuality: 0.85) {

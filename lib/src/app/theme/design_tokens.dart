@@ -90,7 +90,7 @@ class AccentSwatch {
     AccentPreset.coral: AccentSwatch(
       preset: AccentPreset.coral,
       label: 'Coral',
-      base: Color(0xFFBC493C),
+      base: Color(0xFFFF4D5E),
       on: Color(0xFFFFFFFF),
     ),
     AccentPreset.violet: AccentSwatch(

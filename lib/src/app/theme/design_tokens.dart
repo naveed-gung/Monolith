@@ -53,14 +53,14 @@ class AppSurfaces {
 
   // Apple-ish warm near-white. NOT pure white — pure white reads cheap.
   static const light = AppSurfaces(
-    canvas: Color(0xFFFAFAFB),
+    canvas: Color(0xFFFCFCFA),
     surface: Color(0xFFFFFFFF),
-    surfaceHigh: Color(0xFFF1F1F4),
-    surfaceHigher: Color(0xFFE7E7EC),
-    border: Color(0xFFDDDDE3),
+    surfaceHigh: Color(0xFFF3F3F0),
+    surfaceHigher: Color(0xFFEAEAE5),
+    border: Color(0xFFE1E1DC),
     textPrimary: Color(0xFF0B0B0F),
     textSecondary: Color(0xFF5C5C66),
-    textTertiary: Color(0xFF9A9AA4),
+    textTertiary: Color(0xFF75756F),
   );
 }
 
@@ -90,7 +90,7 @@ class AccentSwatch {
     AccentPreset.coral: AccentSwatch(
       preset: AccentPreset.coral,
       label: 'Coral',
-      base: Color(0xFFFF4D5E),
+      base: Color(0xFFBC493C),
       on: Color(0xFFFFFFFF),
     ),
     AccentPreset.violet: AccentSwatch(
@@ -161,10 +161,10 @@ class AppSpacing {
 
 class AppRadii {
   const AppRadii._();
-  static const double sm = 12; // chips, small controls
-  static const double md = 18; // buttons, inputs, list tiles
-  static const double lg = 24; // cards, sheets, artwork
-  static const double xl = 32; // hero / now-playing artwork
+  static const double sm = 8; // chips, small controls
+  static const double md = 12; // buttons, inputs, list tiles
+  static const double lg = 16; // cards, sheets, artwork
+  static const double xl = 20; // hero / now-playing artwork
   static const double pill = 999;
 
   static BorderRadius all(double r) => BorderRadius.circular(r);
@@ -185,7 +185,12 @@ class AppMotion {
 
   // Curves
   static const Curve standard = Curves.easeOutCubic; // default for everything
-  static const Curve emphasized = Cubic(0.2, 0.0, 0.0, 1.0); // hero / sheet open
+  static const Curve emphasized = Cubic(
+    0.2,
+    0.0,
+    0.0,
+    1.0,
+  ); // hero / sheet open
   static const Curve exit = Curves.easeInCubic; // things leaving
 
   // Spring (for the draggable now-playing sheet). Use with SpringSimulation
@@ -213,11 +218,7 @@ class AppElevation {
       ];
     }
     return const [
-      BoxShadow(
-        color: Color(0x14000000),
-        blurRadius: 20,
-        offset: Offset(0, 6),
-      ),
+      BoxShadow(color: Color(0x14000000), blurRadius: 20, offset: Offset(0, 6)),
     ];
   }
 

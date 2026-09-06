@@ -48,7 +48,7 @@ class AppRelease {
 
 class AppUpdateService extends ChangeNotifier {
   static final instance = AppUpdateService();
-  static const currentVersion = '1.3.0';
+  static const currentVersion = '1.4.0';
   bool autoDownload = true;
   bool busy = false;
   double? progress;

@@ -2,6 +2,17 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.4.0] — 2026-09-06
+
+### Added
+- **One-tap "Import All from Music Library"** — native `MPMediaQuery.songs()` query in Swift allows batch-importing the entire accessible local music collection into Monolith with a single tap, eliminating the need to tick songs individually.
+- **Apple App Store & Apple Music download indicator** — top-bar morphing indicator displays centered download info for 2s, shrinks into a 38px circle with a perimeter progress ring and centered rounded stop square in the user's selected accent color, and completes with a green checkmark (✓).
+
+### Fixed / Refined
+- **Theme color accuracy** — restored the vibrant signature coral red (`Color(0xFFFF4D5E)`) accent preset.
+- **Library import menu** — redesigned the `+` action button into a modern frosted glass popover menu with options for "Import All from Music", "Select from Music…", and "From Files".
+- **Corrupt track guard** — skips orphaned/0-byte audio files (< 4KB) during disk sync to prevent playback errors from incomplete legacy exports.
+
 ## [1.3.0] — 2026-09-06
 
 ### Fixed / Reliability

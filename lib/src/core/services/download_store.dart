@@ -1,12 +1,34 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 
 import '../models/music_models.dart';
 
 class DownloadStore {
+  Future<Map<Object?, Object?>> readAudioMetadata(String path) async {
+    try {
+      return await const MethodChannel('monolith/media_import')
+              .invokeMapMethod<Object?, Object?>('readAudioMetadata', {
+                'path': path,
+              })
+              .timeout(const Duration(seconds: 10)) ??
+          {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<Track> resolveMetadata(Track track) async {
+    if (track.filePath == null || track.duration > Duration.zero) return track;
+    final metadata = await readAudioMetadata(track.filePath!);
+    final durationMs = (metadata['durationMs'] as num?)?.toInt() ?? 0;
+    return durationMs > 0
+        ? track.copyWith(duration: Duration(milliseconds: durationMs))
+        : track;
+  }
+
   static const _sep = '/';
   Future<void> _pendingWrite = Future<void>.value();
 
@@ -90,7 +112,11 @@ class DownloadStore {
       return const [];
     }
 
-    final decoded = jsonDecode(rawContent) as List<dynamic>;
+    final json = jsonDecode(rawContent);
+    final decoded = json is List
+        ? json
+        : (json as Map<String, dynamic>)['tracks'] as List;
+
     final root = await _rootDirectory();
     String? recover(String? saved) {
       if (saved == null) return null;
@@ -118,6 +144,11 @@ class DownloadStore {
         .map((item) {
           final track = Track.fromJson(item as Map<String, dynamic>);
           return track.copyWith(
+            source:
+                (track.filePath?.replaceAll('\\', '/').contains('/Imports/') ??
+                    false)
+                ? TrackSource.imported
+                : track.source,
             filePath: recover(track.filePath),
             artworkFilePath: recover(track.artworkFilePath),
           );
@@ -163,21 +194,31 @@ class DownloadStore {
       }
     }
 
-    if (orphans.isEmpty) return manifest;
-
     orphans.sort(
       (a, b) => (b.addedAt ?? DateTime(0)).compareTo(a.addedAt ?? DateTime(0)),
     );
-    final merged = [...manifest, ...orphans];
+    final merged = <Track>[];
+    for (final track in [...manifest, ...orphans]) {
+      merged.add(await resolveMetadata(track));
+    }
     // Persist so the re-discovered files become first-class manifest entries
     // (smart-playlist counts, ordering, etc.) on the next boot.
-    await saveTracks(merged);
+    if (orphans.isNotEmpty ||
+        merged.asMap().entries.any(
+          (e) => e.value.duration != manifest[e.key].duration,
+        )) {
+      await saveTracks(merged);
+    }
     return merged;
   }
 
   Future<Track> _trackFromDiskFile(File file) async {
     final name = file.uri.pathSegments.last;
-    final title = _stem(name);
+    final title = _stem(name).replaceFirst(
+      RegExp(r'-[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$'),
+      '',
+    );
+    final imported = _canonical(file.path).contains('/Imports/');
     DateTime? addedAt;
     try {
       addedAt = (await file.stat()).modified;
@@ -190,12 +231,12 @@ class DownloadStore {
       id: 'disk-${file.path.hashCode}',
       title: title,
       artist: 'Unknown',
-      album: 'Downloads',
-      genre: 'Downloaded audio',
+      album: imported ? 'Imported audio' : 'Downloads',
+      genre: imported ? 'Imported audio' : 'Downloaded audio',
       duration: Duration.zero,
       colors: Track.paletteForSeed(file.path),
       blurb: 'Recovered from $name',
-      source: TrackSource.downloaded,
+      source: imported ? TrackSource.imported : TrackSource.downloaded,
       filePath: file.path,
       artworkFilePath: artwork,
       addedAt: addedAt,

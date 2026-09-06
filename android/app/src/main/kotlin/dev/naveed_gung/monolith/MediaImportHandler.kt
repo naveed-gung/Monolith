@@ -1,5 +1,6 @@
 package dev.naveed_gung.monolith
 
+import android.media.MediaMetadataRetriever
 import android.app.Activity
 import android.content.ContentValues
 import android.content.Intent
@@ -77,6 +78,18 @@ class MediaImportHandler(private val activity: Activity) {
         MethodChannel(engine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+            "readAudioMetadata" -> {
+                val path = call.argument<String>("path")
+                executor.execute {
+                    val reader = MediaMetadataRetriever()
+                    val metadata = try {
+                        reader.setDataSource(path)
+                        mapOf("durationMs" to (reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L))
+                    } catch (_: Exception) { emptyMap<String, Any>() }
+                    finally { reader.release() }
+                    Handler(Looper.getMainLooper()).post { result.success(metadata) }
+                }
+            }
                     "exportToSaf" -> exportToSaf(call, result)
                     "writeToPublicMusic" -> writeToPublicMusic(call, result)
                     "getPublicMusicDir" -> getPublicMusicDir(result)

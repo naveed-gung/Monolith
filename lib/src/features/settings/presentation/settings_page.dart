@@ -398,15 +398,57 @@ class SettingsPage extends StatelessWidget {
                         onTap: () async {
                           if (controller.isImportingAudio) return;
                           controller.hapticLight();
+                          final choice = await showModalBottomSheet<String>(
+                            context: context,
+                            backgroundColor:
+                                Theme.of(context).colorScheme.surface,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(20),
+                              ),
+                            ),
+                            builder: (sheetCtx) => SafeArea(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ListTile(
+                                      leading: const Icon(Icons.library_music_rounded),
+                                      title: const Text('Import All from Music'),
+                                      subtitle: const Text(
+                                        'Batch import all accessible offline songs',
+                                      ),
+                                      onTap: () => Navigator.pop(sheetCtx, 'all'),
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.checklist_rounded),
+                                      title: const Text('Select from Music…'),
+                                      subtitle: const Text(
+                                        'Pick individual songs or albums',
+                                      ),
+                                      onTap: () => Navigator.pop(sheetCtx, 'pick'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                          if (choice == null || !context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              duration: Duration(seconds: 2),
-                              content: Text('Opening Music picker…'),
+                            SnackBar(
+                              duration: const Duration(seconds: 2),
+                              content: Text(
+                                choice == 'all'
+                                    ? 'Scanning Music library…'
+                                    : 'Opening Music picker…',
+                              ),
                             ),
                           );
                           try {
-                            final message = await controller
-                                .importFromMusicLibrary();
+                            final message = choice == 'all'
+                                ? await controller.importAllFromMusicLibrary()
+                                : await controller.importFromMusicLibrary();
                             if (context.mounted && message != null) {
                               ScaffoldMessenger.of(
                                 context,
@@ -417,7 +459,7 @@ class SettingsPage extends StatelessWidget {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                    'Could not open Music. Check Music access in Settings.',
+                                    'Could not access Music. Check Music access in Settings.',
                                   ),
                                 ),
                               );

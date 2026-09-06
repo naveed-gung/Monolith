@@ -1,35 +1,30 @@
-<div align="center">
+# Monolith
 
-<img src="docs/assets/readme-hero.svg" alt="Monolith — offline-first Flutter music player" width="100%" />
+A personal music player for iOS and Android. Bring your own music, keep a local collection, and listen with the screen locked.
 
-<h1>Monolith</h1>
+**Local development update:** the screenshots and reliability changes below are from the working tree. They have not been committed, pushed, or published. The iOS changes require an iPhone test before release.
 
-<p><strong>An offline-first Flutter music player for Android &amp; iOS</strong><br/>
-Local listening, managed downloads, playlist control, and system-grade playback surfaces — from one shared codebase.</p>
+## Screenshots
 
-<p>
-  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Android%20%7C%20iOS-FF4D5E?style=flat-square" />
-  <a href="https://github.com/naveed-gung/Monolith/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/naveed-gung/Monolith?style=flat-square&color=FF4D5E" /></a>
-  <a href="https://github.com/naveed-gung/Monolith/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/naveed-gung/Monolith/total?style=flat-square&color=FF4D5E" /></a>
-  <img alt="Flutter" src="https://img.shields.io/badge/Flutter-Dart%20%5E3.10-FF4D5E?style=flat-square" />
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Personal%20Free%20%C2%B7%20Commercial%20Paid-FF4D5E?style=flat-square" /></a>
-</p>
+Actual captures from the Pixel 10a emulator, using a local test tone and a short public download. The shared Flutter interface uses a light canvas, compact lists, square artwork, and a persistent mini-player. These are Android captures, not iPhone screenshots.
 
-<p>
-  <a href="#-download">Download</a> ·
-  <a href="#-features">Features</a> ·
-  <a href="#-architecture">Architecture</a> ·
-  <a href="#-getting-started">Getting started</a> ·
-  <a href="#-license">License</a>
-</p>
+| Library | Songs | Player |
+| --- | --- | --- |
+| <img src="docs/screenshots/library.png" width="230" alt="Monolith library with recent artwork and song list"> | <img src="docs/screenshots/songs.png" width="230" alt="All songs with durations"> | <img src="docs/screenshots/player.png" width="230" alt="Now playing and playback controls"> |
 
-</div>
+| Downloads | Search | Settings |
+| --- | --- | --- |
+| <img src="docs/screenshots/downloads.png" width="230" alt="Downloads, separated from Music imports"> | <img src="docs/screenshots/search.png" width="230" alt="Search within the local music library"> | <img src="docs/screenshots/settings.png" width="230" alt="Appearance and playback preferences"> |
 
----
+## Your collection
 
-## <img src="docs/assets/icons/ic-overview.svg" width="22" align="center" /> Overview
-
-Monolith is a personal music player built around a simple idea: **your library is yours.** Downloaded and imported tracks live on the device as a permanent, manifest-backed collection — not a disposable streaming session — and surface natively on the iOS lock screen, iOS Control Center, and the Android media notification deck.
+- Import readable songs from the iOS Music picker or audio files from Files.
+- Browse songs, artists, albums, playlists, and recent additions.
+- Download supported YouTube audio and its thumbnail. Completed downloads appear in Downloads; imported files remain in Library and Songs.
+- Read missing durations from native audio metadata without playing every song.
+- Play local files through `just_audio`, with background playback and system media controls.
+- Export copies through Files on iOS or the Android document picker.
+- Choose light/dark appearance, accent color, and reduced visual effects. Equalizer controls are Android-only.
 
 <details>
 <summary><strong>Why I built this</strong></summary>
@@ -44,174 +39,98 @@ So I thought — if I'm already trusting a third-party app, why not just build m
 
 </details>
 
-| | |
-| --- | --- |
-| **Platforms** | Android · iOS 16.4+ (primary test device iOS 16.7) |
-| **Core stack** | Flutter · `just_audio` · `just_audio_background` · `audio_session` · `on_audio_query` |
-| **State** | A single controller-driven app state (`MonolithController`) |
-| **Download model** | yt-dlp-oriented workflow; current mobile backend is `youtube_explode_dart` |
-| **Playback surfaces** | Android media deck · lock screen · headset buttons · iOS Control Center |
+## How iOS Music imports work
 
----
+Music exposes selected items as media assets. An `ipod-library://` URL is not an ordinary file path. Monolith's Swift bridge either copies a readable file or asks AVFoundation to export the selected asset to an M4A file. It validates that the result has a playable audio track, then saves duration, title, artist, and available artwork.
 
-## <img src="docs/assets/icons/ic-download.svg" width="22" align="center" /> Download
-
-Grab the latest build from the [**Releases**](https://github.com/naveed-gung/Monolith/releases/latest) page:
-
-| Platform | File | Install |
-| --- | --- | --- |
-| **Android** | `monolith.apk` | Download and open on any Android 7.0+ device (allow install from unknown sources). |
-| **iOS** | `monolith.ipa` | Unsigned build. Sideload with [AltStore](https://altstore.io) / [Sideloadly](https://sideloadly.io), re-sign with your own Apple ID in Xcode, or install it **permanently** with TrollStore (see below). |
-
-> **Jailbroken or TrollStore-capable iOS?**
-> - **Jailbroken device** → install `monolith.ipa` permanently with [**TrollStore**](https://github.com/opa334/TrollStore). No 7-day re-sign, no computer, no developer account.
-> - **iOS 16.7.x** → use [**TrollStore Lite**](https://github.com/opa334/TrollStore) to install the same IPA permanently.
->
-> TrollStore-installed apps stay signed forever, so this is the smoothest way to run Monolith on a supported iPhone.
-
----
-
-## <img src="docs/assets/icons/ic-product.svg" width="22" align="center" /> Features
-
-<img src="docs/assets/product-overview.svg" alt="Product surface" width="100%" />
-
-- **Library** — import on-device audio, browse and manage playlists, organise listening.
-- **Smart playlists** — auto-curated *Recently added*, *Most played*, and *Never played* lists, backed by manifest play counts.
-- **Downloads** — fetch and manage offline files with progress, pause, cancel, retry, and fatal-error handling.
-- **Player** — full-screen player with animated artwork, scrubbing, repeat/shuffle, and queue navigation.
-- **Lyrics** — `.lrc` sidecar (and embedded ID3 `USLT`) with synced line highlighting and a clean *No lyrics* empty state.
-- **Equalizer** *(Android only)* — per-band graphic EQ in **Settings → Sound**, persisted across launches.
-- **Haptics** — feedback on transport, navigation, and controls, with a toggle in **Settings → Playback** (Android + iOS).
-- **Search** — surface tracks instantly and jump straight into playback.
-- **Storage** — browse, share, and inspect every downloaded file in Monolith's own folder; iOS Apple Music import toggle and a re-runnable import prompt in Settings.
-- **System integration** — background metadata for Android notifications and the iOS lock screen / Control Center.
-- **Theming** — light/dark with a user-selectable accent, an accent-following in-app **m** logo, and a *Reduce visual effects* switch for cooler, longer battery life on older phones.
-
-### Experience pillars
-
-| Pillar | What it delivers |
-| --- | --- |
-| **Offline listening** | Downloaded and imported tracks stay available as a local-first library — no live stream required. |
-| **Unified player** | One controller keeps queue, metadata, and transport state consistent across every surface. |
-| **System integration** | Notification controls, headset buttons, lock screen, and Control Center are first-class. |
-| **Library ownership** | Imports, playlists, and manifest-backed downloads form a permanent collection. |
-| **Runs cool** | Backdrop blurs are cached and capped, and *Reduce visual effects* drops them entirely — tuned for older hardware like the iPhone X (A11). |
-
-### Gestures & input
-
-- **Swipe between tabs** — a horizontal swipe moves between Library, Downloads, and Search; a swipe right also leaves Settings.
-- **Tap to dismiss** — tap anywhere off a text field to close the keyboard, and sheets like *Add to playlist* rise above it.
-- **Pull-down player** — drag the player sheet down to dismiss it; the mini deck stays put when the keyboard opens.
-
----
-
-## <img src="docs/assets/icons/ic-playback.svg" width="22" align="center" /> Playback pipeline
-
-<img src="docs/assets/media-playback-pipeline.svg" alt="Media playback pipeline" width="100%" />
-
-`just_audio` renders the file, `just_audio_background` publishes a `MediaItem` for the system, and `audio_session` pins a music-friendly session so the current track surfaces correctly on the iOS lock screen, iOS Control Center, and Android's media notification deck.
-
-> **Platform note:** iOS does not expose an Android-style notification-shade media card. The equivalent surfaces are the Lock Screen and Control Center.
-
----
-
-## <img src="docs/assets/icons/ic-download.svg" width="22" align="center" /> Download pipeline
-
-Monolith fetches music from YouTube-source inputs for offline playback and local library management.
-
-- The downloader surface is shaped around a **yt-dlp-style** acquisition flow.
-- The checked-in mobile backend uses **`youtube_explode_dart`** rather than bundling `yt-dlp` binaries.
-- Downloads are persisted locally, reconciled into manifest-backed storage, and surfaced through the Library and Player.
-
----
-
-## <img src="docs/assets/icons/ic-architecture.svg" width="22" align="center" /> Architecture
-
-<img src="docs/assets/architecture-map.svg" alt="Architecture map" width="100%" />
-
-A controller-driven architecture with a thin app shell and feature-scoped presentation. The orchestration point is `MonolithController` (`lib/src/app/state/app_controller.dart`): navigation, playback bindings, device-library refresh, download/import persistence, playlist state, and theming.
-
-```text
-lib/
-  main.dart              # bootstraps bindings + background media
-  src/
-    app/                 # wiring, top-level state, theming
-    core/                # models, services, reusable widgets
-    features/            # Library · Downloads · Player · Search · Settings · Storage · Shell
-android/ · ios/          # platform runners and capabilities
-third_party/             # vendored plugin overrides for toolchain compatibility
-test/                    # widget-level regression coverage
+```mermaid
+flowchart TD
+    Picker[Select songs in the iOS Music picker] --> Access{Local, readable, unprotected asset?}
+    Access -- No --> Skip[Report why this item could not be imported]
+    Access -- Yes --> URL{Asset URL type}
+    URL -- File URL --> Copy[Copy audio into Monolith]
+    URL -- ipod-library URL --> Export[AVAssetExportSession exports M4A]
+    Copy --> Validate[Check audio track and playability]
+    Export --> Validate
+    Validate --> Store[Documents / Monolith / Music / Imports]
+    Store --> Manifest[Save metadata and artwork]
+    Manifest --> Play[Play Monolith's independent local copy]
 ```
 
----
+**Can the originals or Music app be removed afterwards?** A successful import is an independent copy inside Monolith. It does not depend on the original Music item for playback. Before removing originals, confirm the songs appear in Monolith, close and reopen it, test playback in airplane mode, and export a backup to a location outside Monolith. This is especially important for files imported by older builds that showed “Cannot Open.”
 
-## <img src="docs/assets/icons/ic-getting-started.svg" width="22" align="center" /> Getting started
+Protected subscription tracks and unavailable cloud-only items are not copied. Jailbreak/TrollStore installation does not turn those assets into unprotected files. Removing **Monolith itself** can remove its stored music; removing Music and removing Monolith are different operations. See [storage and backups](docs/storage.md).
 
-**Prerequisites:** Flutter SDK (Dart `^3.10`), Android SDK; Xcode + CocoaPods on macOS for iOS.
+The platform API details are described in Apple's [assetURL documentation](https://developer.apple.com/documentation/mediaplayer/mpmediaitem/asseturl) and [protected asset flag](https://developer.apple.com/documentation/mediaplayer/mpmediaitem/hasprotectedasset).
 
-```sh
-flutter pub get      # install dependencies
-flutter run          # run on the connected device
+## Download lifecycle
+
+Inspection retrieves the title, duration, and thumbnail. The download reuses that preview, resolves an AAC/MP4 stream for iOS, and writes to a temporary `.part` file. Only completed audio is renamed into the music folder and added to the manifest. Thumbnail failure does not fail audio. Lyrics are independent of downloads.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Inspect
+    Inspect --> Ready: Metadata received
+    Inspect --> Failed: Timeout or unavailable source
+    Ready --> Downloading: Start
+    Downloading --> Finalizing: Audio stream ends
+    Finalizing --> Saved: Rename file and save manifest
+    Downloading --> Paused: Stop current transfer
+    Paused --> Downloading: Restart transfer
+    Downloading --> Cancelled: Cancel
+    Ready --> Cancelled: Cancel during preparation
+    Downloading --> Failed: Network or source error
+    Failed --> Downloading: Explicit retry
+    Failed --> [*]: Dismiss
+    Cancelled --> [*]: Dismiss
+    Saved --> [*]
 ```
 
-<img src="docs/assets/development-workflow.svg" alt="Development workflow" width="100%" />
+Cancelled and dismissed jobs ignore late events. “Resume” restarts the transfer; byte-range resume is not implemented. Files already in the library are not removed when another download fails.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Screens[Library / Songs / Downloads / Search / Player] --> Controller[MonolithController]
+    Controller --> Player[just_audio]
+    Player --> System[Background audio and system controls]
+    Controller --> Storage[DownloadStore and manifest]
+    Controller --> Native[Swift / Kotlin import and metadata bridge]
+    Native --> Storage
+    Controller --> Downloader[youtube_explode_dart 3.1]
+    Downloader --> Temporary[Temporary audio plus optional artwork]
+    Temporary --> Storage
+    Controller --> Android[Android device-library query]
+```
+
+The live application starts at `lib/main.dart` and uses `lib/src/`. The repository also contains an in-progress alternative domain/repository layer; it does not own the live player. See [architecture and invariants](docs/architecture.md) for playback, recovery, and update flows.
+
+## Install and build
+
+Previously published APK/IPA files are available on [GitHub Releases](https://github.com/naveed-gung/Monolith/releases). Those releases do not contain this unpublished working-tree update.
+
+- Android: install a compatible APK over the existing app, with the same application ID and signing key.
+- iOS: this project targets the user's TrollStore installation. Build/package the IPA on macOS with Xcode; no Apple Developer signing flow was added here. Use TrollStore on a supported device and replace the installed app rather than deleting it first.
+- Desktop: deferred. Windows/Linux feature parity and the requested under-150 MB memory budget have not been demonstrated.
 
 ```sh
+flutter pub get
 flutter analyze
 flutter test
 flutter build apk --release
-flutter build ios --release --no-codesign   # macOS only
+# On macOS with Xcode and CocoaPods:
+flutter build ios --release --no-codesign
 ```
 
-> The downloader is not intended for web builds, and local plugin overrides live in `third_party/` to avoid AGP/Kotlin drift.
+The repository's debug APK configuration targets x86_64 emulators; its release configuration targets arm64 phones. Release builds use Gradle 8.14.5 with AGP 8.9.1 and build successfully on GitHub Actions CI.
 
----
+## Verification and remaining checks
 
-## <img src="docs/assets/icons/ic-platform.svg" width="22" align="center" /> Platform notes
-
-**Android** — device-library access, downloads, media notifications, lock-screen controls. Release builds are shrunk and arm64 ABI-filtered, built locally and published to Releases as `monolith.apk`.
-
-**iOS** — shared Flutter UI; min deployment iOS 16.4. A one-time startup prompt offers Apple Music / media-library import. CI builds an **unsigned IPA** (no Apple Developer Program required) on each `v*` tag and attaches `monolith.ipa` to the release. No signing material is ever committed.
-
-**Platform gating (honest):**
-
-- The **equalizer is Android-only** — it rides Android's audio-effect pipeline; iOS shows no EQ section.
-- **Downloads & uninstall:** updating the app over an old build keeps every download on both platforms. *Deleting* the app removes downloads — on iOS this is Apple's sandbox rule and is unavoidable in-app (iCloud is the only survival path); on Android, true uninstall-survival needs downloads in OS-public storage (MediaStore), which is in progress. The library already re-discovers any audio files that survive on disk. See [`docs/storage.md`](docs/storage.md).
-
----
-
-## <img src="docs/assets/icons/ic-troubleshoot.svg" width="22" align="center" /> Troubleshooting
-
-<details>
-<summary>Lock screen / Android media notification doesn't appear</summary>
-
-<br/>
-
-- Confirm a track with a valid local file path is playing.
-- Verify `just_audio_background` is installed (`flutter pub get`).
-- On iOS, confirm the build includes `UIBackgroundModes audio`.
-
-</details>
-
-<details>
-<summary>Downloaded tracks disappear</summary>
-
-<br/>
-
-Monolith stores track metadata in a manifest under its own folder; missing files are pruned from the manifest on load. On iOS the music lives in **On My iPhone › Monolith › Music** (Files app).
-
-</details>
-
-<details>
-<summary>Android build behaves inconsistently after dependency changes</summary>
-
-<br/>
-
-Re-run `flutter pub get` and check the vendored overrides in `third_party/`.
-
-</details>
-
----
+- **54 tests pass; Dart analysis reports no issues.** The regression suite covers the active controller as well as existing repository tests.
+- Regression coverage includes nonzero volume when changing songs, preserving playback on refresh/download completion, cancellation during preparation, source classification, duration caching, schema migration, and existing UI/import/export/update behavior.
+- Android builds and six emulator screenshots are checked locally. The app completed a real YouTube download with artwork, and both songs remained after another in-place APK replacement. Foreground/background playback was verified through Android media-session state. The extractor also completed a separate AAC transfer smoke test.
+- iOS Swift compilation, on-device Music import/export, locked playback, TrollStore replacement, and physical-device heat measurements remain device checks. A successful Android test does not establish these iOS results.
 
 ## <img src="docs/assets/icons/ic-docs.svg" width="22" align="center" /> License
 

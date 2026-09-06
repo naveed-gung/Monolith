@@ -43,7 +43,9 @@ void main() {
     expect(controller.currentTrack?.artist, 'Luna Sol');
   });
 
-  testWidgets('Downloads tab searches offline tracks', (tester) async {
+  testWidgets('Downloads excludes imports and searches downloaded tracks', (
+    tester,
+  ) async {
     tester.view.devicePixelRatio = 1.0;
     tester.view.physicalSize = const Size(430, 1600);
     addTearDown(() => _resetSurface(tester));
@@ -83,14 +85,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('downloads-search-field')),
-      'Aurora',
+      'Zulu',
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Aurora Bloom'), findsOneWidget);
+    expect(controller.offlineTracks.length, 2);
+    expect(controller.downloadedTracks.length, 1);
+    expect(find.text('Aurora Bloom'), findsNothing);
     expect(
       find.byKey(const Key('downloaded-track-download-zulu')),
-      findsNothing,
+      findsOneWidget,
     );
   });
 
@@ -231,7 +235,7 @@ void main() {
       ]),
     );
 
-    await controller.refreshLibrary();
+    await controller.whenReady;
     final message = await controller.importAudioFiles();
 
     expect(message, 'Imported 1 audio file from Files.');
@@ -273,7 +277,7 @@ Future<MonolithController> _buildTestController(
       downloadStore: _FakeDownloadStore(downloadedTracks),
     );
 
-    await fresh.refreshLibrary();
+    await fresh.whenReady;
     return fresh;
   });
   return controller!;

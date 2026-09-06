@@ -187,11 +187,14 @@ void main() {
   }
 
   Future<void> pumpUntil(bool Function() condition) async {
-    for (var i = 0; i < 500; i++) {
+    // These conditions depend on real filesystem IO. Event-loop turn counts
+    // can expire before the OS responds when the emulator/build is busy.
+    final deadline = Stopwatch()..start();
+    while (deadline.elapsed < const Duration(seconds: 5)) {
       if (condition()) return;
-      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(const Duration(milliseconds: 2));
     }
-    fail('Condition not met within 500 event-loop turns');
+    fail('Condition not met within five seconds');
   }
 
   group('progress → complete', () {

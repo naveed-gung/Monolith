@@ -1,64 +1,42 @@
-# Downloaded music — where it lives & what survives
+# Music storage, updates, and backups
 
-Honest answer to "do my downloads survive an update / an uninstall?"
+## Owned files
 
-## Where files live today
+- **iOS:** the app Documents directory, then `Monolith/Music`. Imports use `Monolith/Music/Imports`.
+- **Android:** the app external files directory, then `Monolith/Music`; imported copies use its `Imports` subfolder.
+- `Monolith/manifest.json` stores track metadata. Artwork is kept beside audio when available.
+- Temporary downloads end in `.part` and are excluded from library scans.
 
-`DownloadStore` keeps audio under a `Monolith/Music` folder:
+On iOS, browse Files → On My iPhone → Monolith → Monolith → Music. The first Monolith is the app's Documents entry; the second is the folder created by the store.
 
-- **Android:** `getExternalStorageDirectory()` →
-  `…/Android/data/dev.naveed_gung.monolith/files/Monolith/Music`
-- **iOS (and Android fallback):** `getApplicationDocumentsDirectory()/Monolith/Music`
-  (visible in Files → On My iPhone → Monolith)
+## Removing the originals from Apple Music
 
-A `manifest.json` at the `Monolith` root records the library; on load, entries
-whose backing file is gone are pruned, and any audio file found on disk that
-isn't in the manifest is re-added (`loadTracksMergingDisk`).
+A successful Music import produces a separate audio file in Monolith. A readable file URL is copied; a library asset is exported by AVFoundation. Monolith subsequently plays its own file, so deleting the original song or the Music app should not delete that copy.
 
-## Update (install a new build over the old) — ✅ keeps everything
+Before removing originals, verify **every song you need**, especially imports from a build that showed “Cannot Open”:
 
-On **both platforms**, updating the app does **not** wipe app data — the
-container persists. The new build reads the existing manifest, keeps every
-present track, and new downloads prepend (newest-first). This is covered by
-`test/download_store_survival_test.dart` (D1) and the ordering is deliberate in
-`_rebuildTracks` (Task D1).
+1. Confirm it appears in Monolith with a duration.
+2. Close and reopen Monolith, then play it in airplane mode.
+3. Export a backup outside Monolith, such as a computer or a separate Files location.
 
-## Delete / uninstall — the honest split
+A duration alone does not prove that an entire file decodes correctly. Files reported as failed, unavailable, or protected were not successfully copied. Protected Apple Music subscription assets are not converted into unrestricted audio by TrollStore or a jailbreak.
 
-### Android — re-discovery is implemented; true survival needs MediaStore (flagged)
+Deleting Music can affect Apple's Music-library integrations and future imports. See Apple's [built-in app deletion guidance](https://support.apple.com/en-nz/101264). It is different from deleting Monolith.
 
-What's **done & verified** (Dart, unit-tested): on launch the app scans the
-Music folder and rebuilds the library from whatever audio files are present —
-so if the files survive, the library repopulates from disk after a reinstall
-without needing the manifest (`loadTracksMergingDisk`, D2 tests).
+## Updating Monolith
 
-What's **NOT done** (flagged, needs native + a device): for files to actually
-**survive uninstall**, downloads must be written to **OS-public storage**, not
-the app-private external dir (which Android erases on uninstall). The correct
-route is **MediaStore (`MediaStore.Audio`)** on API 29+, which requires a native
-Kotlin `MethodChannel` and on-device verification. A path-only hack
-(`/storage/emulated/0/Music/Monolith`) would only work on Android ≤9 and silently
-fail under scoped storage on Android 10+, so shipping it as "survives uninstall"
-would be a false claim on modern devices. **Deferred to a device session** — the
-re-discovery half is ready to consume those surviving files the moment the
-MediaStore write lands.
+Install the replacement build over the existing app, using the same app identity. On iOS, use the intended TrollStore replacement flow; on Android, use a compatible signing key. Updates are stored in cache, separately from music. The loader repairs paths if an iOS app container moves.
 
-### iOS — not possible in-sandbox. No false claims.
+No installation flow can promise recovery after the user deletes the app or its data. Keep a separate backup before replacing a build containing valuable music.
 
-iOS **always** erases the app container (Documents, including
-"On My iPhone → Monolith") when the app is deleted. **There is no API to keep
-files in the sandbox across an uninstall.** Options:
+## Deleting Monolith
 
-1. **iCloud Drive (ubiquity container):** the only "survives delete" path — write
-   downloads to the app's iCloud container so they re-pull after reinstall (needs
-   the user's iCloud + space; entitlement + config require a Mac to validate). Not
-   implemented this round.
-2. **Manual export:** the user can move files out of the Files app before
-   deleting. Not automatic.
-3. **Accept the platform rule:** on iOS, deleting the app removes downloads
-   unless iCloud sync is enabled.
+Treat Monolith's app storage as removable with the app. Do not rely on app-private Documents or Android app external files surviving uninstall.
 
-**Bottom line:** iOS update keeps everything; iOS delete removes downloads — by
-Apple's sandbox rules, not a bug. Android update keeps everything, and reinstall
-re-discovers any files that survive once downloads move to MediaStore public
-storage (the remaining native piece).
+Use the export action to make copies outside the app first. The repository has native Files/SAF export and a public-Music writing bridge, but the active download path still defaults to the app's own music folder. Automatic iCloud backup/sync is not implemented.
+
+## Recovery behavior
+
+The loader accepts legacy and schema-v2 manifests, rebinds moved paths, and merges surviving audio. It recognizes `Imports` as imported music and reads missing durations without starting playback. Missing files are excluded from the visible snapshot; the read path does not deliberately prune their manifest records. A later explicit save can persist the visible collection, so the manifest is not a substitute for a backup.
+
+Imported songs appear in Library and Songs. Downloads lists only records with `source=downloaded`. Storage management includes all owned audio, irrespective of source.

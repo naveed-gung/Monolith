@@ -86,20 +86,10 @@ class _MusicShellState extends State<MusicShell>
   void _handleControllerChanged() {
     final controller = _controller;
     if (controller == null || !mounted) return;
-    // Only spin the reactive visualizer when it can actually be seen and the
-    // user wants it: the player sheet is open, audio is playing, and immersive
-    // canvas is on.
-    final shouldAnimate =
-        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
-        !controller.reduceVisualEffects &&
-        controller.isPlaying &&
-        controller.isPlayerOpen &&
-        controller.immersiveCanvas;
-    if (shouldAnimate) {
-      if (!_visualizerController.isAnimating) _visualizerController.repeat();
-    } else if (_visualizerController.isAnimating) {
-      _visualizerController.stop();
-    }
+    // Artwork tint is static. Keep compatibility animations idle, including
+    // when reduced effects is disabled, instead of spending frames on a glow.
+    _visualizerController.stop();
+    _artworkController.stop();
   }
 
   @override
@@ -134,7 +124,7 @@ class _MusicShellState extends State<MusicShell>
         final currentPage = _buildPage(controller);
 
         return Scaffold(
-          extendBody: true,
+          extendBody: false,
           resizeToAvoidBottomInset: false,
           body: Stack(
             children: [
@@ -142,14 +132,13 @@ class _MusicShellState extends State<MusicShell>
               currentPage,
               // Mini player — above page content, below player overlay.
               // Gesture down hides it; gesture up opens full player.
-              if (!controller.isPlayerOpen && miniTrack != null && !_isMiniPlayerDismissed)
+              if (!controller.isPlayerOpen &&
+                  miniTrack != null &&
+                  !_isMiniPlayerDismissed)
                 Positioned(
                   left: AppSpacing.lg,
                   right: AppSpacing.lg,
-                  bottom:
-                      _kNavBarHeight +
-                      MediaQuery.of(context).viewPadding.bottom +
-                      _kMiniPlayerGap,
+                  bottom: _kMiniPlayerGap,
                   child: GestureDetector(
                     onVerticalDragEnd: (details) {
                       final velocity = details.primaryVelocity ?? 0;
@@ -163,15 +152,18 @@ class _MusicShellState extends State<MusicShell>
                         controller.openPlayer();
                       }
                     },
-                    child: _MiniPlayer(controller: controller, track: miniTrack),
+                    child: _MiniPlayer(
+                      controller: controller,
+                      track: miniTrack,
+                    ),
                   ),
                 ),
               // If mini player was dismissed, show subtle floating pill to reshow
-              if (!controller.isPlayerOpen && miniTrack != null && _isMiniPlayerDismissed)
+              if (!controller.isPlayerOpen &&
+                  miniTrack != null &&
+                  _isMiniPlayerDismissed)
                 Positioned(
-                  bottom: _kNavBarHeight +
-                      MediaQuery.of(context).viewPadding.bottom +
-                      4,
+                  bottom: 4,
                   left: 0,
                   right: 0,
                   child: Center(
@@ -198,10 +190,9 @@ class _MusicShellState extends State<MusicShell>
                               .withValues(alpha: 0.92),
                           borderRadius: BorderRadius.circular(AppRadii.pill),
                           border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outlineVariant
-                                .withValues(alpha: 0.5),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.outlineVariant.withValues(alpha: 0.5),
                             width: 0.5,
                           ),
                           boxShadow: const [
@@ -225,13 +216,12 @@ class _MusicShellState extends State<MusicShell>
                               miniTrack.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
                                   ),
                             ),
                           ],
@@ -255,15 +245,16 @@ class _MusicShellState extends State<MusicShell>
                           curve: AppMotion.standard,
                         ),
                         child: SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0, 1),
-                            end: Offset.zero,
-                          ).animate(
-                            CurvedAnimation(
-                              parent: anim,
-                              curve: AppMotion.emphasized,
-                            ),
-                          ),
+                          position:
+                              Tween<Offset>(
+                                begin: const Offset(0, 1),
+                                end: Offset.zero,
+                              ).animate(
+                                CurvedAnimation(
+                                  parent: anim,
+                                  curve: AppMotion.emphasized,
+                                ),
+                              ),
                           child: child,
                         ),
                       );
@@ -321,10 +312,7 @@ class _MusicShellState extends State<MusicShell>
           bottom: false,
           child: DownloadsPage(key: ValueKey('downloads'), embedded: true),
         ),
-        const SafeArea(
-          bottom: false,
-          child: SongsPage(key: ValueKey('songs')),
-        ),
+        const SafeArea(bottom: false, child: SongsPage(key: ValueKey('songs'))),
         const SafeArea(
           bottom: false,
           child: SearchPage(key: ValueKey('search')),
@@ -388,7 +376,9 @@ class _BottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: _kNavBarHeight,
+          height:
+              _kNavBarHeight +
+              (MediaQuery.textScalerOf(context).scale(12) - 12).clamp(0, 24),
           child: Row(
             children: [
               for (final tab in AppTab.values)
@@ -463,7 +453,7 @@ class _NavItem extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 AnimatedScale(
-                  scale: isSelected ? 1.12 : 1.0,
+                  scale: 1.0,
                   duration: AppMotion.durFast,
                   curve: AppMotion.standard,
                   child: PhosphorIcon(
@@ -509,13 +499,13 @@ class _MiniPlayer extends StatelessWidget {
 
     return GlassPanel(
       key: const Key('mini-player'),
-      borderRadius: AppRadii.all(AppRadii.xl),
+      borderRadius: AppRadii.all(AppRadii.md),
       padding: EdgeInsets.zero,
       reduceEffects: controller.reduceVisualEffects,
       child: Material(
         color: Colors.transparent,
         child: ClipRRect(
-          borderRadius: AppRadii.all(AppRadii.xl),
+          borderRadius: AppRadii.all(AppRadii.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -525,7 +515,7 @@ class _MiniPlayer extends StatelessWidget {
                   controller.hapticLight();
                   controller.openPlayer();
                 },
-                borderRadius: AppRadii.all(AppRadii.xl),
+                borderRadius: AppRadii.all(AppRadii.md),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.sm,
@@ -537,8 +527,8 @@ class _MiniPlayer extends StatelessWidget {
                     children: [
                       // Artwork
                       SizedBox(
-                        width: 52,
-                        height: 52,
+                        width: 44,
+                        height: 44,
                         child: Hero(
                           tag: 'player-artwork-${track.id}',
                           child: TrackArtwork(
@@ -766,7 +756,16 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
       offset: Offset(0, _dragOffset),
       child: Container(
         key: const Key('player-overlay-sheet'),
-        color: scheme.surface,
+        color:
+            widget.controller.immersiveCanvas &&
+                widget.controller.currentTrack != null
+            ? Color.alphaBlend(
+                widget.controller.currentTrack!.colors.first.withValues(
+                  alpha: 0.035,
+                ),
+                scheme.surface,
+              )
+            : scheme.surface,
         child: SafeArea(
           child: Column(
             children: [

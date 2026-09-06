@@ -5,7 +5,6 @@ import 'package:on_audio_query/on_audio_query.dart';
 
 import '../../app/theme/design_tokens.dart';
 import '../models/music_models.dart';
-import 'artwork_painters.dart';
 
 class TrackArtwork extends StatelessWidget {
   const TrackArtwork({super.key, required this.track, this.borderRadius});
@@ -67,9 +66,15 @@ class TrackArtwork extends StatelessWidget {
   }
 
   Widget _fallbackArtwork() {
-    return CustomPaint(
-      painter: AlbumArtPainter(colors: track.colors),
-      child: const SizedBox.expand(),
+    return ColoredBox(
+      color: track.colors.first.withValues(alpha: 0.16),
+      child: Center(
+        child: Icon(
+          Icons.music_note_rounded,
+          color: track.colors.first,
+          size: 32,
+        ),
+      ),
     );
   }
 }

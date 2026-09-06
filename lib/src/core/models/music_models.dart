@@ -128,23 +128,26 @@ class Track {
       album: json['album'] as String,
       genre: json['genre'] as String? ?? 'Downloaded audio',
       duration: Duration(milliseconds: json['durationMs'] as int? ?? 0),
-      colors: (json['colors'] as List<dynamic>? ?? const [])
-          .map((value) => Color(value as int))
-          .toList(),
+      colors: (json['colors'] as List<dynamic>?)?.isNotEmpty == true
+          ? (json['colors'] as List<dynamic>)
+                .map((value) => Color(value as int))
+                .toList()
+          : paletteForSeed(json['id'] as String),
       blurb: json['blurb'] as String? ?? '',
       source: TrackSource.values.byName(
         json['source'] as String? ?? TrackSource.mock.name,
       ),
       filePath: json['filePath'] as String?,
       artworkQueryId: json['artworkQueryId'] as int?,
-      artworkFilePath: json['artworkFilePath'] as String?,
+      artworkFilePath:
+          (json['artworkFilePath'] ?? json['artworkPath']) as String?,
       artworkUrl: json['artworkUrl'] as String?,
       playCount: json['playCount'] as int? ?? 0,
       lastPlayed: json['lastPlayedMs'] == null
-          ? null
+          ? DateTime.tryParse(json['lastPlayedAt'] as String? ?? '')
           : DateTime.fromMillisecondsSinceEpoch(json['lastPlayedMs'] as int),
       addedAt: json['addedAtMs'] == null
-          ? null
+          ? DateTime.tryParse(json['addedAt'] as String? ?? '')
           : DateTime.fromMillisecondsSinceEpoch(json['addedAtMs'] as int),
     );
   }

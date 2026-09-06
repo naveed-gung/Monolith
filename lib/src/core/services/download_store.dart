@@ -190,6 +190,11 @@ class DownloadStore {
         final ext = _extension(entity.path);
         if (!_audioExtensions.contains(ext)) continue;
         if (known.contains(_canonical(entity.path))) continue;
+        try {
+          if (await entity.length() < 4096) continue;
+        } catch (_) {
+          continue;
+        }
         orphans.add(await _trackFromDiskFile(entity));
       }
     }

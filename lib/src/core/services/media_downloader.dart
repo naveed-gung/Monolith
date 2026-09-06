@@ -44,12 +44,8 @@ abstract class MediaDownloader {
 class _StreamMediaDownloader implements MediaDownloader {
   _StreamMediaDownloader();
 
-  static final List<yt.YoutubeApiClient> _preferredClients =
-      <yt.YoutubeApiClient>[
-        yt.YoutubeApiClient.ios,
-        yt.YoutubeApiClient.androidVr,
-        yt.YoutubeApiClient.android,
-      ];
+  static final _preferredClients = [yt.YoutubeApiClient.androidSdkless];
+  final Map<String, yt.Video> _previews = {};
 
   final yt.YoutubeExplode _youtube = yt.YoutubeExplode();
   final http.Client _httpClient = http.Client();
@@ -102,13 +98,11 @@ class _StreamMediaDownloader implements MediaDownloader {
   Future<VideoInfo> getVideoInfo(String url) async {
     await _ensureInitialized();
 
-    final video = await _youtube.videos.get(url);
-    final manifest = await _youtube.videos.streams.getManifest(
-      video.id,
-      ytClients: _preferredClients,
-    );
-    final streams = manifest.audioOnly.toList();
-    final preferredStream = _selectAudioStream(streams);
+    final video = await _youtube.videos
+        .get(url)
+        .timeout(const Duration(seconds: 25));
+    if (_previews.length >= 8) _previews.remove(_previews.keys.first);
+    _previews[url] = video;
 
     return VideoInfo(
       id: video.id.value,
@@ -124,18 +118,11 @@ class _StreamMediaDownloader implements MediaDownloader {
       likeCount: video.engagement.likeCount,
       thumbnail: _thumbnailUrl(video),
       url: video.url,
-      formats: streams.map(_toVideoFormat).toList(growable: false),
-      ext: preferredStream == null
-          ? null
-          : _audioExtension(preferredStream.container),
-      acodec: preferredStream?.audioCodec,
     );
   }
 
   @override
   Future<DownloadResult> download(DownloadRequest request) async {
-    await _ensureInitialized();
-
     final processId = _normalizeProcessId(request.processId);
     if (_activeDownloads.containsKey(processId)) {
       return DownloadResult(
@@ -148,13 +135,20 @@ class _StreamMediaDownloader implements MediaDownloader {
     _activeDownloads[processId] = activeDownload;
 
     try {
+      await _ensureInitialized();
       _emitState(processId, DownloadStateType.started);
       _log(processId, 'Inspecting available YouTube audio streams.');
 
-      final video = await _youtube.videos.get(request.url);
-      final manifest = await _youtube.videos.streams.getManifest(
-        video.id,
-        ytClients: _preferredClients,
+      final video =
+          _previews[request.url] ??
+          await activeDownload.waitFor<yt.Video>(
+            activeDownload.youtube.videos.get(request.url),
+          );
+      final manifest = await activeDownload.waitFor(
+        activeDownload.youtube.videos.streams.getManifest(
+          video.id,
+          ytClients: _preferredClients,
+        ),
       );
       final selectedStream = _selectAudioStream(manifest.audioOnly);
       if (selectedStream == null) {
@@ -163,17 +157,21 @@ class _StreamMediaDownloader implements MediaDownloader {
         );
       }
 
-      final outputFile = await _prepareOutputFile(
+      final finalFile = await _prepareOutputFile(
         request: request,
         video: video,
         stream: selectedStream,
       );
+      final outputFile = File('${finalFile.path}.part');
       activeDownload.outputFile = outputFile;
+      if (activeDownload.cancelled) {
+        await _deletePartialFiles(activeDownload);
+        return DownloadResult(status: OperationStatus.cancelled);
+      }
       activeDownload.artworkFile = request.embedThumbnail == true
-          ? File('${_fileStem(outputFile.path)}.jpg')
+          ? File('${_fileStem(finalFile.path)}.jpg')
           : null;
       activeDownload.sink = outputFile.openWrite();
-      activeDownload.completer = Completer<DownloadResult>();
 
       _emitProgress(
         processId: processId,
@@ -184,9 +182,11 @@ class _StreamMediaDownloader implements MediaDownloader {
 
       final stopwatch = Stopwatch()..start();
       var downloadedBytes = 0;
+      var lastProgressMs = -250;
 
-      activeDownload.subscription = _youtube.videos.streams
+      activeDownload.subscription = activeDownload.youtube.videos.streams
           .get(selectedStream)
+          .timeout(const Duration(seconds: 30))
           .listen(
             (chunk) {
               if (activeDownload.cancelled || activeDownload.sink == null) {
@@ -195,6 +195,8 @@ class _StreamMediaDownloader implements MediaDownloader {
 
               activeDownload.sink!.add(chunk);
               downloadedBytes += chunk.length;
+              if (stopwatch.elapsedMilliseconds - lastProgressMs < 250) return;
+              lastProgressMs = stopwatch.elapsedMilliseconds;
               _emitProgress(
                 processId: processId,
                 downloadedBytes: downloadedBytes,
@@ -215,46 +217,65 @@ class _StreamMediaDownloader implements MediaDownloader {
               );
             },
             onDone: () async {
-              await activeDownload.closeSink();
+              try {
+                await activeDownload.closeSink();
 
-              if (activeDownload.cancelled) {
-                await _deletePartialFiles(activeDownload);
-                _emitState(processId, DownloadStateType.cancelled);
-                activeDownload.complete(
-                  DownloadResult(status: OperationStatus.cancelled),
-                );
-                return;
-              }
+                if (activeDownload.cancelled) {
+                  await _deletePartialFiles(activeDownload);
+                  _emitState(processId, DownloadStateType.cancelled);
+                  activeDownload.complete(
+                    DownloadResult(status: OperationStatus.cancelled),
+                  );
+                  return;
+                }
 
-              if (request.embedThumbnail == true) {
-                await _downloadThumbnail(
-                  video: video,
-                  destination: activeDownload.artworkFile,
+                if (request.embedThumbnail == true) {
+                  await _downloadThumbnail(
+                    video: video,
+                    destination: activeDownload.artworkFile,
+                    processId: processId,
+                  );
+                }
+
+                if (activeDownload.cancelled) {
+                  await _deletePartialFiles(activeDownload);
+                  return;
+                }
+                _emitProgress(
                   processId: processId,
+                  downloadedBytes: selectedStream.size.totalBytes,
+                  totalBytes: selectedStream.size.totalBytes,
+                  elapsed: stopwatch.elapsed,
+                );
+                await outputFile.rename(finalFile.path);
+                activeDownload.outputFile = finalFile;
+                _emitState(processId, DownloadStateType.completed);
+                activeDownload.complete(
+                  DownloadResult(
+                    status: OperationStatus.success,
+                    outputPath: finalFile.path,
+                  ),
+                );
+              } catch (error) {
+                await _deletePartialFiles(activeDownload);
+                activeDownload.complete(
+                  DownloadResult(
+                    status: OperationStatus.error,
+                    errorMessage: _normalizeDownloadError(error),
+                  ),
                 );
               }
-
-              _emitProgress(
-                processId: processId,
-                downloadedBytes: selectedStream.size.totalBytes,
-                totalBytes: selectedStream.size.totalBytes,
-                elapsed: stopwatch.elapsed,
-              );
-              _emitState(processId, DownloadStateType.completed);
-              activeDownload.complete(
-                DownloadResult(
-                  status: OperationStatus.success,
-                  outputPath: outputFile.path,
-                ),
-              );
             },
             cancelOnError: true,
           );
 
-      return await activeDownload.completer!.future;
+      return await activeDownload.completer.future;
     } catch (error) {
       await activeDownload.closeSink();
       await _deletePartialFiles(activeDownload);
+      if (activeDownload.cancelled) {
+        return DownloadResult(status: OperationStatus.cancelled);
+      }
       final message = _normalizeDownloadError(error);
       _emitError(processId, message);
       return DownloadResult(
@@ -262,7 +283,10 @@ class _StreamMediaDownloader implements MediaDownloader {
         errorMessage: message,
       );
     } finally {
-      _activeDownloads.remove(processId);
+      if (identical(_activeDownloads[processId], activeDownload)) {
+        _activeDownloads.remove(processId);
+      }
+      activeDownload.youtube.close();
     }
   }
 
@@ -274,6 +298,10 @@ class _StreamMediaDownloader implements MediaDownloader {
     }
 
     activeDownload.cancelled = true;
+    if (!activeDownload.cancellation.isCompleted) {
+      activeDownload.cancellation.complete();
+    }
+    activeDownload.youtube.close();
     await activeDownload.subscription?.cancel();
     await activeDownload.closeSink();
     await _deletePartialFiles(activeDownload);
@@ -286,6 +314,10 @@ class _StreamMediaDownloader implements MediaDownloader {
   void dispose() {
     for (final activeDownload in _activeDownloads.values) {
       activeDownload.cancelled = true;
+      if (!activeDownload.cancellation.isCompleted) {
+        activeDownload.cancellation.complete();
+      }
+      activeDownload.youtube.close();
       unawaited(activeDownload.subscription?.cancel());
       unawaited(activeDownload.closeSink());
     }
@@ -339,6 +371,8 @@ class _StreamMediaDownloader implements MediaDownloader {
       return mp4Streams.withHighestBitrate();
     }
 
+    if (Platform.isIOS) return null; // AVPlayer needs an AAC/MP4 stream.
+
     final directStreams = streamList
         .where((stream) => stream.container != yt.StreamContainer.m3u8)
         .toList(growable: false);
@@ -347,20 +381,6 @@ class _StreamMediaDownloader implements MediaDownloader {
     }
 
     return streamList.withHighestBitrate();
-  }
-
-  VideoFormat _toVideoFormat(yt.AudioOnlyStreamInfo stream) {
-    return VideoFormat(
-      formatId: '${stream.tag}',
-      formatNote: stream.qualityLabel,
-      ext: _audioExtension(stream.container),
-      url: stream.url.toString(),
-      filesize: stream.size.totalBytes,
-      tbr: stream.bitrate.kiloBitsPerSecond.round(),
-      vcodec: 'none',
-      acodec: stream.audioCodec,
-      resolution: 'audio only',
-    );
   }
 
   Future<File> _prepareOutputFile({
@@ -376,10 +396,12 @@ class _StreamMediaDownloader implements MediaDownloader {
     final baseName = _requestedBaseName(request.outputTemplate, video.title);
     final extension = _audioExtension(stream.container);
     final outputFile = File(
-      '${outputDirectory.path}${Platform.pathSeparator}$baseName.$extension',
+      '${outputDirectory.path}${Platform.pathSeparator}$baseName-${request.processId}.$extension',
     );
     if (await outputFile.exists()) {
-      await outputFile.delete();
+      return File(
+        '${outputDirectory.path}${Platform.pathSeparator}$baseName-${request.processId}.$extension',
+      );
     }
     return outputFile;
   }
@@ -394,7 +416,9 @@ class _StreamMediaDownloader implements MediaDownloader {
     }
 
     try {
-      final response = await _httpClient.get(Uri.parse(_thumbnailUrl(video))).timeout(const Duration(seconds: 15));
+      final response = await _httpClient
+          .get(Uri.parse(_thumbnailUrl(video)))
+          .timeout(const Duration(seconds: 15));
       if (response.statusCode < 200 || response.statusCode >= 300) {
         _log(
           processId,
@@ -609,7 +633,14 @@ class _ActiveDownload {
   File? artworkFile;
   IOSink? sink;
   StreamSubscription<List<int>>? subscription;
-  Completer<DownloadResult>? completer;
+  final Completer<DownloadResult> completer = Completer<DownloadResult>();
+  final Completer<void> cancellation = Completer<void>();
+  final yt.YoutubeExplode youtube = yt.YoutubeExplode();
+
+  Future<T> waitFor<T>(Future<T> operation) => Future.any<T>([
+    operation.timeout(const Duration(seconds: 25)),
+    cancellation.future.then<T>((_) => throw StateError('Download cancelled')),
+  ]);
   bool cancelled = false;
   bool _sinkClosed = false;
 
@@ -631,7 +662,7 @@ class _ActiveDownload {
 
   void complete(DownloadResult result) {
     final currentCompleter = completer;
-    if (currentCompleter == null || currentCompleter.isCompleted) {
+    if (currentCompleter.isCompleted) {
       return;
     }
 

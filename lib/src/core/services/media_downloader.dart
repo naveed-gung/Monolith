@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 
 import 'media_downloader_models.dart';
+import 'audio_stream_transfer.dart';
 
 abstract class MediaDownloader {
   Stream<DownloadProgress> get onProgress;
@@ -44,7 +45,6 @@ abstract class MediaDownloader {
 class _StreamMediaDownloader implements MediaDownloader {
   _StreamMediaDownloader();
 
-  static final _preferredClients = [yt.YoutubeApiClient.androidSdkless];
   final Map<String, yt.Video> _previews = {};
 
   final yt.YoutubeExplode _youtube = yt.YoutubeExplode();
@@ -144,143 +144,116 @@ class _StreamMediaDownloader implements MediaDownloader {
           await activeDownload.waitFor<yt.Video>(
             activeDownload.youtube.videos.get(request.url),
           );
-      final manifest = await activeDownload.waitFor(
-        activeDownload.youtube.videos.streams.getManifest(
-          video.id,
-          ytClients: _preferredClients,
-        ),
-      );
-      final selectedStream = _selectAudioStream(manifest.audioOnly);
-      if (selectedStream == null) {
-        throw StateError(
-          'No downloadable audio stream was found for this video.',
-        );
-      }
-
-      final finalFile = await _prepareOutputFile(
-        request: request,
-        video: video,
-        stream: selectedStream,
-      );
-      final outputFile = File('${finalFile.path}.part');
-      activeDownload.outputFile = outputFile;
-      if (activeDownload.cancelled) {
-        await _deletePartialFiles(activeDownload);
-        return DownloadResult(status: OperationStatus.cancelled);
-      }
-      activeDownload.artworkFile = request.embedThumbnail == true
-          ? File('${_fileStem(finalFile.path)}.jpg')
-          : null;
-      activeDownload.sink = outputFile.openWrite();
-
-      _emitProgress(
-        processId: processId,
-        downloadedBytes: 0,
-        totalBytes: selectedStream.size.totalBytes,
-        elapsed: Duration.zero,
-      );
-
-      final stopwatch = Stopwatch()..start();
-      var downloadedBytes = 0;
-      var lastProgressMs = -250;
-
-      activeDownload.subscription = activeDownload.youtube.videos.streams
-          .get(selectedStream)
-          .timeout(const Duration(seconds: 30))
-          .listen(
-            (chunk) {
-              if (activeDownload.cancelled || activeDownload.sink == null) {
+      // Try at most two independently resolved mobile manifests. Never let an
+      // extractor retry HTTP failures forever behind a zero-percent task.
+      Object? transferError;
+      File? completedFile;
+      for (final client in [
+        yt.YoutubeApiClient.androidSdkless,
+        yt.YoutubeApiClient.ios,
+      ]) {
+        activeDownload.checkCancelled();
+        try {
+          final manifest = await activeDownload.waitFor(
+            activeDownload.youtube.videos.streams.getManifest(
+              video.id,
+              ytClients: [client],
+            ),
+          );
+          final selectedStream = _selectAudioStream(
+            manifest.audioOnly.where((s) => s.fragments.isEmpty),
+          );
+          if (selectedStream == null) {
+            throw StateError(
+              'No compatible downloadable audio stream was found.',
+            );
+          }
+          final finalFile = await _prepareOutputFile(
+            request: request,
+            video: video,
+            stream: selectedStream,
+          );
+          final outputFile = File('${finalFile.path}.part');
+          activeDownload.outputFile = outputFile;
+          activeDownload.checkCancelled();
+          activeDownload.transfer = AudioStreamTransfer();
+          final watch = Stopwatch()..start();
+          var lastProgress = -250;
+          _emitProgress(
+            processId: processId,
+            downloadedBytes: 0,
+            totalBytes: selectedStream.size.totalBytes,
+            elapsed: Duration.zero,
+          );
+          _log(processId, 'Connecting to audio source…');
+          await activeDownload.transfer!.download(
+            url: selectedStream.url,
+            headers: {
+              if (client.payload['context']['client']['userAgent']
+                  case final String agent)
+                'User-Agent': agent,
+            },
+            size: selectedStream.size.totalBytes,
+            destination: outputFile,
+            onProgress: (received) {
+              if (activeDownload.cancelled ||
+                  watch.elapsedMilliseconds - lastProgress < 250) {
                 return;
               }
-
-              activeDownload.sink!.add(chunk);
-              downloadedBytes += chunk.length;
-              if (stopwatch.elapsedMilliseconds - lastProgressMs < 250) return;
-              lastProgressMs = stopwatch.elapsedMilliseconds;
+              lastProgress = watch.elapsedMilliseconds;
               _emitProgress(
                 processId: processId,
-                downloadedBytes: downloadedBytes,
+                downloadedBytes: received,
                 totalBytes: selectedStream.size.totalBytes,
-                elapsed: stopwatch.elapsed,
+                elapsed: watch.elapsed,
               );
             },
-            onError: (Object error, StackTrace stackTrace) async {
-              await activeDownload.closeSink();
-              await _deletePartialFiles(activeDownload);
-              final message = _normalizeDownloadError(error);
-              _emitError(processId, message);
-              activeDownload.complete(
-                DownloadResult(
-                  status: OperationStatus.error,
-                  errorMessage: message,
-                ),
-              );
-            },
-            onDone: () async {
-              try {
-                await activeDownload.closeSink();
-
-                if (activeDownload.cancelled) {
-                  await _deletePartialFiles(activeDownload);
-                  _emitState(processId, DownloadStateType.cancelled);
-                  activeDownload.complete(
-                    DownloadResult(status: OperationStatus.cancelled),
-                  );
-                  return;
-                }
-
-                if (request.embedThumbnail == true) {
-                  await _downloadThumbnail(
-                    video: video,
-                    destination: activeDownload.artworkFile,
-                    processId: processId,
-                  );
-                }
-
-                if (activeDownload.cancelled) {
-                  await _deletePartialFiles(activeDownload);
-                  return;
-                }
-                _emitProgress(
-                  processId: processId,
-                  downloadedBytes: selectedStream.size.totalBytes,
-                  totalBytes: selectedStream.size.totalBytes,
-                  elapsed: stopwatch.elapsed,
-                );
-                if (!await outputFile.exists() || await outputFile.length() < 4096) {
-                  await _deletePartialFiles(activeDownload);
-                  const msg = 'Download produced an incomplete or unreadable audio file.';
-                  _emitError(processId, msg);
-                  activeDownload.complete(
-                    DownloadResult(status: OperationStatus.error, errorMessage: msg),
-                  );
-                  return;
-                }
-                await outputFile.rename(finalFile.path);
-                activeDownload.outputFile = finalFile;
-                _emitState(processId, DownloadStateType.completed);
-                activeDownload.complete(
-                  DownloadResult(
-                    status: OperationStatus.success,
-                    outputPath: finalFile.path,
-                  ),
-                );
-              } catch (error) {
-                await _deletePartialFiles(activeDownload);
-                activeDownload.complete(
-                  DownloadResult(
-                    status: OperationStatus.error,
-                    errorMessage: _normalizeDownloadError(error),
-                  ),
-                );
-              }
-            },
-            cancelOnError: true,
           );
-
-      return await activeDownload.completer.future;
+          activeDownload.checkCancelled();
+          if (await outputFile.length() != selectedStream.size.totalBytes) {
+            throw StateError('Audio download is incomplete.');
+          }
+          _emitProgress(
+            processId: processId,
+            downloadedBytes: selectedStream.size.totalBytes,
+            totalBytes: selectedStream.size.totalBytes,
+            elapsed: watch.elapsed,
+          );
+          completedFile = finalFile;
+          break;
+        } catch (error) {
+          transferError = error;
+          await _deletePartialFiles(activeDownload);
+          activeDownload.checkCancelled();
+          _log(
+            processId,
+            'Audio source failed; trying the remaining compatible source.',
+            LogLevel.warning,
+          );
+        }
+      }
+      if (completedFile == null) {
+        throw transferError ?? StateError('No audio source available.');
+      }
+      if (request.embedThumbnail == true) {
+        activeDownload.artworkFile = File(
+          '${_fileStem(completedFile.path)}.jpg',
+        );
+        await _downloadThumbnail(
+          video: video,
+          destination: activeDownload.artworkFile,
+          processId: processId,
+        );
+      }
+      activeDownload.checkCancelled();
+      await activeDownload.outputFile!.rename(completedFile.path);
+      activeDownload.outputFile = completedFile;
+      _emitState(processId, DownloadStateType.completed);
+      return DownloadResult(
+        status: OperationStatus.success,
+        outputPath: completedFile.path,
+      );
     } catch (error) {
-      await activeDownload.closeSink();
       await _deletePartialFiles(activeDownload);
       if (activeDownload.cancelled) {
         return DownloadResult(status: OperationStatus.cancelled);
@@ -296,6 +269,7 @@ class _StreamMediaDownloader implements MediaDownloader {
         _activeDownloads.remove(processId);
       }
       activeDownload.youtube.close();
+      activeDownload.transfer?.cancel();
     }
   }
 
@@ -306,29 +280,16 @@ class _StreamMediaDownloader implements MediaDownloader {
       return false;
     }
 
-    activeDownload.cancelled = true;
-    if (!activeDownload.cancellation.isCompleted) {
-      activeDownload.cancellation.complete();
-    }
-    activeDownload.youtube.close();
-    await activeDownload.subscription?.cancel();
-    await activeDownload.closeSink();
-    await _deletePartialFiles(activeDownload);
+    activeDownload.cancel();
     _emitState(processId, DownloadStateType.cancelled);
-    activeDownload.complete(DownloadResult(status: OperationStatus.cancelled));
+    // The owning download future removes its partial file after its writer exits.
     return true;
   }
 
   @override
   void dispose() {
     for (final activeDownload in _activeDownloads.values) {
-      activeDownload.cancelled = true;
-      if (!activeDownload.cancellation.isCompleted) {
-        activeDownload.cancellation.complete();
-      }
-      activeDownload.youtube.close();
-      unawaited(activeDownload.subscription?.cancel());
-      unawaited(activeDownload.closeSink());
+      activeDownload.cancel();
     }
     _activeDownloads.clear();
     _httpClient.close();
@@ -377,7 +338,10 @@ class _StreamMediaDownloader implements MediaDownloader {
         .where((stream) => stream.container == yt.StreamContainer.mp4)
         .toList(growable: false);
     if (mp4Streams.isNotEmpty) {
-      return mp4Streams.withHighestBitrate();
+      // Standard AAC is the portable music choice. The highest bitrate entry
+      // can instead be a surround variant with different source availability.
+      return mp4Streams.where((stream) => stream.tag == 140).firstOrNull ??
+          mp4Streams.withHighestBitrate();
     }
 
     if (Platform.isIOS) return null; // AVPlayer needs an AAC/MP4 stream.
@@ -643,46 +607,25 @@ class _UnsupportedMediaDownloader implements MediaDownloader {
 
 class _ActiveDownload {
   _ActiveDownload({required this.processId});
-
   final String processId;
-
   File? outputFile;
   File? artworkFile;
-  IOSink? sink;
-  StreamSubscription<List<int>>? subscription;
-  final Completer<DownloadResult> completer = Completer<DownloadResult>();
+  AudioStreamTransfer? transfer;
   final Completer<void> cancellation = Completer<void>();
   final yt.YoutubeExplode youtube = yt.YoutubeExplode();
+  bool get cancelled => cancellation.isCompleted;
+  void cancel() {
+    if (!cancelled) cancellation.complete();
+    transfer?.cancel();
+    youtube.close();
+  }
+
+  void checkCancelled() {
+    if (cancelled) throw StateError('Download cancelled');
+  }
 
   Future<T> waitFor<T>(Future<T> operation) => Future.any<T>([
     operation.timeout(const Duration(seconds: 25)),
     cancellation.future.then<T>((_) => throw StateError('Download cancelled')),
   ]);
-  bool cancelled = false;
-  bool _sinkClosed = false;
-
-  Future<void> closeSink() async {
-    if (_sinkClosed) {
-      return;
-    }
-
-    _sinkClosed = true;
-    final currentSink = sink;
-    sink = null;
-    if (currentSink == null) {
-      return;
-    }
-
-    await currentSink.flush();
-    await currentSink.close();
-  }
-
-  void complete(DownloadResult result) {
-    final currentCompleter = completer;
-    if (currentCompleter.isCompleted) {
-      return;
-    }
-
-    currentCompleter.complete(result);
-  }
 }

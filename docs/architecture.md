@@ -20,7 +20,8 @@ flowchart TB
     Bridge --> Swift[MediaImportPlugin.swift]
     Bridge --> Kotlin[MediaImportHandler.kt]
     C --> YT[MediaDownloader]
-    YT --> Extract[youtube_explode_dart]
+    YT --> Extract[youtube_explode_dart: metadata and manifests]
+    YT --> Transfer[AudioStreamTransfer: bounded range requests]
     C --> Query[LocalMediaService: Android device library]
 ```
 
@@ -90,7 +91,8 @@ Position updates use small listenables instead of rebuilding the whole applicati
 flowchart TD
     Inspect[Inspect URL once; cache preview] --> Job[Create managed job]
     Job --> Resolve[Resolve supported mobile stream]
-    Resolve --> Partial[Write unique .part file]
+    Resolve --> Transfer[Bounded HTTP requests; standard AAC first]
+    Transfer --> Partial[Write unique .part file]
     Partial --> Finished[Close audio file]
     Finished --> Art[Best-effort thumbnail]
     Art --> Rename[Rename completed audio]
@@ -103,7 +105,7 @@ flowchart TD
     Cleanup --> Terminal[Ignore late events; allow dismissal]
 ```
 
-- Metadata and stream resolution have timeouts; stream inactivity is bounded.
+- Metadata and stream resolution have timeouts. The owned transport bounds request/stream inactivity, verifies ranges and final byte counts, and never loops on empty responses. A second mobile manifest can be tried once; HTTP 403 may still make a source unavailable.
 - Each transfer owns its network client and unique output path. Cancellation is recorded before awaiting the provider.
 - A provider finishing does not mark a UI task saved until persistence finishes.
 - Pause cancels the current transfer; resume restarts it. It is not byte-range resume.
@@ -137,7 +139,9 @@ flowchart LR
     Cache --> Validate[Validate package size and archive header]
     Validate --> Installer{Platform installer}
     Installer --> Android[Android APK installer]
-    Installer --> Troll[TrollStore handoff or IPA export]
+    Cache --> Restore[Recover verified local package after restart]
+    Restore --> Share[Open downloaded IPA: local share sheet]
+    Share --> Troll[TrollStore or Save to Files]
     Android --> Replace[Replace same installed app]
     Troll --> Replace
     Replace --> Data[Keep Documents and music]
@@ -150,3 +154,9 @@ Downloaded update packages are separate from the music directory. Installer hand
 The automated suite exercises controller behavior, disk recovery, source separation, cancellation, metadata persistence, UI flows, and the pre-existing import/export/update repositories. Android compilation checks the Kotlin metadata bridge. A desktop extractor smoke test verified a complete AAC transfer.
 
 Swift compilation and real Music-library access cannot be established on Windows. Validate import/export, previously failing files, background/locked playback, and TrollStore replacement on the actual iPhone. Windows/Linux ports remain deferred until feature parity and the requested memory budget can be demonstrated.
+
+## Activity and import progress
+
+The activity control occupies its own row below each header, so the two-second pill cannot compress a title. Its menu listens to all current song jobs, the Music import, and the update service. Stop buttons belong to individual jobs.
+
+Only the active import registers the native progress callback. Creating notification or storage bridge objects does not replace that handler. The Swift import lock stays held until its batch returns, including cancellation. Both file copies and AVFoundation exports are staged outside Music with their real audio extension, validated, then moved into Imports. Export/read operations have deadlines; a failed item returns its reason without blocking later songs indefinitely.

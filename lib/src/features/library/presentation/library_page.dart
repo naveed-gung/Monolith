@@ -520,6 +520,8 @@ class _LibraryPageState extends State<LibraryPage> {
                       children: [
                         Text(
                           'MONOLITH',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: textTheme.labelSmall?.copyWith(
                             letterSpacing: 2.4,
                             color: scheme.onSurfaceVariant,
@@ -549,7 +551,6 @@ class _LibraryPageState extends State<LibraryPage> {
                       ],
                     ),
                   ),
-                  const AppDownloadIndicator(),
                   Theme(
                     data: Theme.of(context).copyWith(
                       popupMenuTheme: PopupMenuThemeData(
@@ -592,7 +593,8 @@ class _LibraryPageState extends State<LibraryPage> {
                       onSelected: (source) async {
                         final String? message;
                         if (source == 'music_all') {
-                          message = await controller.importAllFromMusicLibrary();
+                          message = await controller
+                              .importAllFromMusicLibrary();
                         } else if (source == 'music') {
                           message = await controller.importFromMusicLibrary();
                         } else {
@@ -682,6 +684,8 @@ class _LibraryPageState extends State<LibraryPage> {
               ),
             ),
           ),
+          const SliverToBoxAdapter(child: AppDownloadIndicator()),
+
           // ── Library error banner ─────────────────────────────────────
           if (controller.libraryError != null)
             SliverToBoxAdapter(

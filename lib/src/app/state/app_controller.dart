@@ -6,6 +6,7 @@ import '../../../data/platform_channels/media_import_channel.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -40,7 +41,9 @@ class MonolithController extends ChangeNotifier {
     AudioPlayer? audioPlayer,
     MediaDownloader? mediaDownloader,
     ManualAudioImportService? manualAudioImportService,
-  }) : _localMediaService = localMediaService ?? LocalMediaService(),
+    MediaImportChannel? mediaImportChannel,
+  }) : _mediaImport = mediaImportChannel ?? MediaImportChannel(),
+       _localMediaService = localMediaService ?? LocalMediaService(),
        _downloadStore = downloadStore ?? DownloadStore(),
        _youtubeDL = mediaDownloader ?? MediaDownloader.platform(),
        _manualAudioImportService =
@@ -73,6 +76,16 @@ class MonolithController extends ChangeNotifier {
   final AndroidEqualizer _equalizer = AndroidEqualizer();
   final MediaDownloader _youtubeDL;
   final ManualAudioImportService _manualAudioImportService;
+  final MediaImportChannel _mediaImport;
+  bool _isCancellingImport = false;
+  bool _nativeImportActive = false;
+  bool get canCancelImport => _nativeImportActive && !_isCancellingImport;
+  bool get isCancellingImport => _isCancellingImport;
+  String? _lastImportSummary;
+  String? get lastImportSummary => _lastImportSummary;
+  List<ImportedItemResult> _importFailures = [];
+  List<ImportedItemResult> get importFailures =>
+      List.unmodifiable(_importFailures);
   SharedPreferences? _prefs;
 
   late final StreamSubscription<PlayerState> _playerStateSubscription;
@@ -222,14 +235,20 @@ class MonolithController extends ChangeNotifier {
   String? get importStatus => _importStatus;
 
   Future<void> cancelImport() async {
-    await MediaImportChannel().cancelImport();
-    _isImportingAudio = false;
-    _importProgress = null;
-    _importCurrent = 0;
-    _importTotal = 0;
-    _importStatus = null;
+    if (!canCancelImport) return;
+    _isCancellingImport = true;
+    _importStatus = 'Stopping import; keeping completed copies…';
     notifyListeners();
+    try {
+      await _mediaImport.cancelImport();
+    } catch (_) {
+      _isCancellingImport = false;
+      _importStatus = 'Could not stop the import. Try again.';
+      if (!_isDisposed) notifyListeners();
+    }
+    // Retain the busy lock until native code returns its completed copies.
   }
+
   bool get isDownloaderReady => _isDownloaderReady;
   String? get downloaderError => _downloaderError;
   List<DownloadTaskInfo> get downloadTasks => _downloadTasks;
@@ -826,81 +845,43 @@ class MonolithController extends ChangeNotifier {
     }
   }
 
-  Future<String?> importFromMusicLibrary() async {
-    if (_isImportingAudio) return null;
-    _isImportingAudio = true;
-    notifyListeners();
-    try {
-      final items = await MediaImportChannel().pickFromMusicLibrary();
-      if (items.isEmpty) return null;
-      final previousId = currentTrack?.id;
-      final imported = <Track>[];
-      for (final item in items) {
-        if (item.status != ImportedItemStatus.copied || item.path == null) {
-          continue;
-        }
-        imported.add(
-          Track(
-            id: 'music-${DateTime.now().microsecondsSinceEpoch}-${imported.length}',
-            title: item.title,
-            artist: item.artist,
-            album: 'Music library',
-            genre: 'Imported audio',
-            duration: Duration(milliseconds: item.durationMs),
-            colors: Track.paletteForSeed(item.path!),
-            blurb: 'Saved from your Music library for offline listening.',
-            source: TrackSource.imported,
-            filePath: item.path,
-            artworkFilePath: await _downloadStore.findArtworkForAudio(
-              item.path!,
-            ),
-            addedAt: DateTime.now(),
-          ),
-        );
-      }
-      if (imported.isNotEmpty) {
-        _selectedCategory = LibraryCategory.tracks;
-      }
-      _downloadedTracks = [...imported, ..._downloadedTracks];
-      await _downloadStore.saveTracks(_downloadedTracks);
-      _rebuildTracks(preferredTrackId: previousId);
-      if (previousId == null && imported.isNotEmpty) {
-        await _syncSelectedTrack(autoplay: false);
-      }
-      final skipped = items.length - imported.length;
-      return 'Imported ${imported.length} tracks.'
-          '${skipped == 0 ? '' : ' $skipped unavailable or protected tracks skipped. Import original audio files for protected songs.'}';
-    } finally {
-      _isImportingAudio = false;
-      notifyListeners();
-    }
-  }
+  Future<String?> importFromMusicLibrary() => _importMusic(all: false);
+  Future<String?> importAllFromMusicLibrary() => _importMusic(all: true);
 
-  Future<String?> importAllFromMusicLibrary() async {
+  Future<String?> _importMusic({required bool all}) async {
     if (_isImportingAudio) return null;
     _isImportingAudio = true;
-    _importProgress = 0.0;
+    _isCancellingImport = false;
+    _nativeImportActive = true;
+    _importProgress = null;
     _importCurrent = 0;
     _importTotal = 0;
-    _importStatus = 'Scanning Music library…';
+    _importFailures = [];
+    _lastImportSummary = null;
+    _importStatus = all ? 'Scanning Music library…' : 'Select songs in Music…';
     notifyListeners();
+    _mediaImport.onProgress = (current, total, title) {
+      if (_isDisposed || !_isImportingAudio || _isCancellingImport) return;
+      _importCurrent = current;
+      _importTotal = total;
+      _importProgress = total > 0 ? (current / total).clamp(0, 1) : null;
+      _importStatus = '$current of $total · $title';
+      notifyListeners();
+    };
     try {
-      final channel = MediaImportChannel();
-      channel.onProgress = (current, total, title) {
-        _importCurrent = current;
-        _importTotal = total;
-        _importProgress = total > 0 ? (current / total) : 0.0;
-        _importStatus = 'Importing ($current/$total)';
-        notifyListeners();
-      };
-      final items = await channel.importAllFromMusicLibrary();
-      if (items.isEmpty) return 'No accessible local tracks found in Music library.';
+      final items = all
+          ? await _mediaImport.importAllFromMusicLibrary()
+          : await _mediaImport.pickFromMusicLibrary();
+      if (_isDisposed) return null;
       final previousId = currentTrack?.id;
       final imported = <Track>[];
+      final existingPaths = _downloadedTracks.map((t) => t.filePath).toSet();
       for (final item in items) {
         if (item.status != ImportedItemStatus.copied || item.path == null) {
+          _importFailures.add(item);
           continue;
         }
+        if (!existingPaths.add(item.path)) continue;
         imported.add(
           Track(
             id: 'music-${DateTime.now().microsecondsSinceEpoch}-${imported.length}',
@@ -922,23 +903,40 @@ class MonolithController extends ChangeNotifier {
       }
       if (imported.isNotEmpty) {
         _selectedCategory = LibraryCategory.tracks;
+        _downloadedTracks = [...imported, ..._downloadedTracks];
+        await _downloadStore.saveTracks(_downloadedTracks);
+        _rebuildTracks(preferredTrackId: previousId);
+        if (previousId == null) await _syncSelectedTrack(autoplay: false);
       }
-      _downloadedTracks = [...imported, ..._downloadedTracks];
-      await _downloadStore.saveTracks(_downloadedTracks);
-      _rebuildTracks(preferredTrackId: previousId);
-      if (previousId == null && imported.isNotEmpty) {
-        await _syncSelectedTrack(autoplay: false);
-      }
-      final skipped = items.length - imported.length;
-      return 'Imported ${imported.length} tracks.'
-          '${skipped == 0 ? '' : ' $skipped unavailable or protected tracks skipped. Import original audio files for protected songs.'}';
+      final failures = _importFailures.length;
+      final detail = _importFailures
+          .take(3)
+          .map((item) => '${item.title}: ${item.reason ?? item.status.name}')
+          .join('\n');
+      _lastImportSummary = items.isEmpty && !_isCancellingImport
+          ? (all
+                ? 'No accessible local songs found. Download originals in Music or import from Files.'
+                : 'No songs selected.')
+          : '${_isCancellingImport ? 'Stopped. ' : ''}Imported ${imported.length} songs.'
+                '${failures > 0 ? ' $failures could not be imported.\n$detail' : ''}';
+      return _lastImportSummary;
+    } catch (error) {
+      final reason = error is PlatformException
+          ? error.message ?? error.code
+          : error.toString();
+      _importFailures = [
+        ImportedItemResult(status: ImportedItemStatus.failed, reason: reason),
+      ];
+      _lastImportSummary = 'Music import failed: $reason';
+      return _lastImportSummary;
     } finally {
+      _mediaImport.onProgress = null;
+      _nativeImportActive = false;
       _isImportingAudio = false;
+      _isCancellingImport = false;
       _importProgress = null;
-      _importCurrent = 0;
-      _importTotal = 0;
       _importStatus = null;
-      notifyListeners();
+      if (!_isDisposed) notifyListeners();
     }
   }
 
@@ -1083,7 +1081,7 @@ class MonolithController extends ChangeNotifier {
   }) async {
     await _checkConnectivity();
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-      unawaited(MediaImportChannel().requestNotificationPermission());
+      unawaited(_mediaImport.requestNotificationPermission());
     }
     final sanitizedName = _sanitizeFileName(
       fileName.trim().isEmpty ? preview.suggestedFileName : fileName.trim(),
@@ -1340,7 +1338,7 @@ class MonolithController extends ChangeNotifier {
     );
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       unawaited(
-        MediaImportChannel().updateDownloadNotification(
+        _mediaImport.updateDownloadNotification(
           id: task.processId,
           title: 'Download complete',
           body: '${track.title} is ready to play in Monolith',
@@ -1360,7 +1358,7 @@ class MonolithController extends ChangeNotifier {
       ).copyWith(status: DownloadTaskStatus.cancelled, errorMessage: null),
     );
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-      unawaited(MediaImportChannel().cancelDownloadNotification(processId));
+      unawaited(_mediaImport.cancelDownloadNotification(processId));
     }
     await _youtubeDL.cancelDownload(processId);
   }
@@ -1554,11 +1552,11 @@ class MonolithController extends ChangeNotifier {
         final speed = progress.speedBytesPerSecond;
         final speedStr = (speed != null && speed > 0)
             ? (speed >= 1024 * 1024
-                ? ' · ${(speed / (1024 * 1024)).toStringAsFixed(1)} MB/s'
-                : ' · ${(speed / 1024).toStringAsFixed(0)} KB/s')
+                  ? ' · ${(speed / (1024 * 1024)).toStringAsFixed(1)} MB/s'
+                  : ' · ${(speed / 1024).toStringAsFixed(0)} KB/s')
             : '';
         unawaited(
-          MediaImportChannel().updateDownloadNotification(
+          _mediaImport.updateDownloadNotification(
             id: progress.processId,
             title: 'Downloading: ${existingTask.title}',
             body: '$pct%$speedStr',

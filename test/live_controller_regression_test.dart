@@ -1,3 +1,4 @@
+import 'package:monolith/data/platform_channels/media_import_channel.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
@@ -196,6 +197,75 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     await root.delete(recursive: true);
   });
+  test(
+    'import cancellation retains busy lock and preserves completed songs with failure reasons',
+    () async {
+      final native = Completer<Object?>();
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        const MethodChannel('monolith/media_import'),
+        (call) async {
+          if (call.method == 'importAllFromMusicLibrary') return native.future;
+          return null;
+        },
+      );
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(
+          const MethodChannel('monolith/media_import'),
+          null,
+        ),
+      );
+      final work = controller.importAllFromMusicLibrary();
+      await Future<void>.delayed(Duration.zero);
+      await controller.cancelImport();
+      expect(controller.isImportingAudio, isTrue);
+      expect(await controller.importAllFromMusicLibrary(), isNull);
+      final copied = File('${root.path}/copied.m4a')
+        ..writeAsBytesSync([1, 2, 3]);
+      native.complete([
+        {
+          'status': 'copied',
+          'path': copied.path,
+          'title': 'Kept song',
+          'durationMs': 30000,
+        },
+        {'status': 'failed', 'title': 'Bad song', 'reason': 'Export timed out'},
+      ]);
+      final message = await work;
+      expect(controller.tracks.any((t) => t.title == 'Kept song'), isTrue);
+      expect(message, contains('Export timed out'));
+      expect(controller.isImportingAudio, isFalse);
+      expect(controller.importFailures.single.title, 'Bad song');
+    },
+  );
+  test(
+    'notification bridge construction does not replace the import progress handler',
+    () async {
+      final bridge = MediaImportChannel();
+      var seen = 0;
+      bridge.onProgress = (current, total, title) {
+        seen = current;
+      };
+      MediaImportChannel(); // Notifications/storage used to replace the handler here.
+      final reply = Completer<void>();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+            'monolith/media_import',
+            const StandardMethodCodec().encodeMethodCall(
+              const MethodCall('onImportProgress', {
+                'current': 7,
+                'total': 10,
+                'title': 'Song',
+              }),
+            ),
+            (_) => reply.complete(),
+          );
+      await reply.future;
+      expect(seen, 7);
+      bridge.onProgress = null;
+    },
+  );
   test(
     'audio is audible before play future completes and refresh preserves playback',
     () async {

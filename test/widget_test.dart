@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -30,6 +31,51 @@ void main() {
         (call) async => <String>['none'],
       );
 
+  testWidgets('expanded import activity stays below narrow library header', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 900);
+    addTearDown(() => _resetSurface(tester));
+    final native = Completer<Object?>();
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      const MethodChannel('monolith/media_import'),
+      (call) async {
+        if (call.method == 'importAllFromMusicLibrary') return native.future;
+        return null;
+      },
+    );
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(
+        const MethodChannel('monolith/media_import'),
+        null,
+      ),
+    );
+    final controller = await _buildTestController(tester);
+    await tester.pumpWidget(MonolithApp(controller: controller));
+    await tester.pumpAndSettle();
+    final work = controller.importAllFromMusicLibrary();
+    await tester.pump();
+    final title = tester.getRect(find.text('Your library'));
+    final activity = tester.getRect(
+      find.byKey(const Key('activity-menu-button')).first,
+    );
+    expect(activity.top, greaterThan(title.bottom));
+    expect(title.width, greaterThan(160));
+    expect(tester.takeException(), isNull);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 125));
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const Key('activity-menu-button')).first);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Activity'), findsOneWidget);
+    native.complete([]);
+    await tester.pump();
+    await work;
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets('Monolith opens on the library page', (tester) async {
     final controller = await _buildTestController(tester);
 

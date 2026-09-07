@@ -2,6 +2,19 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.4.2] — 2026-09-07
+
+### Fixed
+- Move activity below Library and Downloads headers so the expanding pill cannot squeeze the title. A themed dropdown shows concurrent jobs with individual stop controls.
+- Replace unbounded audio retries with timed, cancellable transfers that validate byte counts and report empty, stalled, or rejected sources. Prefer standard AAC when available.
+- Preserve Music import progress callbacks and keep the import lock until native completion. Validate copied/exported audio in staging files with the correct extension, retain successful copies on cancellation, and report per-song failures.
+- Restore **Open downloaded IPA…** using the existing local file, recover verified packages after restart, and protect them from cache cleanup. Installer handoff no longer claims installation succeeded or silently starts a remote download.
+
+### Documentation and verification
+- Replace the six README screenshots with alternating light/dark emulator captures using the current coral accent; update the import, download, and update diagrams.
+- 67 unit/widget tests pass, Dart analysis is clean, and the Android emulator debug build passes.
+- **Remaining device checks:** every chosen download reportedly fails on the user's iPhone. A short AAC source completed locally, but a longer source returned HTTP 403. This release does not claim all source failures are repaired. Native Music import, playback, and TrollStore replacement still require testing on the target iPhone.
+
 ## [1.4.1] — 2026-09-06
 
 ### Added

@@ -128,6 +128,8 @@ class _DownloadsPageState extends State<DownloadsPage>
                     children: [
                       Text(
                         'Downloads',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: textTheme.displaySmall?.copyWith(
                           fontWeight: AppType.display,
                           letterSpacing: AppType.trackTight,
@@ -144,7 +146,6 @@ class _DownloadsPageState extends State<DownloadsPage>
                   ),
                 ),
                 // App morphing download indicator & Add button
-                const AppDownloadIndicator(),
                 const SizedBox(width: AppSpacing.xs),
                 FilledButton.icon(
                   onPressed: () => setState(() => _showAdder = !_showAdder),
@@ -164,6 +165,8 @@ class _DownloadsPageState extends State<DownloadsPage>
             ),
           ),
         ),
+
+        const SliverToBoxAdapter(child: AppDownloadIndicator()),
 
         // ── Adder panel (inline, animated expand) ─────────────────────
         SliverToBoxAdapter(
@@ -935,7 +938,7 @@ class _ActiveTaskCard extends StatelessWidget {
               _StatusDot(status: task.status),
               const SizedBox(width: AppSpacing.xs),
               Text(
-                task.statusLabel,
+                task.isActive && pct == 0 ? 'Connecting' : task.statusLabel,
                 style: textTheme.labelSmall?.copyWith(
                   color: _statusColor(scheme, task.status),
                   fontWeight: AppType.label,
@@ -952,7 +955,9 @@ class _ActiveTaskCard extends StatelessWidget {
                 ),
               ],
               const Spacer(),
-              if (task.downloadedBytes != null && task.totalBytes != null && task.totalBytes! > 0)
+              if (task.downloadedBytes != null &&
+                  task.totalBytes != null &&
+                  task.totalBytes! > 0)
                 Text(
                   '${_fmtBytes(task.downloadedBytes!)} / ${_fmtBytes(task.totalBytes!)}',
                   style: textTheme.labelSmall?.copyWith(
@@ -973,7 +978,8 @@ class _ActiveTaskCard extends StatelessWidget {
             const SizedBox(height: 6),
             Row(
               children: [
-                if (task.downloadSpeedBytesPerSecond != null && task.downloadSpeedBytesPerSecond! > 0) ...[
+                if (task.downloadSpeedBytesPerSecond != null &&
+                    task.downloadSpeedBytesPerSecond! > 0) ...[
                   PhosphorIcon(
                     PhosphorIcons.lightning(),
                     size: 13,

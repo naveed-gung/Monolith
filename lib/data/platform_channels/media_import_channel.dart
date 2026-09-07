@@ -8,17 +8,21 @@ import 'package:flutter/services.dart';
 /// canceled exports) so a native hiccup never crashes the app;
 /// [MissingPluginException] is deliberately rethrown so callers can fall back
 /// to share-sheet based export on platforms without the native module.
-typedef ImportProgressCallback = void Function(int current, int total, String title);
+typedef ImportProgressCallback =
+    void Function(int current, int total, String title);
 
 class MediaImportChannel {
   /// Injectable for tests; defaults to the production channel.
   MediaImportChannel({MethodChannel? channel})
-    : channel = channel ?? const MethodChannel('monolith/media_import') {
-    this.channel.setMethodCallHandler(_handleNativeCall);
-  }
+    : channel = channel ?? const MethodChannel('monolith/media_import');
 
   final MethodChannel channel;
-  ImportProgressCallback? onProgress;
+  ImportProgressCallback? _onProgress;
+  ImportProgressCallback? get onProgress => _onProgress;
+  set onProgress(ImportProgressCallback? value) {
+    _onProgress = value;
+    channel.setMethodCallHandler(value == null ? null : _handleNativeCall);
+  }
 
   Future<void> _handleNativeCall(MethodCall call) async {
     if (call.method == 'onImportProgress') {
@@ -42,7 +46,10 @@ class MediaImportChannel {
 
   Future<bool> requestNotificationPermission() async {
     try {
-      return await channel.invokeMethod<bool>('requestNotificationPermission') ?? false;
+      return await channel.invokeMethod<bool>(
+            'requestNotificationPermission',
+          ) ??
+          false;
     } on PlatformException {
       return false;
     }
@@ -55,12 +62,15 @@ class MediaImportChannel {
     bool isComplete = false,
   }) async {
     try {
-      await channel.invokeMethod<void>('updateDownloadNotification', <String, dynamic>{
-        'id': id,
-        'title': title,
-        'body': body,
-        'isComplete': isComplete,
-      });
+      await channel.invokeMethod<void>(
+        'updateDownloadNotification',
+        <String, dynamic>{
+          'id': id,
+          'title': title,
+          'body': body,
+          'isComplete': isComplete,
+        },
+      );
     } on PlatformException {
       // Ignore
     }
@@ -68,9 +78,10 @@ class MediaImportChannel {
 
   Future<void> cancelDownloadNotification(String id) async {
     try {
-      await channel.invokeMethod<void>('cancelDownloadNotification', <String, dynamic>{
-        'id': id,
-      });
+      await channel.invokeMethod<void>(
+        'cancelDownloadNotification',
+        <String, dynamic>{'id': id},
+      );
     } on PlatformException {
       // Ignore
     }
@@ -96,7 +107,9 @@ class MediaImportChannel {
   /// app sandbox.
   Future<List<ImportedItemResult>> importAllFromMusicLibrary() async {
     try {
-      final raw = await channel.invokeMethod<Object?>('importAllFromMusicLibrary');
+      final raw = await channel.invokeMethod<Object?>(
+        'importAllFromMusicLibrary',
+      );
       if (raw is! List) return const [];
       return [
         for (final entry in raw)

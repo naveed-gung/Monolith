@@ -2,334 +2,369 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../app/state/app_scope.dart';
+import '../../app/state/app_controller.dart';
+import '../../core/models/music_models.dart';
 import '../../core/services/app_update_service.dart';
 
-/// Apple App Store & Apple Music style morphing download indicator.
-///
-/// Features:
-/// - Expanded pill for 2 seconds with 100% centered text.
-/// - Smoothly shrinks to a 38x38 circular carrier.
-/// - Outer perimeter IS the progress ring (no double outer circle).
-/// - Exact Apple HIG centered rounded stop square inside ring.
-/// - Transforms into an Apple green checkmark (✓) at 100%.
-/// - Dynamically themed to the user's selected accent color from Settings.
+/// A separate activity row: expanding the pill never takes width from a title.
+/// The carrier opens a live menu; only a job's own stop button cancels that job.
 class AppDownloadIndicator extends StatefulWidget {
-  const AppDownloadIndicator({super.key});
-
+  const AppDownloadIndicator({super.key, this.updateService});
+  final AppUpdateService? updateService;
   @override
   State<AppDownloadIndicator> createState() => _AppDownloadIndicatorState();
 }
 
-String _fmtBytes(int b) {
-  const u = ['B', 'KB', 'MB', 'GB'];
-  var v = b.toDouble();
-  var i = 0;
-  while (v >= 1024 && i < u.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  final p = v >= 100
-      ? 0
-      : v >= 10
-      ? 1
-      : 2;
-  return '${v.toStringAsFixed(p)} ${u[i]}';
-}
-
-class _AppDownloadIndicatorState extends State<AppDownloadIndicator>
-    with SingleTickerProviderStateMixin {
-  bool _isPillMode = true;
-  Timer? _shrinkTimer;
-  Timer? _dismissTimer;
-  bool _wasActive = false;
-  bool _isComplete = false;
-
-  @override
-  void initState() {
-    super.initState();
-    AppUpdateService.instance.addListener(_onUpdateServiceChanged);
-  }
-
+class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
+  final _menu = MenuController();
+  Timer? _timer;
+  bool _expanded = true;
+  String _workKey = '';
   @override
   void dispose() {
-    _shrinkTimer?.cancel();
-    _dismissTimer?.cancel();
-    AppUpdateService.instance.removeListener(_onUpdateServiceChanged);
+    _timer?.cancel();
     super.dispose();
-  }
-
-  void _onUpdateServiceChanged() {
-    if (mounted) setState(() {});
-  }
-
-  void _triggerShrinkTimer() {
-    _shrinkTimer?.cancel();
-    _shrinkTimer = Timer(const Duration(milliseconds: 2000), () {
-      if (mounted) setState(() => _isPillMode = false);
-    });
-  }
-
-  void _toggleMode() {
-    setState(() {
-      _isPillMode = !_isPillMode;
-    });
-    if (_isPillMode) {
-      _shrinkTimer?.cancel();
-      _shrinkTimer = Timer(const Duration(milliseconds: 2500), () {
-        if (mounted) setState(() => _isPillMode = false);
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final updateService = AppUpdateService.instance;
     final controller = AppScope.watch(context);
-    final activeTask = controller.downloadTasks
-        .where((t) => t.isActive)
-        .firstOrNull;
-    final isSongDownloading = activeTask != null;
-    final isImporting = controller.isImportingAudio;
-
-    final isUpdateDownloading =
-        updateService.busy && updateService.progress != null;
-    final isAnyActive = isUpdateDownloading || isImporting || isSongDownloading;
-    final isJustCompleted = updateService.progress != null &&
-        updateService.progress! >= 1.0;
-
-    if (isAnyActive && !_wasActive) {
-      _wasActive = true;
-      _isPillMode = true;
-      _isComplete = false;
-      _triggerShrinkTimer();
-    } else if (!isAnyActive && _wasActive && !_isComplete) {
-      _wasActive = false;
-    } else if (isJustCompleted && !_isComplete) {
-      _isComplete = true;
-      _dismissTimer?.cancel();
-      _dismissTimer = Timer(const Duration(milliseconds: 3000), () {
-        if (mounted) {
-          setState(() {
-            _wasActive = false;
-            _isComplete = false;
-            _isPillMode = true;
-          });
+    final service = widget.updateService ?? AppUpdateService.instance;
+    return ListenableBuilder(
+      listenable: service,
+      builder: (context, _) {
+        final jobs = _jobs(controller, service);
+        if (jobs.isEmpty) return const SizedBox.shrink();
+        final active = jobs.where((j) => j.active).toList();
+        final key = active.map((j) => j.id).join('|');
+        if (key != _workKey) {
+          _workKey = key;
+          _expanded = true;
+          _timer?.cancel();
+          if (active.isNotEmpty) {
+            _timer = Timer(const Duration(seconds: 2), () {
+              if (mounted) setState(() => _expanded = false);
+            });
+          }
         }
-      });
-    }
-
-    final isActive = isAnyActive || _isComplete;
-    if (!isActive) {
-      return const SizedBox.shrink();
-    }
-
-    final double rawProgress = isUpdateDownloading
-        ? (updateService.progress ?? 0.0).clamp(0.0, 1.0)
-        : (isSongDownloading
-            ? activeTask.progress.clamp(0.0, 1.0)
-            : (isImporting
-                ? (controller.importProgress ?? 0.15).clamp(0.0, 1.0)
-                : (_isComplete ? 1.0 : 0.0)));
-
-    final pctStr = '${(rawProgress * 100).round()}%';
-    final String titleText;
-    final String subText;
-
-    if (isSongDownloading) {
-      titleText = _isComplete ? 'Download complete' : activeTask.title;
-      final curBytes = activeTask.downloadedBytes;
-      final totBytes = activeTask.totalBytes;
-      final bytesStr = (curBytes != null && totBytes != null && totBytes > 0)
-          ? '${_fmtBytes(curBytes)} / ${_fmtBytes(totBytes)} · '
-          : '';
-      subText = _isComplete ? 'Saved to downloads' : '$bytesStr$pctStr';
-    } else if (isImporting) {
-      titleText = 'Importing library';
-      subText = controller.importStatus ?? 'Processing audio…';
-    } else {
-      titleText = isUpdateDownloading
-          ? (_isComplete ? 'Download complete' : 'Downloading update')
-          : 'Download complete';
-      subText = isUpdateDownloading
-          ? (_isComplete
-              ? 'Ready to install'
-              : 'v${updateService.release?.version ?? '1.4.1'} · $pctStr')
-          : 'Ready to play';
-    }
-
-    final accentColor = Theme.of(context).colorScheme.primary;
-    const greenColor = Color(0xFF22C55E);
-    final isDone = _isComplete || rawProgress >= 1.0;
-
-    return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: GestureDetector(
-        onTap: _toggleMode,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeOutCubic,
-          height: 38,
-          width: _isPillMode ? 178 : 38,
-          decoration: BoxDecoration(
-            color: _isPillMode
-                ? const Color(0xFF141924).withValues(alpha: 0.96)
-                : const Color(0xFF0D1118),
-            borderRadius: BorderRadius.circular(19),
-            border: _isPillMode
-                ? Border.all(color: Colors.white.withValues(alpha: 0.14))
-                : null, // Clean: No extra outer box border in circle mode!
-            boxShadow: [
-              BoxShadow(
-                color: isDone
-                    ? greenColor.withValues(alpha: 0.35)
-                    : Colors.black.withValues(alpha: 0.5),
-                blurRadius: isDone ? 14 : 8,
-                offset: const Offset(0, 3),
+        final scheme = Theme.of(context).colorScheme;
+        final done = active.isEmpty && jobs.every((j) => j.complete);
+        final progress = active.isEmpty
+            ? 1.0
+            : active.any((j) => j.progress == null)
+            ? null
+            : active.fold<double>(0, (sum, j) => sum + j.progress!) /
+                  active.length;
+        final title = active.length == 1
+            ? active.first.title
+            : active.isNotEmpty
+            ? '${active.length} activities'
+            : 'Recent activity';
+        final subtitle = active.length == 1
+            ? active.first.detail
+            : active.isNotEmpty
+            ? 'Tap to view each task'
+            : 'Tap for results';
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: MenuAnchor(
+              controller: _menu,
+              style: MenuStyle(
+                backgroundColor: WidgetStatePropertyAll(
+                  scheme.surfaceContainerHigh,
+                ),
+                elevation: const WidgetStatePropertyAll(8),
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                padding: const WidgetStatePropertyAll(EdgeInsets.all(8)),
               ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(19),
-            child: _isPillMode
-                // 1) 100% Symmetrically Centered Text Pill
-                ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          titleText,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            height: 1.15,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          subText,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: isDone ? greenColor : accentColor,
-                            height: 1.15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                // 2) 38x38 Single Perimeter Circular Carrier (Apple Style 1)
-                : SizedBox(
-                    width: 38,
-                    height: 38,
-                    child: CustomPaint(
-                      painter: _AppleDownloadRingPainter(
-                        progress: rawProgress,
-                        trackColor: Colors.white.withValues(alpha: 0.12),
-                        progressColor: isDone ? greenColor : accentColor,
-                        strokeWidth: 2.8,
+              menuChildren: [
+                SizedBox(
+                  width: math.min(320, MediaQuery.sizeOf(context).width - 40),
+                  child: ListenableBuilder(
+                    listenable: Listenable.merge([controller, service]),
+                    builder: (context, _) => ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.sizeOf(context).height * .55,
                       ),
-                      child: Center(
-                        child: isDone
-                            // Apple Checkmark (✓)
-                            ? const Icon(
-                                Icons.check_rounded,
-                                size: 18,
-                                color: greenColor,
-                              )
-                            // Apple HIG Rounded Stop Square
-                            : GestureDetector(
-                                onTap: () {
-                                  if (isSongDownloading) {
-                                    controller.cancelDownload(activeTask.processId);
-                                  } else if (isImporting) {
-                                    controller.cancelImport();
-                                  } else {
-                                    _toggleMode();
-                                  }
-                                },
-                                child: Container(
-                                  width: 14,
-                                  height: 14,
-                                  alignment: Alignment.center,
-                                  child: Container(
-                                    width: 9,
-                                    height: 9,
-                                    decoration: BoxDecoration(
-                                      color: accentColor,
-                                      borderRadius: BorderRadius.circular(2.2),
-                                    ),
-                                  ),
-                                ),
+                      child: SingleChildScrollView(
+                        primary: false,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Text(
+                                'Activity',
+                                style: TextStyle(fontWeight: FontWeight.w700),
                               ),
+                            ),
+                            for (final job in _jobs(controller, service))
+                              _ActivityRow(job: job),
+                          ],
+                        ),
                       ),
                     ),
                   ),
+                ),
+              ],
+              builder: (context, menu, _) => Semantics(
+                button: true,
+                label: 'Show activity, ${active.length} active tasks',
+                child: Tooltip(
+                  message: 'Show activity',
+                  child: Material(
+                    color: scheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(22),
+                    child: InkWell(
+                      key: const Key('activity-menu-button'),
+                      borderRadius: BorderRadius.circular(22),
+                      onTap: () => menu.isOpen ? menu.close() : menu.open(),
+                      child: AnimatedSize(
+                        alignment: Alignment.centerRight,
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        child: Container(
+                          width: _expanded
+                              ? math.min(
+                                  260,
+                                  MediaQuery.sizeOf(context).width - 48,
+                                )
+                              : 44,
+                          constraints: const BoxConstraints(minHeight: 44),
+                          padding: EdgeInsets.all(_expanded ? 10 : 8),
+                          child: _expanded
+                              ? Row(
+                                  children: [
+                                    Icon(
+                                      done
+                                          ? Icons.check_circle_rounded
+                                          : Icons.downloading_rounded,
+                                      size: 22,
+                                      color: done
+                                          ? Colors.green
+                                          : scheme.primary,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            subtitle,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.expand_more_rounded,
+                                      size: 18,
+                                    ),
+                                  ],
+                                )
+                              : SizedBox(
+                                  width: 28,
+                                  height: 28,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      CircularProgressIndicator(
+                                        value: progress,
+                                        strokeWidth: 2.5,
+                                        color: done
+                                            ? Colors.green
+                                            : scheme.primary,
+                                        backgroundColor: scheme.outlineVariant,
+                                      ),
+                                      if (done)
+                                        const Icon(
+                                          Icons.check_rounded,
+                                          size: 18,
+                                          color: Colors.green,
+                                        )
+                                      else if (active.length > 1)
+                                        Text(
+                                          '${active.length}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        )
+                                      else
+                                        const Icon(
+                                          Icons.expand_more_rounded,
+                                          size: 18,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
-/// CustomPainter for the perimeter SVG progress ring.
-class _AppleDownloadRingPainter extends CustomPainter {
-  const _AppleDownloadRingPainter({
-    required this.progress,
-    required this.trackColor,
-    required this.progressColor,
-    required this.strokeWidth,
+class _Activity {
+  const _Activity(
+    this.id,
+    this.title,
+    this.detail, {
+    this.active = false,
+    this.complete = false,
+    this.progress,
+    this.cancel,
   });
+  final String id, title, detail;
+  final bool active, complete;
+  final double? progress;
+  final VoidCallback? cancel;
+}
 
-  final double progress;
-  final Color trackColor;
-  final Color progressColor;
-  final double strokeWidth;
+List<_Activity> _jobs(
+  MonolithController controller,
+  AppUpdateService service,
+) => [
+  if (controller.isImportingAudio)
+    _Activity(
+      'music-import',
+      'Importing Music',
+      controller.importStatus ?? 'Preparing import…',
+      active: true,
+      progress: controller.importProgress,
+      cancel: !controller.canCancelImport
+          ? null
+          : () => unawaited(controller.cancelImport()),
+    ),
+  if (!controller.isImportingAudio && controller.lastImportSummary != null)
+    _Activity(
+      'music-result',
+      'Music import',
+      controller.lastImportSummary!,
+      complete: controller.importFailures.isEmpty,
+    ),
+  for (final task in controller.downloadTasks)
+    _Activity(
+      task.processId,
+      task.title,
+      task.isActive && task.progress == 0
+          ? 'Connecting to audio source…'
+          : task.isActive
+          ? '${(task.progress * 100).floor()}% · ${_bytes(task.downloadedBytes ?? 0)} / ${_bytes(task.totalBytes ?? 0)}'
+          : task.errorMessage ?? task.statusLabel,
+      active: task.isActive,
+      complete: task.status == DownloadTaskStatus.completed,
+      progress: task.progress > 0 ? task.progress.clamp(0, 1) : null,
+      cancel: task.isActive || task.status == DownloadTaskStatus.paused
+          ? () => unawaited(controller.cancelDownload(task.processId))
+          : null,
+    ),
+  if (service.isDownloading || service.downloaded != null)
+    _Activity(
+      'app-update',
+      'Monolith update',
+      service.status,
+      active: service.isDownloading,
+      complete: service.downloaded != null && !service.isDownloading,
+      progress: service.progress != null && service.progress! > 0
+          ? service.progress
+          : null,
+      cancel: service.isDownloading ? service.cancelDownload : null,
+    ),
+];
 
+String _bytes(int value) => value >= 1024 * 1024
+    ? '${(value / (1024 * 1024)).toStringAsFixed(1)} MB'
+    : '${(value / 1024).toStringAsFixed(0)} KB';
+
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow({required this.job});
+  final _Activity job;
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
-
-    // Track background
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawCircle(center, radius, trackPaint);
-
-    // Progress sweep arc (starts at 12 o'clock, clockwise)
-    if (progress > 0) {
-      final progressPaint = Paint()
-        ..color = progressColor
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = strokeWidth;
-
-      final sweepAngle = 2 * math.pi * progress.clamp(0.0, 1.0);
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        -math.pi / 2,
-        sweepAngle,
-        false,
-        progressPaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _AppleDownloadRingPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.progressColor != progressColor ||
-        oldDelegate.trackColor != trackColor;
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 0, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  job.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  job.detail,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                if (job.active)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: LinearProgressIndicator(value: job.progress),
+                  ),
+              ],
+            ),
+          ),
+          if (job.cancel != null)
+            IconButton(
+              key: Key('stop-${job.id}'),
+              tooltip: 'Stop ${job.title}',
+              onPressed: job.cancel,
+              icon: Icon(Icons.stop_rounded, color: scheme.primary, size: 20),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Icon(
+                job.complete ? Icons.check_rounded : Icons.info_outline_rounded,
+                size: 18,
+                color: job.complete ? Colors.green : scheme.onSurfaceVariant,
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

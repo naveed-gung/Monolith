@@ -2059,7 +2059,7 @@ class MonolithController extends ChangeNotifier {
         lower.contains('sign in to confirm you') ||
         lower.contains('unable to get player script') ||
         lower.contains('error solving')) {
-      return 'The source blocked this download request (403 / anti-bot challenge), so Monolith stopped it before conversion.';
+      return 'YouTube refused this download (HTTP 403). Try again later or import the audio from Files.';
     }
 
     if (lower.contains('preprocessing: conversion failed') ||

@@ -2,7 +2,7 @@
 
 A personal music player for iOS and Android. Bring your own music, keep a local collection, and listen with the screen locked.
 
-**v1.4.2 · Build 11:** this reliability update improves import handling, the activity menu, download transfers, and local IPA handoff. The iOS changes still require an iPhone test; downloads are not confirmed fixed on the user's device.
+**v1.4.3 · Build 12:** this reliability update improves import handling, the activity menu, download transfers, and local IPA handoff. The iOS changes still require an iPhone test; downloads are not confirmed fixed on the user's device.
 
 ## Screenshots
 
@@ -67,7 +67,7 @@ The platform API details are described in Apple's [assetURL documentation](https
 
 ## Download lifecycle
 
-Inspection retrieves the title, duration, and thumbnail. Transfer requests are bounded, verify byte counts, and prefer standard AAC. At most two mobile manifests are tried; a rejected or empty stream becomes a visible failure instead of an endless zero-byte task. Some YouTube sources still return HTTP 403; the transport cannot guarantee every video is available. The download reuses that preview, resolves an AAC/MP4 stream for iOS, and writes to a temporary `.part` file. Only completed audio is renamed into the music folder and added to the manifest. Thumbnail failure does not fail audio. Lyrics are independent of downloads.
+Inspection retrieves the title, duration, and thumbnail. Transfer requests are bounded, verify byte counts, and prefer standard AAC. At most two mobile manifests are tried. When audio-only streams fail, Monolith can download the smallest compatible MP4 and extract only its AAC track locally, without re-encoding; temporary video is removed. Each manifest offers at most one audio-only and one combined-stream attempt; a rejected or empty stream becomes a visible failure instead of an endless zero-byte task. Some YouTube sources still return HTTP 403; the transport cannot guarantee every video is available. The download reuses that preview, resolves an AAC/MP4 stream for iOS, and writes to a temporary `.part` file. Only completed audio is renamed into the music folder and added to the manifest. Thumbnail failure does not fail audio. Lyrics are independent of downloads.
 
 ```mermaid
 stateDiagram-v2
@@ -132,11 +132,11 @@ The repository's debug APK configuration targets x86_64 emulators; its release c
 
 ## Verification and remaining checks
 
-- **67 tests pass; Dart analysis reports no issues.** The regression suite covers the active controller as well as existing repository tests.
+- **69 tests pass; Dart analysis reports no issues.** The regression suite covers the active controller as well as existing repository tests.
 - Regression coverage includes nonzero volume when changing songs, preserving playback on refresh/download completion, cancellation during preparation, source classification, duration caching, schema migration, and existing UI/import/export/update behavior.
 - This patch passes an Android emulator debug build. Six fresh screenshots show the current coral accent in three light and three dark screens, and existing songs survived an in-place APK replacement.
-- The new transfer completed a short public AAC source locally (309,288 bytes). A longer source received bytes on the emulator, then failed with HTTP 403. The user reports that every selected song fails on their iPhone; that device's download failure is not yet verified as resolved.
-- iOS Swift compilation, on-device Music import/export, locked playback, TrollStore replacement, and physical-device heat measurements remain device checks. A successful Android test does not establish these iOS results.
+- The new transfer completed a short public AAC source locally (309,288 bytes). The audio-only path for a longer source failed with HTTP 403; its combined-stream fallback subsequently completed all 28,523,658 bytes locally. The user reports that every selected song fails on their iPhone; that device's download failure is not yet verified as resolved.
+- On-device Music import/export, locked playback, TrollStore replacement, and physical-device heat measurements remain device checks. A successful Android test does not establish these iOS results.
 
 See the [reliability patch handoff](plans/v141-reliability-handoff.md) for behavior changes, regression coverage, and remaining iPhone checks.
 

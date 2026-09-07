@@ -7,6 +7,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 
 import 'media_downloader_models.dart';
 import 'audio_stream_transfer.dart';
+import 'native_audio_extractor.dart';
 
 abstract class MediaDownloader {
   Stream<DownloadProgress> get onProgress;
@@ -160,67 +161,123 @@ class _StreamMediaDownloader implements MediaDownloader {
               ytClients: [client],
             ),
           );
-          final selectedStream = _selectAudioStream(
+          final audio = _selectAudioStream(
             manifest.audioOnly.where((s) => s.fragments.isEmpty),
           );
-          if (selectedStream == null) {
-            throw StateError(
-              'No compatible downloadable audio stream was found.',
-            );
+          final combined =
+              manifest.muxed
+                  .where(
+                    (s) =>
+                        s.container == yt.StreamContainer.mp4 &&
+                        s.fragments.isEmpty,
+                  )
+                  .toList()
+                ..sort(
+                  (a, b) => a.size.totalBytes.compareTo(b.size.totalBytes),
+                );
+          final candidates = <yt.StreamInfo>[
+            ?audio,
+            if ((Platform.isIOS || Platform.isAndroid) && combined.isNotEmpty)
+              combined.first,
+          ];
+          if (candidates.isEmpty) {
+            throw StateError('No compatible audio source was found.');
           }
-          final finalFile = await _prepareOutputFile(
-            request: request,
-            video: video,
-            stream: selectedStream,
-          );
-          final outputFile = File('${finalFile.path}.part');
-          activeDownload.outputFile = outputFile;
-          activeDownload.checkCancelled();
-          activeDownload.transfer = AudioStreamTransfer();
-          final watch = Stopwatch()..start();
-          var lastProgress = -250;
-          _emitProgress(
-            processId: processId,
-            downloadedBytes: 0,
-            totalBytes: selectedStream.size.totalBytes,
-            elapsed: Duration.zero,
-          );
-          _log(processId, 'Connecting to audio source…');
-          await activeDownload.transfer!.download(
-            url: selectedStream.url,
-            headers: {
-              if (client.payload['context']['client']['userAgent']
-                  case final String agent)
-                'User-Agent': agent,
-            },
-            size: selectedStream.size.totalBytes,
-            destination: outputFile,
-            onProgress: (received) {
-              if (activeDownload.cancelled ||
-                  watch.elapsedMilliseconds - lastProgress < 250) {
-                return;
+          for (final selectedStream in candidates) {
+            try {
+              final needsExtraction = selectedStream is yt.MuxedStreamInfo;
+              final finalFile = await _prepareOutputFile(
+                request: request,
+                video: video,
+                stream: selectedStream,
+              );
+              File outputFile;
+              if (needsExtraction) {
+                activeDownload.staging = await Directory.systemTemp.createTemp(
+                  'monolith_audio_',
+                );
+                outputFile = File('${activeDownload.staging!.path}/source.mp4');
+                _log(
+                  processId,
+                  'Trying a compatible source; keeping only its audio.',
+                );
+              } else {
+                outputFile = File('${finalFile.path}.part');
               }
-              lastProgress = watch.elapsedMilliseconds;
+              activeDownload.outputFile = outputFile;
+              activeDownload.checkCancelled();
+              activeDownload.transfer = AudioStreamTransfer();
+              final watch = Stopwatch()..start();
+              var lastProgress = -250;
               _emitProgress(
                 processId: processId,
-                downloadedBytes: received,
+                downloadedBytes: 0,
+                totalBytes: selectedStream.size.totalBytes,
+                elapsed: Duration.zero,
+              );
+              _log(processId, 'Connecting to audio source…');
+              await activeDownload.transfer!.download(
+                url: selectedStream.url,
+                headers: {
+                  if (client.payload['context']['client']['userAgent']
+                      case final String agent)
+                    'User-Agent': agent,
+                },
+                size: selectedStream.size.totalBytes,
+                destination: outputFile,
+                onProgress: (received) {
+                  if (activeDownload.cancelled ||
+                      watch.elapsedMilliseconds - lastProgress < 250) {
+                    return;
+                  }
+                  lastProgress = watch.elapsedMilliseconds;
+                  _emitProgress(
+                    processId: processId,
+                    downloadedBytes: received,
+                    totalBytes: selectedStream.size.totalBytes,
+                    elapsed: watch.elapsed,
+                  );
+                },
+              );
+              activeDownload.checkCancelled();
+              if (await outputFile.length() != selectedStream.size.totalBytes) {
+                throw StateError('Audio download is incomplete.');
+              }
+              _emitProgress(
+                processId: processId,
+                downloadedBytes: selectedStream.size.totalBytes,
                 totalBytes: selectedStream.size.totalBytes,
                 elapsed: watch.elapsed,
               );
-            },
-          );
-          activeDownload.checkCancelled();
-          if (await outputFile.length() != selectedStream.size.totalBytes) {
-            throw StateError('Audio download is incomplete.');
+              if (needsExtraction) {
+                _log(processId, 'Saving audio…');
+                final audioFile = File(
+                  '${activeDownload.staging!.path}/audio.m4a',
+                );
+                activeDownload.checkCancelled();
+                await activeDownload.extractor.extract(
+                  processId,
+                  outputFile.path,
+                  audioFile.path,
+                );
+                activeDownload.checkCancelled();
+                if (!await audioFile.exists() ||
+                    await audioFile.length() == 0) {
+                  throw StateError('Audio extraction produced no audio.');
+                }
+                final stagedAudio = File('${finalFile.path}.part');
+                activeDownload.outputFile = stagedAudio;
+                await audioFile.copy(stagedAudio.path);
+              }
+              completedFile = finalFile;
+              break;
+            } catch (error) {
+              transferError = error;
+              await _deletePartialFiles(activeDownload);
+              activeDownload.checkCancelled();
+            }
           }
-          _emitProgress(
-            processId: processId,
-            downloadedBytes: selectedStream.size.totalBytes,
-            totalBytes: selectedStream.size.totalBytes,
-            elapsed: watch.elapsed,
-          );
-          completedFile = finalFile;
-          break;
+          if (completedFile != null) break;
         } catch (error) {
           transferError = error;
           await _deletePartialFiles(activeDownload);
@@ -270,6 +327,7 @@ class _StreamMediaDownloader implements MediaDownloader {
       }
       activeDownload.youtube.close();
       activeDownload.transfer?.cancel();
+      await activeDownload.clearStaging();
     }
   }
 
@@ -320,7 +378,7 @@ class _StreamMediaDownloader implements MediaDownloader {
         lower.contains('forbidden') ||
         lower.contains('sign in to confirm you') ||
         lower.contains('challenge request')) {
-      return 'The source blocked this download request (403 / anti-bot challenge), so Monolith stopped it before saving anything.';
+      return 'YouTube refused this download (HTTP 403). Try again later or import the audio from Files.';
     }
 
     return 'Download failed: $message';
@@ -359,7 +417,7 @@ class _StreamMediaDownloader implements MediaDownloader {
   Future<File> _prepareOutputFile({
     required DownloadRequest request,
     required yt.Video video,
-    required yt.AudioOnlyStreamInfo stream,
+    required yt.StreamInfo stream,
   }) async {
     final outputDirectory = Directory(request.outputPath);
     if (!await outputDirectory.exists()) {
@@ -506,6 +564,7 @@ class _StreamMediaDownloader implements MediaDownloader {
   }
 
   Future<void> _deletePartialFiles(_ActiveDownload activeDownload) async {
+    await activeDownload.clearStaging();
     final outputFile = activeDownload.outputFile;
     if (outputFile != null && await outputFile.exists()) {
       await outputFile.delete();
@@ -611,12 +670,23 @@ class _ActiveDownload {
   File? outputFile;
   File? artworkFile;
   AudioStreamTransfer? transfer;
+  Directory? staging;
+  final extractor = NativeAudioExtractor();
+  Future<void> clearStaging() async {
+    final directory = staging;
+    staging = null;
+    if (directory != null && await directory.exists()) {
+      await directory.delete(recursive: true);
+    }
+  }
+
   final Completer<void> cancellation = Completer<void>();
   final yt.YoutubeExplode youtube = yt.YoutubeExplode();
   bool get cancelled => cancellation.isCompleted;
   void cancel() {
     if (!cancelled) cancellation.complete();
     transfer?.cancel();
+    unawaited(extractor.cancel(processId));
     youtube.close();
   }
 

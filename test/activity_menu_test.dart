@@ -75,6 +75,15 @@ void main() {
           ),
         ),
       );
+      final carrier = find.byKey(const Key('activity-carrier'));
+      expect(tester.getSize(carrier).height, 44);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(milliseconds: 90));
+      final midway = tester.getSize(carrier);
+      expect(midway.height, 44);
+      expect(midway.width, inInclusiveRange(44, 260));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.getSize(carrier), const Size(44, 44));
       await tester.tap(find.byKey(const Key('activity-menu-button')));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('First song'), findsOneWidget);
@@ -83,6 +92,11 @@ void main() {
       await tester.tap(find.byKey(const Key('stop-First')));
       await tester.pump();
       expect(controller.stopped, ['First']);
+      expect(
+        tester.getSize(carrier),
+        const Size(44, 44),
+        reason: 'Finishing one concurrent job must not replay the pill.',
+      );
       expect(find.text('Second song'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

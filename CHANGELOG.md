@@ -2,6 +2,13 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.4.3] — 2026-09-07
+
+- Add a bounded fallback when audio-only streams fail: download the smallest compatible MP4, extract its AAC track locally without re-encoding, then discard the temporary video. Native extraction has separate cancellation and a two-minute deadline on iOS and Android.
+- Keep the activity carrier at 44px high with one 180ms shrink. Remove icon swapping, touch ripples, and repeated pill expansion when concurrent tasks change; respect system reduced motion.
+- Describe HTTP 403 accurately without assuming an anti-bot challenge or conversion failure.
+- A previously rejected long public source completed its full 28,523,658-byte fallback transfer. Source availability can still vary by video and network; target-iPhone playback/import checks remain necessary.
+
 ## [1.4.2] — 2026-09-07
 
 ### Fixed

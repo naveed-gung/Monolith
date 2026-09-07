@@ -33,6 +33,7 @@ final class MediaImportPlugin: NSObject {
   private var pendingImportResult: FlutterResult?
   private var pendingExportResult: FlutterResult?
 
+  private var audioExtractions: [String: () -> Void] = [:]
   private var isImportCancelled = false
   private var cancelCurrentImport: (() -> Void)?
 
@@ -68,6 +69,13 @@ final class MediaImportPlugin: NSObject {
 
   private func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "extractAudio":
+      extractAudio(arguments: call.arguments, result: result)
+    case "cancelAudioExtraction":
+      if let args = call.arguments as? [String: Any], let id = args["id"] as? String {
+        audioExtractions[id]?()
+      }
+      result(nil)
     case "cancelMusicImport":
       isImportCancelled = true
       cancelCurrentImport?()
@@ -125,6 +133,70 @@ final class MediaImportPlugin: NSObject {
       getDocumentsMusicPath(result: result)
     default:
       result(FlutterMethodNotImplemented)
+    }
+  }
+
+  // Local MP4 -> M4A: copy the AAC track without re-encoding or sharing import state.
+  private func extractAudio(arguments: Any?, result: @escaping FlutterResult) {
+    guard let args = arguments as? [String: Any], let id = args["id"] as? String,
+          let input = args["input"] as? String, let output = args["output"] as? String,
+          audioExtractions[id] == nil else {
+      result(FlutterError(code: "extract_arguments", message: "Invalid or duplicate audio extraction", details: nil)); return
+    }
+    let outputURL = URL(fileURLWithPath: output)
+    let asset = AVURLAsset(url: URL(fileURLWithPath: input))
+    var exporter: AVAssetExportSession?
+    var finished = false
+    var timeout: DispatchWorkItem?
+    func finish(_ error: Error?) {
+      guard !finished else { return }
+      finished = true
+      timeout?.cancel()
+      self.audioExtractions.removeValue(forKey: id)
+      if let error = error {
+        exporter?.cancelExport()
+        asset.cancelLoading()
+        try? FileManager.default.removeItem(at: outputURL)
+        result(FlutterError(code: "audio_extraction", message: error.localizedDescription, details: nil))
+      } else { result(nil) }
+    }
+    audioExtractions[id] = { finish(self.importError("Audio extraction cancelled.")) }
+    let deadline = DispatchWorkItem { finish(self.importError("Audio extraction timed out.")) }
+    timeout = deadline
+    DispatchQueue.main.asyncAfter(deadline: .now() + 120, execute: deadline)
+    Task { @MainActor in
+      do {
+        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        let duration = try await asset.load(.duration)
+        guard !finished else { return }
+        guard let track = tracks.first, CMTimeGetSeconds(duration) > 0 else {
+          throw self.importError("Downloaded video contains no audio.")
+        }
+        let composition = AVMutableComposition()
+        guard let audio = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+          throw self.importError("Could not prepare audio track.")
+        }
+        try audio.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: track, at: .zero)
+        guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough),
+              session.supportedFileTypes.contains(.m4a) else {
+          throw self.importError("This source cannot be saved as M4A.")
+        }
+        exporter = session
+        session.outputURL = outputURL
+        session.outputFileType = .m4a
+        session.exportAsynchronously {
+          DispatchQueue.main.async {
+            if finished {
+              try? FileManager.default.removeItem(at: outputURL)
+              return
+            }
+            if session.status == .completed {
+              try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.none], ofItemAtPath: output)
+              finish(nil)
+            } else { finish(session.error ?? self.importError("Could not save audio.")) }
+          }
+        }
+      } catch { finish(error) }
     }
   }
 

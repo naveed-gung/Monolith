@@ -1,6 +1,13 @@
 package dev.naveed_gung.monolith
 
 import android.media.MediaMetadataRetriever
+import android.media.MediaExtractor
+import android.media.MediaMuxer
+import android.media.MediaCodec
+import android.media.MediaFormat
+import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import android.app.Activity
 import android.content.ContentValues
 import android.content.Intent
@@ -65,6 +72,8 @@ class MediaImportHandler(private val activity: Activity) {
 
     private data class SafJob(val sourcePath: String, val mimeType: String, val fileName: String)
 
+    private val extractions = ConcurrentHashMap<String, AtomicBoolean>()
+    private val audioExecutor = Executors.newFixedThreadPool(2)
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -78,6 +87,11 @@ class MediaImportHandler(private val activity: Activity) {
         MethodChannel(engine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "extractAudio" -> extractAudio(call, result)
+                    "cancelAudioExtraction" -> {
+                        call.argument<String>("id")?.let { extractions[it]?.set(true) }
+                        result.success(null)
+                    }
             "readAudioMetadata" -> {
                 val path = call.argument<String>("path")
                 executor.execute {
@@ -100,7 +114,70 @@ class MediaImportHandler(private val activity: Activity) {
 
     /** Releases background resources. Call from cleanUpFlutterEngine. */
     fun detach() {
+        extractions.values.forEach { it.set(true) }
+        audioExecutor.shutdown()
         executor.shutdown()
+    }
+
+    private fun extractAudio(call: MethodCall, result: MethodChannel.Result) {
+        val id = call.argument<String>("id")
+        val input = call.argument<String>("input")
+        val output = call.argument<String>("output")
+        val cancelled = AtomicBoolean(false)
+        if (id == null || input == null || output == null || extractions.putIfAbsent(id, cancelled) != null) {
+            result.error("extract_arguments", "Invalid or duplicate audio extraction", null)
+            return
+        }
+        val deadline = System.nanoTime() + 120_000_000_000L
+        audioExecutor.execute {
+            val reader = MediaExtractor()
+            var writer: MediaMuxer? = null
+            var started = false
+            var failure: Exception? = null
+            try {
+                reader.setDataSource(input)
+                val index = (0 until reader.trackCount).firstOrNull {
+                    reader.getTrackFormat(it).getString(MediaFormat.KEY_MIME) == "audio/mp4a-latm"
+                } ?: error("Downloaded video contains no compatible AAC audio.")
+                reader.selectTrack(index)
+                val format = reader.getTrackFormat(index)
+                val muxer = MediaMuxer(output, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+                writer = muxer
+                val target = muxer.addTrack(format)
+                muxer.start()
+                started = true
+                val capacity = if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) else 262144
+                val buffer = ByteBuffer.allocate(capacity.coerceIn(262144, 4 * 1024 * 1024))
+                val info = MediaCodec.BufferInfo()
+                var samples = 0
+                while (true) {
+                    check(!cancelled.get()) { "Audio extraction cancelled." }
+                    check(System.nanoTime() < deadline) { "Audio extraction timed out." }
+                    buffer.clear()
+                    val size = reader.readSampleData(buffer, 0)
+                    if (size < 0) break
+                    check(size <= buffer.capacity()) { "Audio sample exceeds buffer capacity." }
+                    info.set(0, size, reader.sampleTime, if (reader.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
+                    muxer.writeSampleData(target, buffer, info)
+                    samples++
+                    reader.advance()
+                }
+                check(samples > 0) { "Downloaded video contains no audio samples." }
+            } catch (error: Exception) { failure = error }
+            finally {
+                try { if (started) writer?.stop() } catch (error: Exception) { if (failure == null) failure = error }
+                try { writer?.release() } catch (_: Exception) {}
+                reader.release()
+                extractions.remove(id)
+            }
+            if (cancelled.get() && failure == null) failure = IllegalStateException("Audio extraction cancelled.")
+            val error = failure
+            if (error != null) File(output).delete()
+            mainHandler.post {
+                if (error == null) result.success(null)
+                else result.error("audio_extraction", error.message, null)
+            }
+        }
     }
 
     // ------------------------------------------------------------------

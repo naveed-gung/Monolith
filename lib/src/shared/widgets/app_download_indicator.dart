@@ -19,7 +19,7 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
   final _menu = MenuController();
   Timer? _timer;
   bool _expanded = true;
-  String _workKey = '';
+  bool _wasActive = false;
   @override
   void dispose() {
     _timer?.cancel();
@@ -36,12 +36,12 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
         final jobs = _jobs(controller, service);
         if (jobs.isEmpty) return const SizedBox.shrink();
         final active = jobs.where((j) => j.active).toList();
-        final key = active.map((j) => j.id).join('|');
-        if (key != _workKey) {
-          _workKey = key;
-          _expanded = true;
+        final hasActive = active.isNotEmpty;
+        if (hasActive != _wasActive) {
+          _wasActive = hasActive;
           _timer?.cancel();
-          if (active.isNotEmpty) {
+          _expanded = hasActive;
+          if (hasActive) {
             _timer = Timer(const Duration(seconds: 2), () {
               if (mounted) setState(() => _expanded = false);
             });
@@ -119,109 +119,110 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
                 label: 'Show activity, ${active.length} active tasks',
                 child: Tooltip(
                   message: 'Show activity',
-                  child: Material(
-                    color: scheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(22),
-                    child: InkWell(
-                      key: const Key('activity-menu-button'),
-                      borderRadius: BorderRadius.circular(22),
-                      onTap: () => menu.isOpen ? menu.close() : menu.open(),
-                      child: AnimatedSize(
-                        alignment: Alignment.centerRight,
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        child: Container(
-                          width: _expanded
-                              ? math.min(
-                                  260,
-                                  MediaQuery.sizeOf(context).width - 48,
-                                )
-                              : 44,
-                          constraints: const BoxConstraints(minHeight: 44),
-                          padding: EdgeInsets.all(_expanded ? 10 : 8),
-                          child: _expanded
-                              ? Row(
-                                  children: [
-                                    Icon(
-                                      done
-                                          ? Icons.check_circle_rounded
-                                          : Icons.downloading_rounded,
-                                      size: 22,
-                                      color: done
-                                          ? Colors.green
-                                          : scheme.primary,
+                  child: GestureDetector(
+                    key: const Key('activity-menu-button'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => menu.isOpen ? menu.close() : menu.open(),
+                    child: AnimatedContainer(
+                      key: const Key('activity-carrier'),
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 180),
+                      curve: Curves.easeOut,
+                      width: _expanded
+                          ? math.min(260, MediaQuery.sizeOf(context).width - 48)
+                          : 44,
+                      height: 44,
+                      clipBehavior: Clip.hardEdge,
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            left: 14,
+                            width: math.min(
+                              196,
+                              MediaQuery.sizeOf(context).width - 112,
+                            ),
+                            top: 4,
+                            bottom: 4,
+                            child: AnimatedOpacity(
+                              opacity: _expanded ? 1 : 0,
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 80),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                          Text(
-                                            subtitle,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: scheme.onSurfaceVariant,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.expand_more_rounded,
-                                      size: 18,
-                                    ),
-                                  ],
-                                )
-                              : SizedBox(
-                                  width: 28,
-                                  height: 28,
-                                  child: Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      CircularProgressIndicator(
-                                        value: progress,
-                                        strokeWidth: 2.5,
-                                        color: done
-                                            ? Colors.green
-                                            : scheme.primary,
-                                        backgroundColor: scheme.outlineVariant,
-                                      ),
-                                      if (done)
-                                        const Icon(
-                                          Icons.check_rounded,
-                                          size: 18,
-                                          color: Colors.green,
-                                        )
-                                      else if (active.length > 1)
-                                        Text(
-                                          '${active.length}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        )
-                                      else
-                                        const Icon(
-                                          Icons.expand_more_rounded,
-                                          size: 18,
-                                        ),
-                                    ],
                                   ),
+                                  Text(
+                                    subtitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            width: 28,
+                            height: 28,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  value: progress,
+                                  strokeWidth: 2,
+                                  color: done ? Colors.green : scheme.primary,
+                                  backgroundColor: scheme.outlineVariant,
                                 ),
-                        ),
+                                if (done)
+                                  const Icon(
+                                    Icons.check_rounded,
+                                    size: 16,
+                                    color: Colors.green,
+                                  )
+                                else if (active.length > 1)
+                                  Text(
+                                    '${active.length}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  )
+                                else if (hasActive)
+                                  Icon(
+                                    Icons.stop_rounded,
+                                    size: 14,
+                                    color: scheme.primary,
+                                  )
+                                else
+                                  Icon(
+                                    Icons.more_horiz_rounded,
+                                    size: 16,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

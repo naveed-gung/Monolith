@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import '../../../data/platform_channels/media_import_channel.dart';
 
 import 'package:audio_session/audio_session.dart';
@@ -34,6 +35,8 @@ class MonolithController extends ChangeNotifier {
   static const _kEqEnabled = 'pref_eq_enabled';
   static const _kEqGains = 'pref_eq_gains';
   static const _kSeenImportPrompt = 'pref_seen_import_prompt';
+  static const _kRepeat = 'pref_repeat';
+  static const _kPlaylists = 'pref_playlists_v1';
 
   MonolithController({
     LocalMediaService? localMediaService,
@@ -102,7 +105,7 @@ class MonolithController extends ChangeNotifier {
   LibraryCategory _selectedCategory = LibraryCategory.tracks;
   ThemePreference _themePreference = ThemePreference.system;
   AccentPreset _accentPreset = AccentSwatch.fallback;
-  RepeatMode _repeatMode = RepeatMode.all;
+  RepeatMode _repeatMode = RepeatMode.off;
 
   bool _isDisposed = false;
   String? _loadedTrackId;
@@ -113,6 +116,8 @@ class MonolithController extends ChangeNotifier {
   int _selectedTrackIndex = 0;
   bool _isPlaying = false;
   bool _shuffleEnabled = false;
+  List<String>? _collectionQueue;
+  final List<String> _shuffledQueue = [];
   String _searchQuery = '';
 
   List<Track> _tracks = const [];
@@ -396,8 +401,10 @@ class MonolithController extends ChangeNotifier {
 
     final rotated = [
       ...queue.skip(currentPosition + 1),
-      ...queue.take(currentPosition),
+      if (_repeatMode == RepeatMode.all) ...queue.take(currentPosition),
     ];
+
+    if (_repeatMode == RepeatMode.one) return [tracks[_selectedTrackIndex]];
 
     return rotated.take(3).map((index) => tracks[index]).toList();
   }
@@ -447,17 +454,25 @@ class MonolithController extends ChangeNotifier {
     Track track, {
     bool openPlayer = false,
     bool autoplay = true,
+    Iterable<Track>? queue,
   }) {
     final index = tracks.indexWhere((candidate) => candidate.id == track.id);
     if (index == -1) {
       return;
     }
+    _collectionQueue = queue?.map((t) => t.id).toSet().toList();
+    if (_collectionQueue != null && !_collectionQueue!.contains(track.id)) {
+      _collectionQueue!.insert(0, track.id);
+    }
+    _shuffledQueue.clear();
+    if (_shuffleEnabled) _resetShuffle(track.id);
     unawaited(
       _activateTrackIndex(index, openPlayer: openPlayer, autoplay: autoplay),
     );
   }
 
   void openPlayer() {
+    FocusManager.instance.primaryFocus?.unfocus();
     if (_isPlayerOpen || currentTrack == null) {
       return;
     }
@@ -501,6 +516,8 @@ class MonolithController extends ChangeNotifier {
 
   void toggleShuffle() {
     _shuffleEnabled = !_shuffleEnabled;
+    _shuffledQueue.clear();
+    if (_shuffleEnabled) _resetShuffle(currentTrack?.id);
     notifyListeners();
   }
 
@@ -513,6 +530,7 @@ class MonolithController extends ChangeNotifier {
       case RepeatMode.one:
         _repeatMode = RepeatMode.off;
     }
+    _prefs?.setString(_kRepeat, _repeatMode.name);
     notifyListeners();
   }
 
@@ -876,15 +894,20 @@ class MonolithController extends ChangeNotifier {
       final previousId = currentTrack?.id;
       final imported = <Track>[];
       final existingPaths = _downloadedTracks.map((t) => t.filePath).toSet();
+      final existingIds = _downloadedTracks.map((t) => t.id).toSet();
       for (final item in items) {
         if (item.status != ImportedItemStatus.copied || item.path == null) {
           _importFailures.add(item);
           continue;
         }
         if (!existingPaths.add(item.path)) continue;
+        final id = item.sourceId == null
+            ? 'music-${DateTime.now().microsecondsSinceEpoch}-${imported.length}'
+            : 'music-native-${item.sourceId}';
+        if (!existingIds.add(id)) continue;
         imported.add(
           Track(
-            id: 'music-${DateTime.now().microsecondsSinceEpoch}-${imported.length}',
+            id: id,
             title: item.title,
             artist: item.artist,
             album: 'Music library',
@@ -1017,6 +1040,7 @@ class MonolithController extends ChangeNotifier {
       () => <String>{},
     );
     final inserted = trackIds.add(track.id);
+    _savePlaylists();
     notifyListeners();
 
     if (inserted) {
@@ -1035,6 +1059,7 @@ class MonolithController extends ChangeNotifier {
     final n = name.trim();
     if (n.isEmpty) return;
     _playlistTrackIds.putIfAbsent(n, () => <String>{});
+    _savePlaylists();
     notifyListeners();
   }
 
@@ -1045,6 +1070,7 @@ class MonolithController extends ChangeNotifier {
     final trackIds = _playlistTrackIds[playlistName];
     if (trackIds == null) return 'Playlist not found.';
     trackIds.remove(track.id);
+    _savePlaylists();
     notifyListeners();
     return 'Removed ${track.title} from $playlistName.';
   }
@@ -1214,6 +1240,8 @@ class MonolithController extends ChangeNotifier {
   }
 
   Future<void> _startManagedDownload(DownloadTaskInfo task) async {
+    // All entry points, including retry/resume, must enforce the same policy.
+    await _checkConnectivity();
     _dismissedDownloadIds.remove(task.processId);
     _cancelledDownloadIds.remove(task.processId);
     _pauseRequestedProcessIds.remove(task.processId);
@@ -1380,20 +1408,15 @@ class MonolithController extends ChangeNotifier {
 
     var nextPosition = currentPosition;
 
-    if (_shuffleEnabled && queue.length > 1) {
-      nextPosition = (currentPosition + direction.abs()) % queue.length;
-    } else {
-      nextPosition = currentPosition + direction;
+    nextPosition = currentPosition + direction;
 
-      if (nextPosition < 0) {
-        nextPosition = _repeatMode == RepeatMode.all ? queue.length - 1 : 0;
-      }
-
-      if (nextPosition >= queue.length) {
-        nextPosition = _repeatMode == RepeatMode.all ? 0 : queue.length - 1;
-      }
+    if (nextPosition < 0) {
+      nextPosition = _repeatMode == RepeatMode.all ? queue.length - 1 : 0;
     }
 
+    if (nextPosition >= queue.length) {
+      nextPosition = _repeatMode == RepeatMode.all ? 0 : queue.length - 1;
+    }
     await _activateTrackIndex(
       queue[nextPosition],
       openPlayer: openPlayer,
@@ -1402,7 +1425,50 @@ class MonolithController extends ChangeNotifier {
   }
 
   List<int> _queueIndicesForNavigation() {
-    return List<int>.generate(tracks.length, (index) => index);
+    final byId = {for (var i = 0; i < tracks.length; i++) tracks[i].id: i};
+    final ids = (_collectionQueue ?? tracks.map((t) => t.id))
+        .where(byId.containsKey)
+        .toList();
+    if (!_shuffleEnabled) return ids.map((id) => byId[id]!).toList();
+    // Preserve the visited order across refreshes and removals. New tracks go
+    // at the end so Previous always reverses Next within this shuffle cycle.
+    _shuffledQueue.removeWhere((id) => !ids.contains(id));
+    final added = ids.where((id) => !_shuffledQueue.contains(id)).toList()
+      ..shuffle(math.Random());
+    _shuffledQueue.addAll(added);
+    return _shuffledQueue.map((id) => byId[id]!).toList();
+  }
+
+  void _resetShuffle(String? currentId) {
+    final ids =
+        (_collectionQueue ?? tracks.map((t) => t.id))
+            .where((id) => id != currentId)
+            .toList()
+          ..shuffle(math.Random());
+    _shuffledQueue
+      ..clear()
+      ..addAll([?currentId, ...ids]);
+  }
+
+  void _savePlaylists() {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    final payload = jsonEncode(
+      _playlistTrackIds.map((name, ids) => MapEntry(name, ids.toList())),
+    );
+    unawaited(
+      prefs
+          .setString(_kPlaylists, payload)
+          .then((saved) {
+            if (!saved) throw StateError('Preferences could not be saved');
+          })
+          .catchError((Object error) {
+            if (_isDisposed) return;
+            _libraryError =
+                'Could not save playlists. Check available storage and try again.';
+            notifyListeners();
+          }),
+    );
   }
 
   Future<void> _bootstrap() async {
@@ -1415,6 +1481,27 @@ class MonolithController extends ChangeNotifier {
   Future<void> _loadPrefs() async {
     _prefs = await SharedPreferences.getInstance();
     final p = _prefs!;
+    final savedPlaylists = p.getString(_kPlaylists);
+    if (savedPlaylists != null) {
+      try {
+        final decoded = jsonDecode(savedPlaylists);
+        if (decoded is Map) {
+          for (final entry in decoded.entries) {
+            if (entry.key is String && entry.value is List) {
+              _playlistTrackIds[entry.key as String] = (entry.value as List)
+                  .whereType<String>()
+                  .toSet();
+            }
+          }
+        }
+      } on FormatException {
+        // Keep the damaged value for recovery; do not fail library startup.
+      }
+    }
+    _repeatMode = RepeatMode.values.firstWhere(
+      (mode) => mode.name == p.getString(_kRepeat),
+      orElse: () => RepeatMode.off,
+    );
     _themePreference = ThemePreference.values.firstWhere(
       (e) => e.name == (p.getString(_kTheme) ?? ''),
       orElse: () => ThemePreference.system,
@@ -1757,6 +1844,7 @@ class MonolithController extends ChangeNotifier {
     for (final trackIds in _playlistTrackIds.values) {
       trackIds.remove(trackId);
     }
+    _savePlaylists();
   }
 
   Future<void> _activateTrackIndex(
@@ -1774,6 +1862,7 @@ class MonolithController extends ChangeNotifier {
     progress.value = 0;
     _currentTrackDuration = currentTrack?.duration ?? Duration.zero;
     if (openPlayer) {
+      FocusManager.instance.primaryFocus?.unfocus();
       _isPlayerOpen = true;
     }
     notifyListeners();

@@ -85,3 +85,6 @@ checkhere.md
 # Local session notes — never commit
 MEMORY.md
 DONOTCOMMIT.md
+
+# Local test screenshots, audit probes, logs and build evidence.
+/artifacts/

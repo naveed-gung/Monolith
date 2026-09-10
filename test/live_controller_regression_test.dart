@@ -198,6 +198,26 @@ void main() {
     await root.delete(recursive: true);
   });
   test(
+    'repeat defaults off and remembers each explicit choice on restart',
+    () async {
+      expect(controller.repeatMode, RepeatMode.off);
+      for (final expected in [RepeatMode.all, RepeatMode.one, RepeatMode.off]) {
+        controller.cycleRepeatMode();
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('pref_repeat'), expected.name);
+        final restarted = MonolithController(
+          audioPlayer: _Player(),
+          downloadStore: _Store(root, []),
+          localMediaService: _Media(),
+          mediaDownloader: _Downloader(),
+        );
+        await restarted.whenReady;
+        expect(restarted.repeatMode, expected);
+        restarted.dispose();
+      }
+    },
+  );
+  test(
     'import cancellation retains busy lock and preserves completed songs with failure reasons',
     () async {
       final native = Completer<Object?>();

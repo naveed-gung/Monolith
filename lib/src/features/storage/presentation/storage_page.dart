@@ -50,7 +50,13 @@ class _StoragePageState extends State<StoragePage> {
           : await bridge.exportToSaf([fp], ['audio/*']);
       if (mounted && !result.canceled) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Saved to your chosen folder.')),
+          SnackBar(
+            content: Text(
+              result.savedCount > 0
+                  ? 'Saved to your chosen folder.'
+                  : 'Could not export this file. Check available space and folder access, then try again.',
+            ),
+          ),
         );
       }
     } catch (_) {
@@ -315,11 +321,13 @@ class _StoragePageState extends State<StoragePage> {
                                     color: scheme.primary,
                                   ),
                                   const SizedBox(width: AppSpacing.sm),
-                                  Text(
-                                    'Copy path',
-                                    style: textTheme.labelMedium?.copyWith(
-                                      color: scheme.primary,
-                                      fontWeight: AppType.label,
+                                  Flexible(
+                                    child: Text(
+                                      'Copy path',
+                                      style: textTheme.labelMedium?.copyWith(
+                                        color: scheme.primary,
+                                        fontWeight: AppType.label,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -348,11 +356,13 @@ class _StoragePageState extends State<StoragePage> {
                                     color: scheme.primary,
                                   ),
                                   const SizedBox(width: AppSpacing.sm),
-                                  Text(
-                                    'Open in Files',
-                                    style: textTheme.labelMedium?.copyWith(
-                                      color: scheme.primary,
-                                      fontWeight: AppType.label,
+                                  Flexible(
+                                    child: Text(
+                                      'Open in Files',
+                                      style: textTheme.labelMedium?.copyWith(
+                                        color: scheme.primary,
+                                        fontWeight: AppType.label,
+                                      ),
                                     ),
                                   ),
                                 ],

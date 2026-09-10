@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../core/services/app_update_service.dart';
+import '../core/services/shared_audio_service.dart';
 
 import 'package:flutter/material.dart';
 
@@ -23,6 +24,7 @@ class _MonolithAppState extends State<MonolithApp> {
   late final bool _ownsController;
   bool _didQueueStartupPrompt = false;
   final _navigatorKey = GlobalKey<NavigatorState>();
+  SharedAudioService? _sharedAudio;
 
   @override
   void initState() {
@@ -30,6 +32,32 @@ class _MonolithAppState extends State<MonolithApp> {
     _ownsController = widget.controller == null;
     _controller = widget.controller ?? MonolithController();
     if (_ownsController) unawaited(AppUpdateService.instance.initialize());
+    if (_ownsController) {
+      _sharedAudio = SharedAudioService(
+        onImport: (results) async {
+          await _controller.whenReady;
+          if (!mounted) return;
+          if (results.any((r) => r['path'] is String)) {
+            await _controller.refreshLibrary();
+          }
+          if (!mounted) return;
+          final context = _navigatorKey.currentContext;
+          final errors = results.map((r) => r['error']).whereType<String>();
+          if (context != null && context.mounted) {
+            ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+              SnackBar(
+                content: Text(
+                  errors.isEmpty
+                      ? 'Shared audio added to your library.'
+                      : errors.join('\n'),
+                ),
+              ),
+            );
+          }
+        },
+      );
+      unawaited(_sharedAudio!.start());
+    }
   }
 
   @override
@@ -47,6 +75,7 @@ class _MonolithAppState extends State<MonolithApp> {
 
   @override
   void dispose() {
+    _sharedAudio?.dispose();
     if (_ownsController) {
       _controller.dispose();
     }

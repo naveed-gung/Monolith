@@ -185,6 +185,10 @@ class MediaImportHandler(private val activity: Activity) {
     // ------------------------------------------------------------------
 
     private fun exportToSaf(call: MethodCall, result: MethodChannel.Result) {
+        if (safPendingReply != null) {
+            result.error("export_busy", "Finish the current export first.", null)
+            return
+        }
         @Suppress("UNCHECKED_CAST")
         val paths = call.argument<List<String>>("paths") ?: emptyList()
         @Suppress("UNCHECKED_CAST")

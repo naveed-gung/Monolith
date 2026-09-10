@@ -343,11 +343,46 @@ final class MediaImportPlugin: NSObject {
             userInfo: [NSLocalizedDescriptionKey: message])
   }
 
+  /// Retry a transient media-service interruption once, with a fresh exporter
+  /// and output path. Never retry cancellation or an unavailable/protected asset.
+  @MainActor
+  private func exportMusicAsset(_ url: URL, to work: URL) async throws -> URL {
+    for attempt in 0...1 {
+      let temp = work.appendingPathComponent("export-\(attempt).m4a")
+      let asset = AVURLAsset(url: url)
+      guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+        throw importError("Music cannot export this asset. Try importing the original file.")
+      }
+      exporter.outputURL = temp
+      exporter.outputFileType = .m4a
+      do {
+        let _: Bool = try await importStep(timeout: 300, cancel: { exporter.cancelExport() }) { done in
+          exporter.exportAsynchronously {
+            if exporter.status == .completed { done(.success(true)) }
+            else { done(.failure(exporter.error ?? self.importError("Music export did not complete."))) }
+          }
+        }
+        return temp
+      } catch {
+        let native = error as NSError
+        guard attempt == 0, !isImportCancelled,
+              UIApplication.shared.applicationState == .active,
+              native.domain == AVFoundationErrorDomain,
+              native.code == AVError.Code.operationInterrupted.rawValue else { throw error }
+        // A distinct path keeps late callbacks from touching the retry output.
+        try? FileManager.default.removeItem(at: temp)
+      }
+    }
+    throw importError("Music export did not complete. Try importing the original file.")
+  }
+
   @MainActor
   private func process(item: MPMediaItem) async -> [String: Any] {
     let title = item.title ?? "Unknown Title"
     let artist = item.artist ?? "Unknown Artist"
     var payload: [String: Any] = ["title": title, "artist": artist]
+    let sourceID = item.persistentID == 0 ? nil : String(item.persistentID)
+    if let sourceID = sourceID { payload["sourceId"] = sourceID }
     if item.playbackDuration.isFinite && item.playbackDuration > 0 {
       payload["durationMs"] = Int(item.playbackDuration * 1000)
     }
@@ -370,8 +405,21 @@ final class MediaImportPlugin: NSObject {
       staging = work
       try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
       let ext = assetURL.isFileURL && !assetURL.pathExtension.isEmpty ? assetURL.pathExtension : "m4a"
-      let temp = work.appendingPathComponent("audio").appendingPathExtension(ext)
-      let destination = try Self.importsDirectory().appendingPathComponent("\(Self.sanitizedFileName(title))-\(UUID().uuidString).\(ext)")
+      var temp = work.appendingPathComponent("audio").appendingPathExtension(ext)
+      // Stable path avoids both duplicate records and duplicate exported files.
+      // Unknown identities still get unique paths; titles are never identities.
+      let fileStem = sourceID.map { "music-\($0)" } ?? "\(Self.sanitizedFileName(title))-\(UUID().uuidString)"
+      var destination = try Self.importsDirectory().appendingPathComponent("\(fileStem).\(ext)")
+      if FileManager.default.fileExists(atPath: destination.path) {
+        let existing = try FileManager.default.attributesOfItem(atPath: destination.path)
+        if ((existing[.size] as? NSNumber)?.int64Value ?? 0) > 0 {
+          payload["status"] = "copied"
+          payload["path"] = destination.path
+          return payload
+        }
+        // Preserve a damaged prior file instead of overwriting it silently.
+        destination = try Self.importsDirectory().appendingPathComponent("\(fileStem)-\(UUID().uuidString).\(ext)")
+      }
       if assetURL.isFileURL {
         let _: Bool = try await importStep(timeout: 60) { done in
           DispatchQueue.global(qos: .utility).async {
@@ -380,18 +428,7 @@ final class MediaImportPlugin: NSObject {
           }
         }
       } else {
-        let asset = AVURLAsset(url: assetURL)
-        guard let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
-          throw importError("Music cannot export this asset. Try importing the original file.")
-        }
-        exporter.outputURL = temp
-        exporter.outputFileType = .m4a
-        let _: Bool = try await importStep(timeout: 300, cancel: { exporter.cancelExport() }) { done in
-          exporter.exportAsynchronously {
-            if exporter.status == .completed { done(.success(true)) }
-            else { done(.failure(exporter.error ?? self.importError("Music export did not complete."))) }
-          }
-        }
+        temp = try await exportMusicAsset(assetURL, to: work)
       }
       try FileManager.default.setAttributes([.protectionKey: FileProtectionType.none], ofItemAtPath: temp.path)
       let attrs = try FileManager.default.attributesOfItem(atPath: temp.path)
@@ -429,7 +466,16 @@ final class MediaImportPlugin: NSObject {
     } catch {
       payload["status"] = "failed"
       let nativeError = error as NSError
-      payload["reason"] = "\(error.localizedDescription) (\(nativeError.domain) \(nativeError.code))"
+      if nativeError.domain == AVFoundationErrorDomain &&
+          nativeError.code == AVError.Code.operationInterrupted.rawValue {
+        payload["reason"] = "iOS interrupted copying this song from Music. Keep Monolith open and the screen unlocked, then select this song to retry. If it fails again, import the original audio from Files."
+      } else {
+        payload["reason"] = error.localizedDescription
+      }
+      // Preserve technical details for diagnosis without flooding the Activity menu.
+      payload["errorDomain"] = nativeError.domain
+      payload["errorCode"] = nativeError.code
+      NSLog("Monolith Music import failed: %@", nativeError.description)
     }
     return payload
   }

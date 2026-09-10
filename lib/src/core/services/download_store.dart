@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 
 import '../models/music_models.dart';
+import 'audio_formats.dart';
 
 class DownloadStore {
   Future<Map<Object?, Object?>> readAudioMetadata(String path) async {
@@ -34,17 +35,7 @@ class DownloadStore {
 
   /// Audio container extensions we recognise when rebuilding the library from
   /// files found on disk (used by [loadTracksMergingDisk]).
-  static const _audioExtensions = {
-    'mp3',
-    'm4a',
-    'aac',
-    'flac',
-    'wav',
-    'ogg',
-    'opus',
-    'webm',
-    'mp4',
-  };
+  static const _audioExtensions = supportedAudioExtensions;
 
   /// Monolith's own top-level folder. On iOS this lives in the app's Documents
   /// directory, which — with UIFileSharingEnabled + LSSupportsOpeningDocuments
@@ -112,10 +103,22 @@ class DownloadStore {
       return const [];
     }
 
-    final json = jsonDecode(rawContent);
-    final decoded = json is List
-        ? json
-        : (json as Map<String, dynamic>)['tracks'] as List;
+    List<dynamic> decoded;
+    try {
+      final json = jsonDecode(rawContent);
+      final entries = json is List
+          ? json
+          : (json is Map ? json['tracks'] : null);
+      if (entries is! List) {
+        throw const FormatException('Invalid track manifest');
+      }
+      decoded = entries;
+    } on FormatException {
+      await manifest.copy(
+        '${manifest.path}.corrupt-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      return const []; // Disk recovery still runs; original metadata is retained.
+    }
 
     final root = await _rootDirectory();
     String? recover(String? saved) {
@@ -140,36 +143,51 @@ class DownloadStore {
       return saved;
     }
 
+    var damagedEntry = false;
     final tracks = decoded
-        .map((item) {
-          final track = Track.fromJson(item as Map<String, dynamic>);
-          return track.copyWith(
-            source:
-                (track.filePath?.replaceAll('\\', '/').contains('/Imports/') ??
-                    false)
-                ? TrackSource.imported
-                : track.source,
-            filePath: recover(track.filePath),
-            artworkFilePath: recover(track.artworkFilePath),
-          );
+        .map<Track?>((item) {
+          try {
+            final track = Track.fromJson(item as Map<String, dynamic>);
+            return track.copyWith(
+              source:
+                  (track.filePath
+                          ?.replaceAll('\\', '/')
+                          .contains('/Imports/') ??
+                      false)
+                  ? TrackSource.imported
+                  : track.source,
+              filePath: recover(track.filePath),
+              artworkFilePath: recover(track.artworkFilePath),
+            );
+          } on TypeError {
+            damagedEntry = true;
+            return null;
+          } on ArgumentError {
+            damagedEntry = true;
+            return null;
+          }
         })
-        .where(
-          (track) {
-            if (track.filePath == null) return false;
-            final file = File(track.filePath!);
-            if (!file.existsSync()) return false;
-            try {
-              if (file.lengthSync() == 0) return false;
-            } catch (_) {
-              return false;
-            }
-            return true;
-          },
-        )
+        .whereType<Track>()
+        .where((track) {
+          if (track.filePath == null) return false;
+          final file = File(track.filePath!);
+          if (!file.existsSync()) return false;
+          try {
+            if (file.lengthSync() == 0) return false;
+          } catch (_) {
+            return false;
+          }
+          return true;
+        })
         .toList();
     // Missing files may be temporarily inaccessible; never prune the manifest
     // during a read. The next explicit library write persists recovered paths.
 
+    if (damagedEntry) {
+      await manifest.copy(
+        '${manifest.path}.corrupt-${DateTime.now().microsecondsSinceEpoch}',
+      );
+    }
     return tracks;
   }
 
@@ -229,7 +247,9 @@ class DownloadStore {
   Future<Track> _trackFromDiskFile(File file) async {
     final name = file.uri.pathSegments.last;
     final title = _stem(name).replaceFirst(
-      RegExp(r'-[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$'),
+      RegExp(
+        r'-(?:[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}|shared-[0-9a-f]{16})$',
+      ),
       '',
     );
     final imported = _canonical(file.path).contains('/Imports/');

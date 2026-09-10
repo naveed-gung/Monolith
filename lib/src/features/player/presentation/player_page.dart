@@ -46,6 +46,38 @@ class PlayerPage extends StatelessWidget {
       );
     }
 
+    if (MediaQuery.sizeOf(context).width > MediaQuery.sizeOf(context).height) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenInset),
+        child: Row(
+          children: [
+            Flexible(
+              flex: 2,
+              child: _ArtworkSection(
+                controller: controller,
+                animation: animation,
+                artworkAnimation: artworkAnimation,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xl),
+            Expanded(
+              flex: 3,
+              child: ListView(
+                children: [
+                  _TrackInfo(controller: controller),
+                  const SizedBox(height: AppSpacing.md),
+                  _ProgressSection(controller: controller),
+                  _TransportControls(controller: controller),
+                  const SizedBox(height: AppSpacing.md),
+                  _UpNextSection(controller: controller),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return ListView(
       padding: padding,
       physics: const BouncingScrollPhysics(),
@@ -356,35 +388,40 @@ class _TransportControls extends StatelessWidget {
             tooltip: 'Previous',
           ),
           // Play / pause (large)
-          GestureDetector(
-            key: const Key('player-play-toggle'),
-            onTap: track.canPlay
-                ? () {
-                    controller.hapticMedium();
-                    controller.togglePlayback();
-                  }
-                : null,
-            child: AnimatedContainer(
-              duration: AppMotion.durFast,
-              curve: AppMotion.standard,
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: scheme.primary,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: scheme.primary.withValues(alpha: 0.36),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+          Semantics(
+            button: true,
+            enabled: track.canPlay,
+            label: controller.isPlaying ? 'Pause' : 'Play',
+            child: GestureDetector(
+              key: const Key('player-play-toggle'),
+              onTap: track.canPlay
+                  ? () {
+                      controller.hapticMedium();
+                      controller.togglePlayback();
+                    }
+                  : null,
+              child: AnimatedContainer(
+                duration: AppMotion.durFast,
+                curve: AppMotion.standard,
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: scheme.primary,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: scheme.primary.withValues(alpha: 0.36),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: PhosphorIcon(
+                    controller.isPlaying ? AppIcons.pause : AppIcons.play,
+                    color: Colors.white,
+                    size: 28,
                   ),
-                ],
-              ),
-              child: Center(
-                child: PhosphorIcon(
-                  controller.isPlaying ? AppIcons.pause : AppIcons.play,
-                  color: Colors.white,
-                  size: 28,
                 ),
               ),
             ),

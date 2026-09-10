@@ -197,6 +197,7 @@ class ImportedItemResult {
     this.artist = '',
     this.reason,
     this.durationMs = 0,
+    this.sourceId,
   });
 
   factory ImportedItemResult.fromMap(Map<dynamic, dynamic> map) {
@@ -207,6 +208,7 @@ class ImportedItemResult {
       artist: map['artist'] as String? ?? '',
       reason: map['reason'] as String?,
       durationMs: (map['durationMs'] as num?)?.toInt() ?? 0,
+      sourceId: map['sourceId'] as String?,
     );
   }
 
@@ -235,6 +237,9 @@ class ImportedItemResult {
 
   /// Duration in milliseconds; 0 = unknown.
   final int durationMs;
+
+  /// Stable Music library identity, not a title or temporary export path.
+  final String? sourceId;
 }
 
 class ExportResult {

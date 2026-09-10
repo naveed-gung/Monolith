@@ -150,6 +150,12 @@ class SettingsPage extends StatelessWidget {
                           ),
                           const SizedBox(height: AppSpacing.md),
                           SegmentedButton<ThemePreference>(
+                            direction:
+                                MediaQuery.sizeOf(context).width < 360 ||
+                                    MediaQuery.textScalerOf(context).scale(14) >
+                                        20
+                                ? Axis.vertical
+                                : Axis.horizontal,
                             // No selected check-mark: it competes with each
                             // segment's own icon and squeezes the label onto a
                             // second line (the "m" in "System" dropping down).
@@ -207,7 +213,9 @@ class SettingsPage extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: AppSpacing.md),
-                          Row(
+                          Wrap(
+                            spacing: AppSpacing.md,
+                            runSpacing: AppSpacing.md,
                             children: [
                               for (final swatch in AccentSwatch.all) ...[
                                 _AccentDot(
@@ -217,7 +225,6 @@ class SettingsPage extends StatelessWidget {
                                   onTap: () =>
                                       controller.setAccentPreset(swatch.preset),
                                 ),
-                                const SizedBox(width: AppSpacing.md),
                               ],
                             ],
                           ),
@@ -400,8 +407,9 @@ class SettingsPage extends StatelessWidget {
                           controller.hapticLight();
                           final choice = await showModalBottomSheet<String>(
                             context: context,
-                            backgroundColor:
-                                Theme.of(context).colorScheme.surface,
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.surface,
                             shape: const RoundedRectangleBorder(
                               borderRadius: BorderRadius.vertical(
                                 top: Radius.circular(20),
@@ -409,25 +417,35 @@ class SettingsPage extends StatelessWidget {
                             ),
                             builder: (sheetCtx) => SafeArea(
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     ListTile(
-                                      leading: const Icon(Icons.library_music_rounded),
-                                      title: const Text('Import All from Music'),
+                                      leading: const Icon(
+                                        Icons.library_music_rounded,
+                                      ),
+                                      title: const Text(
+                                        'Import All from Music',
+                                      ),
                                       subtitle: const Text(
                                         'Batch import all accessible offline songs',
                                       ),
-                                      onTap: () => Navigator.pop(sheetCtx, 'all'),
+                                      onTap: () =>
+                                          Navigator.pop(sheetCtx, 'all'),
                                     ),
                                     ListTile(
-                                      leading: const Icon(Icons.checklist_rounded),
+                                      leading: const Icon(
+                                        Icons.checklist_rounded,
+                                      ),
                                       title: const Text('Select from Music…'),
                                       subtitle: const Text(
                                         'Pick individual songs or albums',
                                       ),
-                                      onTap: () => Navigator.pop(sheetCtx, 'pick'),
+                                      onTap: () =>
+                                          Navigator.pop(sheetCtx, 'pick'),
                                     ),
                                   ],
                                 ),
@@ -601,29 +619,30 @@ class _DeveloperCard extends StatelessWidget {
                     color: scheme.onSurfaceVariant,
                   ),
                 ),
+                const SizedBox(height: AppSpacing.md),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    _ProfileButton(
+                      tooltip: 'GitHub',
+                      onTap: onGithub,
+                      child: const FaIcon(FontAwesomeIcons.github, size: 18),
+                    ),
+                    _ProfileButton(
+                      tooltip: 'Instagram',
+                      onTap: onInstagram,
+                      child: const FaIcon(FontAwesomeIcons.instagram, size: 18),
+                    ),
+                    _ProfileButton(
+                      tooltip: 'Portfolio',
+                      onTap: onPortfolio,
+                      child: PhosphorIcon(AppIcons.globe, size: 18),
+                    ),
+                  ],
+                ),
               ],
             ),
-          ),
-          Row(
-            children: [
-              _ProfileButton(
-                tooltip: 'GitHub',
-                onTap: onGithub,
-                child: const FaIcon(FontAwesomeIcons.github, size: 18),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              _ProfileButton(
-                tooltip: 'Instagram',
-                onTap: onInstagram,
-                child: const FaIcon(FontAwesomeIcons.instagram, size: 18),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              _ProfileButton(
-                tooltip: 'Portfolio',
-                onTap: onPortfolio,
-                child: PhosphorIcon(AppIcons.globe, size: 18),
-              ),
-            ],
           ),
         ],
       ),

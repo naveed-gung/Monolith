@@ -16,10 +16,12 @@ class AppDownloadIndicator extends StatefulWidget {
 }
 
 class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
+  // Shared across tab instances/remounts, scoped to this app controller.
+  // Returning to a running batch must not announce that batch again.
+  static final _announcements = Expando<_ActivityAnnouncement>();
   final _menu = MenuController();
   Timer? _timer;
-  bool _expanded = true;
-  bool _wasActive = false;
+  bool _expanded = false;
   @override
   void dispose() {
     _timer?.cancel();
@@ -34,11 +36,12 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
       listenable: service,
       builder: (context, _) {
         final jobs = _jobs(controller, service);
-        if (jobs.isEmpty) return const SizedBox.shrink();
         final active = jobs.where((j) => j.active).toList();
         final hasActive = active.isNotEmpty;
-        if (hasActive != _wasActive) {
-          _wasActive = hasActive;
+        final announcement = _announcements[controller] ??=
+            _ActivityAnnouncement();
+        if (hasActive != announcement.wasActive) {
+          announcement.wasActive = hasActive;
           _timer?.cancel();
           _expanded = hasActive;
           if (hasActive) {
@@ -47,7 +50,13 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
             });
           }
         }
+        if (!hasActive) _expanded = false;
+        if (jobs.isEmpty) return const SizedBox.shrink();
         final scheme = Theme.of(context).colorScheme;
+        final menuWidth = math.min(
+          320.0,
+          MediaQuery.sizeOf(context).width - 64,
+        );
         final done = active.isEmpty && jobs.every((j) => j.complete);
         final progress = active.isEmpty
             ? 1.0
@@ -71,7 +80,12 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
             alignment: Alignment.centerRight,
             child: MenuAnchor(
               controller: _menu,
+              // Align the panel's trailing edge with the carrier, including
+              // its 8px padding on each side; retain a separate vertical gap.
+              alignmentOffset: Offset(-menuWidth - 16, 12),
+              reservedPadding: const EdgeInsets.all(16),
               style: MenuStyle(
+                alignment: AlignmentDirectional.bottomEnd,
                 backgroundColor: WidgetStatePropertyAll(
                   scheme.surfaceContainerHigh,
                 ),
@@ -85,7 +99,9 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
               ),
               menuChildren: [
                 SizedBox(
-                  width: math.min(320, MediaQuery.sizeOf(context).width - 40),
+                  key: const Key('activity-details'),
+                  // Include menu padding in the viewport inset budget.
+                  width: menuWidth,
                   child: ListenableBuilder(
                     listenable: Listenable.merge([controller, service]),
                     builder: (context, _) => ConstrainedBox(
@@ -234,6 +250,10 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
       },
     );
   }
+}
+
+class _ActivityAnnouncement {
+  bool wasActive = false;
 }
 
 class _Activity {

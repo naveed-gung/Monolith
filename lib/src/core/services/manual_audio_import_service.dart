@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
+import 'audio_formats.dart';
 
 class ImportedAudioFile {
   const ImportedAudioFile({required this.name, this.path, this.bytes});
@@ -17,22 +18,7 @@ class ManualAudioImportService {
   Future<List<ImportedAudioFile>> pickAudioFiles() async {
     const audioTypeGroup = XTypeGroup(
       label: 'audio',
-      extensions: [
-        'aac',
-        'aiff',
-        'alac',
-        'amr',
-        'flac',
-        'm4a',
-        'mp3',
-        'mp4',
-        'oga',
-        'ogg',
-        'opus',
-        'wav',
-        'weba',
-        'webm',
-      ],
+      extensions: supportedAudioExtensions,
       mimeTypes: ['audio/*'],
       uniformTypeIdentifiers: ['public.audio', 'public.mpeg-4'],
     );

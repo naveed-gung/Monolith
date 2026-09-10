@@ -2,7 +2,7 @@
 
 A personal music player for iOS and Android. Bring your own music, keep a local collection, and listen with the screen locked.
 
-**v1.4.3 · Build 12:** this reliability update improves import handling, the activity menu, download transfers, and local IPA handoff. The iOS changes still require an iPhone test; downloads are not confirmed fixed on the user's device.
+**v1.4.4 · Build 13:** this reliability release addresses audit findings across storage recovery, playlist persistence, Android back navigation, queue management, and responsive UI scaling. The iOS changes still require an iPhone test; downloads are not confirmed fixed on the user's device.
 
 ## Screenshots
 
@@ -132,7 +132,7 @@ The repository's debug APK configuration targets x86_64 emulators; its release c
 
 ## Verification and remaining checks
 
-- **69 tests pass; Dart analysis reports no issues.** The regression suite covers the active controller as well as existing repository tests.
+- **129 tests pass; Dart analysis reports no issues.** The regression suite covers the active controller, storage recovery, responsive UI matrix, and existing repository tests.
 - Regression coverage includes nonzero volume when changing songs, preserving playback on refresh/download completion, cancellation during preparation, source classification, duration caching, schema migration, and existing UI/import/export/update behavior.
 - This patch passes an Android emulator debug build. Six fresh screenshots show the current coral accent in three light and three dark screens, and existing songs survived an in-place APK replacement.
 - The new transfer completed a short public AAC source locally (309,288 bytes). The audio-only path for a longer source failed with HTTP 403; its combined-stream fallback subsequently completed all 28,523,658 bytes locally. The user reports that every selected song fails on their iPhone; that device's download failure is not yet verified as resolved.

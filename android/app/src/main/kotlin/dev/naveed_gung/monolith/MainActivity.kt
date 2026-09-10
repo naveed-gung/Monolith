@@ -14,10 +14,12 @@ import io.flutter.embedding.engine.FlutterEngine
 class MainActivity : AudioServiceActivity() {
 
     private var mediaImportHandler: MediaImportHandler? = null
+    private var sharedAudioHandler: SharedAudioHandler? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         mediaImportHandler = MediaImportHandler(this).also { it.attach(flutterEngine) }
+        sharedAudioHandler = SharedAudioHandler(this, flutterEngine).also { it.accept(intent) }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "monolith/updates").setMethodCallHandler { call, result ->
             if (call.method != "install") {
                 result.notImplemented()
@@ -42,9 +44,17 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        sharedAudioHandler?.dispose()
+        sharedAudioHandler = null
         mediaImportHandler?.detach()
         mediaImportHandler = null
         super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        sharedAudioHandler?.accept(intent)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

@@ -164,6 +164,10 @@ void main() {
     expect(find.byKey(const Key('player-overlay-sheet')), findsOneWidget);
     expect(find.byKey(const Key('player-deck')), findsOneWidget);
     expect(find.byKey(const Key('player-play-toggle')), findsOneWidget);
+    expect(find.byKey(const Key('nav-search-icon')), findsNothing);
+    controller.closePlayer();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('nav-search-icon')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -248,22 +252,21 @@ void main() {
     await tester.tap(find.byKey(const Key('nav-search-icon')));
     await tester.pumpAndSettle();
 
-    controller.setSearchQuery('Luna');
+    await tester.enterText(find.byKey(const Key('search-field')), 'Luna');
     await tester.pump();
+    expect(tester.testTextInput.isVisible, isTrue);
 
     expect(controller.currentTab, AppTab.search);
     expect(controller.searchResults, hasLength(1));
     expect(controller.searchResults.single.title, 'Midnight Breeze');
 
-    controller.selectTrack(
-      controller.searchResults.single,
-      openPlayer: true,
-      autoplay: false,
-    );
+    await tester.tap(find.byKey(const Key('search-track-track-luna')));
     await tester.pumpAndSettle();
 
     expect(controller.currentTab, AppTab.search);
     expect(controller.isPlayerOpen, isTrue);
+    expect(tester.testTextInput.isVisible, isFalse);
+    expect(find.byKey(const Key('nav-search-icon')), findsNothing);
     expect(find.byKey(const Key('player-overlay-sheet')), findsOneWidget);
     expect(controller.currentTrack?.title, 'Midnight Breeze');
     expect(controller.currentTrack?.artist, 'Luna Sol');

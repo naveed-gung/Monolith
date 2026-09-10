@@ -1044,7 +1044,11 @@ class _DrillTrackList extends StatelessWidget {
             _TrackRow(
               track: track,
               isActive: controller.currentTrack?.id == track.id,
-              onTap: () => controller.selectTrack(track, openPlayer: true),
+              onTap: () => controller.selectTrack(
+                track,
+                openPlayer: true,
+                queue: tracks,
+              ),
               onMenu: () => onMenu(track, playlistContext: playlistContext),
             ),
             if (!isLast)
@@ -1112,7 +1116,11 @@ class _TracksSilver extends StatelessWidget {
               _TrackRow(
                 track: track,
                 isActive: controller.currentTrack?.id == track.id,
-                onTap: () => controller.selectTrack(track, openPlayer: true),
+                onTap: () => controller.selectTrack(
+                  track,
+                  openPlayer: true,
+                  queue: sortedTracks,
+                ),
                 onMenu: () => onMenu(track),
               ),
               if (!isLast)

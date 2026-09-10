@@ -2,6 +2,22 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.4.4] — 2026-09-10
+
+### Fixed & Reliability
+- Persist playlists and track memberships across app restarts into SharedPreferences.
+- Recover audio files from disk even when manifest JSON is malformed or corrupted, safely quarantining corrupted metadata.
+- Intercept Android Back gesture while the full player is open, closing the player instead of exiting the app.
+- Enforce "Wi-Fi only" download setting consistently across initial starts, retries, and resumes.
+- Fix shuffle queue traversal: keep stable visit history so the Previous button accurately reverses back.
+- Deduplicate native Music imports using stable source IDs (`music-native-${item.sourceId}`) preventing redundant copies.
+- Restore discoverable navigation on tablet screens (>880px) and fix text/button overflows across small phones and 200% font scaling.
+- Expand disk recovery format whitelist (aiff, alac, amr, oga, weba) matching manual audio import capabilities.
+- Support incoming shared audio intents on Android via `SharedAudioHandler`.
+- Dismiss keyboard cleanly upon song selection from search.
+- Hide bottom navigation bar when player is open, and persist repeat mode across sessions.
+- Suppress repetitive activity indicator animations across tab changes and add 12px vertical clearance to activity popup.
+
 ## [1.4.3] — 2026-09-07
 
 - Add a bounded fallback when audio-only streams fail: download the smallest compatible MP4, extract its AAC track locally without re-encoding, then discard the temporary video. Native extraction has separate cancellation and a two-minute deadline on iOS and Android.

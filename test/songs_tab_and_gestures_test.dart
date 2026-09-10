@@ -52,8 +52,8 @@ void main() {
       expect(controller.currentTab, AppTab.songs);
     });
 
-    test('AppUpdateService version is bumped to 1.4.3', () {
-      expect(AppUpdateService.currentVersion, '1.4.3');
+    test('Monolith v1.2.0 Features & Enhancements AppUpdateService version is bumped to 1.4.4', () {
+      expect(AppUpdateService.currentVersion, '1.4.4');
     });
 
     test('clearStaleAppCache runs without errors', () async {

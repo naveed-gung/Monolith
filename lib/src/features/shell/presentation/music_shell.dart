@@ -120,171 +120,177 @@ class _MusicShellState extends State<MusicShell>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final wideLayout = constraints.maxWidth > 880;
         final currentPage = _buildPage(controller);
 
-        return Scaffold(
-          extendBody: false,
-          resizeToAvoidBottomInset: false,
-          body: Stack(
-            children: [
-              const Positioned.fill(child: Atmosphere()),
-              currentPage,
-              // Mini player — above page content, below player overlay.
-              // Gesture down hides it; gesture up opens full player.
-              if (!controller.isPlayerOpen &&
-                  miniTrack != null &&
-                  !_isMiniPlayerDismissed)
-                Positioned(
-                  left: AppSpacing.lg,
-                  right: AppSpacing.lg,
-                  bottom: _kMiniPlayerGap,
-                  child: GestureDetector(
-                    onVerticalDragEnd: (details) {
-                      final velocity = details.primaryVelocity ?? 0;
-                      if (velocity > 200) {
-                        // Swiped down -> dismiss mini player
-                        controller.hapticLight();
-                        setState(() => _isMiniPlayerDismissed = true);
-                      } else if (velocity < -200) {
-                        // Swiped up -> open full player
-                        controller.hapticMedium();
-                        controller.openPlayer();
-                      }
-                    },
-                    child: _MiniPlayer(
-                      controller: controller,
-                      track: miniTrack,
-                    ),
-                  ),
-                ),
-              // If mini player was dismissed, show subtle floating pill to reshow
-              if (!controller.isPlayerOpen &&
-                  miniTrack != null &&
-                  _isMiniPlayerDismissed)
-                Positioned(
-                  bottom: 4,
-                  left: 0,
-                  right: 0,
-                  child: Center(
+        return PopScope(
+          canPop: !controller.isPlayerOpen,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop && controller.isPlayerOpen) controller.closePlayer();
+          },
+          child: Scaffold(
+            extendBody: false,
+            resizeToAvoidBottomInset: false,
+            body: Stack(
+              children: [
+                const Positioned.fill(child: Atmosphere()),
+                currentPage,
+                // Mini player — above page content, below player overlay.
+                // Gesture down hides it; gesture up opens full player.
+                if (!controller.isPlayerOpen &&
+                    miniTrack != null &&
+                    !_isMiniPlayerDismissed)
+                  Positioned(
+                    left: AppSpacing.lg,
+                    right: AppSpacing.lg,
+                    bottom: _kMiniPlayerGap,
                     child: GestureDetector(
-                      onTap: () {
-                        controller.hapticLight();
-                        setState(() => _isMiniPlayerDismissed = false);
-                      },
                       onVerticalDragEnd: (details) {
-                        if ((details.primaryVelocity ?? 0) < -150) {
+                        final velocity = details.primaryVelocity ?? 0;
+                        if (velocity > 200) {
+                          // Swiped down -> dismiss mini player
                           controller.hapticLight();
-                          setState(() => _isMiniPlayerDismissed = false);
+                          setState(() => _isMiniPlayerDismissed = true);
+                        } else if (velocity < -200) {
+                          // Swiped up -> open full player
+                          controller.hapticMedium();
+                          controller.openPlayer();
                         }
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withValues(alpha: 0.92),
-                          borderRadius: BorderRadius.circular(AppRadii.pill),
-                          border: Border.all(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.outlineVariant.withValues(alpha: 0.5),
-                            width: 0.5,
+                      child: _MiniPlayer(
+                        controller: controller,
+                        track: miniTrack,
+                      ),
+                    ),
+                  ),
+                // If mini player was dismissed, show subtle floating pill to reshow
+                if (!controller.isPlayerOpen &&
+                    miniTrack != null &&
+                    _isMiniPlayerDismissed)
+                  Positioned(
+                    bottom: 4,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: GestureDetector(
+                        onTap: () {
+                          controller.hapticLight();
+                          setState(() => _isMiniPlayerDismissed = false);
+                        },
+                        onVerticalDragEnd: (details) {
+                          if ((details.primaryVelocity ?? 0) < -150) {
+                            controller.hapticLight();
+                            setState(() => _isMiniPlayerDismissed = false);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
                           ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(AppRadii.pill),
+                            border: Border.all(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outlineVariant
+                                  .withValues(alpha: 0.5),
+                              width: 0.5,
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            PhosphorIcon(
-                              PhosphorIcons.caretUp(),
-                              size: 14,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              miniTrack.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
-                                  ),
-                            ),
-                          ],
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              PhosphorIcon(
+                                PhosphorIcons.caretUp(),
+                                size: 14,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                miniTrack.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
+                                    ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              // Player overlay
-              Positioned.fill(
-                child: IgnorePointer(
-                  ignoring: !controller.isPlayerOpen,
-                  child: AnimatedSwitcher(
-                    duration: AppMotion.durSlow,
-                    switchInCurve: AppMotion.emphasized,
-                    switchOutCurve: AppMotion.exit,
-                    transitionBuilder: (child, anim) {
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: anim,
-                          curve: AppMotion.standard,
-                        ),
-                        child: SlideTransition(
-                          position:
-                              Tween<Offset>(
-                                begin: const Offset(0, 1),
-                                end: Offset.zero,
-                              ).animate(
-                                CurvedAnimation(
-                                  parent: anim,
-                                  curve: AppMotion.emphasized,
-                                ),
-                              ),
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: controller.isPlayerOpen
-                        ? _PlayerOverlay(
-                            key: const ValueKey('player-overlay'),
-                            controller: controller,
-                            animation: _visualizerController,
-                            artworkAnimation: _artworkController,
-                          )
-                        : const SizedBox.shrink(
-                            key: ValueKey('player-overlay-hidden'),
+                // Player overlay
+                Positioned.fill(
+                  child: IgnorePointer(
+                    ignoring: !controller.isPlayerOpen,
+                    child: AnimatedSwitcher(
+                      duration: AppMotion.durSlow,
+                      switchInCurve: AppMotion.emphasized,
+                      switchOutCurve: AppMotion.exit,
+                      transitionBuilder: (child, anim) {
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: anim,
+                            curve: AppMotion.standard,
                           ),
+                          child: SlideTransition(
+                            position:
+                                Tween<Offset>(
+                                  begin: const Offset(0, 1),
+                                  end: Offset.zero,
+                                ).animate(
+                                  CurvedAnimation(
+                                    parent: anim,
+                                    curve: AppMotion.emphasized,
+                                  ),
+                                ),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: controller.isPlayerOpen
+                          ? _PlayerOverlay(
+                              key: const ValueKey('player-overlay'),
+                              controller: controller,
+                              animation: _visualizerController,
+                              artworkAnimation: _artworkController,
+                            )
+                          : const SizedBox.shrink(
+                              key: ValueKey('player-overlay-hidden'),
+                            ),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
+            bottomNavigationBar: controller.isPlayerOpen
+                ? null
+                : _BottomNav(
+                    controller: controller,
+                    onSwipeUp: () {
+                      if (_isMiniPlayerDismissed) {
+                        controller.hapticLight();
+                        setState(() => _isMiniPlayerDismissed = false);
+                      }
+                    },
+                  ),
           ),
-          bottomNavigationBar: wideLayout
-              ? null
-              : _BottomNav(
-                  controller: controller,
-                  onSwipeUp: () {
-                    if (_isMiniPlayerDismissed) {
-                      controller.hapticLight();
-                      setState(() => _isMiniPlayerDismissed = false);
-                    }
-                  },
-                ),
         );
       },
     );
@@ -326,7 +332,10 @@ class _MusicShellState extends State<MusicShell>
             bottom: false,
             child: DownloadsPage(key: ValueKey('downloads'), embedded: true),
           ),
-          const SafeArea(bottom: false, child: SongsPage(key: ValueKey('songs'))),
+          const SafeArea(
+            bottom: false,
+            child: SongsPage(key: ValueKey('songs')),
+          ),
           const SafeArea(
             bottom: false,
             child: SearchPage(key: ValueKey('search')),
@@ -393,7 +402,8 @@ class _BottomNav extends StatelessWidget {
         child: SizedBox(
           height:
               _kNavBarHeight +
-              (MediaQuery.textScalerOf(context).scale(12) - 12).clamp(0, 24),
+              (MediaQuery.textScalerOf(context).scale(12) - 12).clamp(0, 48) *
+                  2,
           child: Row(
             children: [
               for (final tab in AppTab.values)
@@ -489,7 +499,11 @@ class _NavItem extends StatelessWidget {
                         : scheme.onSurfaceVariant,
                     fontWeight: isSelected ? AppType.label : AppType.body,
                   ),
-                  child: Text(label),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -785,25 +799,29 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
           child: Column(
             children: [
               // Drag handle — follows your finger, then settles or closes.
-              GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: widget.controller.closePlayer,
-                onVerticalDragUpdate: _handleDragUpdate,
-                onVerticalDragEnd: _handleDragEnd,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.screenInset,
-                    AppSpacing.lg,
-                    AppSpacing.screenInset,
-                    AppSpacing.md,
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: scheme.outlineVariant,
-                        borderRadius: AppRadii.all(AppRadii.pill),
+              Semantics(
+                button: true,
+                label: 'Close player',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: widget.controller.closePlayer,
+                  onVerticalDragUpdate: _handleDragUpdate,
+                  onVerticalDragEnd: _handleDragEnd,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.screenInset,
+                      AppSpacing.lg,
+                      AppSpacing.screenInset,
+                      AppSpacing.md,
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: scheme.outlineVariant,
+                          borderRadius: AppRadii.all(AppRadii.pill),
+                        ),
                       ),
                     ),
                   ),

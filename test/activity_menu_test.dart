@@ -25,7 +25,7 @@ class _Controller extends ChangeNotifier implements MonolithController {
       ),
   ];
   @override
-  bool get isImportingAudio => true;
+  bool isImportingAudio = true;
   @override
   bool get isCancellingImport => false;
   @override
@@ -77,6 +77,18 @@ void main() {
       );
       final carrier = find.byKey(const Key('activity-carrier'));
       expect(tester.getSize(carrier).height, 44);
+      await tester.tap(find.byKey(const Key('activity-menu-button')));
+      await tester.pump(const Duration(milliseconds: 300));
+      final expandedDetails = tester.getRect(
+        find.byKey(const Key('activity-details')),
+      );
+      expect(
+        expandedDetails.top - 8 - tester.getRect(carrier).bottom,
+        greaterThanOrEqualTo(12),
+      );
+      expect(expandedDetails.right + 8, lessThanOrEqualTo(304));
+      await tester.tap(find.byKey(const Key('activity-menu-button')));
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pump(const Duration(seconds: 2));
       await tester.pump(const Duration(milliseconds: 90));
       final midway = tester.getSize(carrier);
@@ -89,6 +101,11 @@ void main() {
       expect(find.text('First song'), findsOneWidget);
       expect(find.text('Second song'), findsOneWidget);
       expect(find.text('3 of 10 · Current song'), findsOneWidget);
+      final details = tester.getRect(find.byKey(const Key('activity-details')));
+      final button = tester.getRect(carrier);
+      expect(details.top - 8 - button.bottom, greaterThanOrEqualTo(12));
+      expect(details.left - 8, greaterThanOrEqualTo(16));
+      expect(details.right + 8, lessThanOrEqualTo(304));
       await tester.tap(find.byKey(const Key('stop-First')));
       await tester.pump();
       expect(controller.stopped, ['First']);
@@ -104,6 +121,48 @@ void main() {
       updates.dispose();
     },
   );
+
+  testWidgets('switching screens does not replay the activity announcement', (
+    tester,
+  ) async {
+    final controller = _Controller();
+    final updates = AppUpdateService(ios: true);
+    Widget screen(String name) => AppScope(
+      controller: controller,
+      child: MaterialApp(
+        home: Scaffold(
+          body: AppDownloadIndicator(
+            key: ValueKey(name),
+            updateService: updates,
+          ),
+        ),
+      ),
+    );
+    final carrier = find.byKey(const Key('activity-carrier'));
+    await tester.pumpWidget(screen('library'));
+    expect(tester.getSize(carrier).width, greaterThan(44));
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.getSize(carrier).width, 44);
+    await tester.pumpWidget(screen('downloads'));
+    expect(tester.getSize(carrier).width, 44);
+    await tester.pumpWidget(screen('library-again'));
+    expect(tester.getSize(carrier).width, 44);
+
+    // Empty activity must reset the batch so a genuinely new job can announce.
+    controller.isImportingAudio = false;
+    controller.downloadTasks = [];
+    controller.notifyListeners();
+    await tester.pump();
+    expect(carrier, findsNothing);
+    controller.isImportingAudio = true;
+    controller.notifyListeners();
+    await tester.pump();
+    expect(tester.getSize(carrier).width, greaterThan(44));
+    await tester.pumpWidget(const SizedBox());
+    controller.dispose();
+    updates.dispose();
+  });
 
   testWidgets(
     'local IPA action shares the existing file and remains available afterwards',

@@ -21,10 +21,13 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
   static final _announcements = Expando<_ActivityAnnouncement>();
   final _menu = MenuController();
   Timer? _timer;
+  Timer? _fadeTimer;
+  DateTime? _fadeDeadline;
   bool _expanded = false;
   @override
   void dispose() {
     _timer?.cancel();
+    _fadeTimer?.cancel();
     super.dispose();
   }
 
@@ -51,6 +54,39 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
           }
         }
         if (!hasActive) _expanded = false;
+        final settled =
+            jobs.isNotEmpty && jobs.every((j) => !j.active && j.cancel == null);
+        final resultKey = settled
+            ? jobs.map((j) => '${j.id}:${j.complete}:${j.detail}').join('|')
+            : '';
+        if (resultKey != announcement.resultKey) {
+          announcement.resultKey = resultKey;
+          announcement.hidden = false;
+          announcement.hideAt = settled
+              ? DateTime.now().add(const Duration(seconds: 5))
+              : null;
+          _fadeTimer?.cancel();
+          _fadeTimer = null;
+        }
+        final hideAt = announcement.hideAt;
+        if (_fadeDeadline != hideAt) {
+          _fadeDeadline = hideAt;
+          _fadeTimer?.cancel();
+          _fadeTimer = null;
+        }
+        if (hideAt != null && !announcement.hidden && _fadeTimer == null) {
+          final remaining = hideAt.difference(DateTime.now());
+          if (remaining <= Duration.zero) {
+            announcement.hidden = true;
+          } else {
+            _fadeTimer = Timer(remaining, () {
+              _fadeTimer = null;
+              if (!mounted || announcement.hideAt != hideAt) return;
+              _menu.close();
+              setState(() => announcement.hidden = true);
+            });
+          }
+        }
         if (jobs.isEmpty) return const SizedBox.shrink();
         final scheme = Theme.of(context).colorScheme;
         final menuWidth = math.min(
@@ -74,177 +110,212 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
             : active.isNotEmpty
             ? 'Tap to view each task'
             : 'Tap for results';
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: MenuAnchor(
-              controller: _menu,
-              // Align the panel's trailing edge with the carrier, including
-              // its 8px padding on each side; retain a separate vertical gap.
-              alignmentOffset: Offset(-menuWidth - 16, 12),
-              reservedPadding: const EdgeInsets.all(16),
-              style: MenuStyle(
-                alignment: AlignmentDirectional.bottomEnd,
-                backgroundColor: WidgetStatePropertyAll(
-                  scheme.surfaceContainerHigh,
-                ),
-                elevation: const WidgetStatePropertyAll(8),
-                shape: WidgetStatePropertyAll(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                padding: const WidgetStatePropertyAll(EdgeInsets.all(8)),
-              ),
-              menuChildren: [
-                SizedBox(
-                  key: const Key('activity-details'),
-                  // Include menu padding in the viewport inset budget.
-                  width: menuWidth,
-                  child: ListenableBuilder(
-                    listenable: Listenable.merge([controller, service]),
-                    builder: (context, _) => ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: MediaQuery.sizeOf(context).height * .55,
-                      ),
-                      child: SingleChildScrollView(
-                        primary: false,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: Text(
-                                'Activity',
-                                style: TextStyle(fontWeight: FontWeight.w700),
+        return IgnorePointer(
+          ignoring: announcement.hidden,
+          child: AnimatedSwitcher(
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
+            child: announcement.hidden
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: MenuAnchor(
+                        controller: _menu,
+                        // Align the panel's trailing edge with the carrier, including
+                        // its 8px padding on each side; retain a separate vertical gap.
+                        alignmentOffset: Offset(-menuWidth - 16, 12),
+                        reservedPadding: const EdgeInsets.all(16),
+                        style: MenuStyle(
+                          alignment: AlignmentDirectional.bottomEnd,
+                          backgroundColor: WidgetStatePropertyAll(
+                            scheme.surfaceContainerHigh,
+                          ),
+                          elevation: const WidgetStatePropertyAll(8),
+                          shape: WidgetStatePropertyAll(
+                            RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          padding: const WidgetStatePropertyAll(
+                            EdgeInsets.all(8),
+                          ),
+                        ),
+                        menuChildren: [
+                          SizedBox(
+                            key: const Key('activity-details'),
+                            // Include menu padding in the viewport inset budget.
+                            width: menuWidth,
+                            child: ListenableBuilder(
+                              listenable: Listenable.merge([
+                                controller,
+                                service,
+                              ]),
+                              builder: (context, _) => ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxHeight:
+                                      MediaQuery.sizeOf(context).height * .55,
+                                ),
+                                child: SingleChildScrollView(
+                                  primary: false,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      const Padding(
+                                        padding: EdgeInsets.all(12),
+                                        child: Text(
+                                          'Activity',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      for (final job in _jobs(
+                                        controller,
+                                        service,
+                                      ))
+                                        _ActivityRow(job: job),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                            for (final job in _jobs(controller, service))
-                              _ActivityRow(job: job),
-                          ],
+                          ),
+                        ],
+                        builder: (context, menu, _) => Semantics(
+                          button: true,
+                          label: 'Show activity, ${active.length} active tasks',
+                          child: Tooltip(
+                            message: 'Show activity',
+                            child: GestureDetector(
+                              key: const Key('activity-menu-button'),
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () =>
+                                  menu.isOpen ? menu.close() : menu.open(),
+                              child: AnimatedContainer(
+                                key: const Key('activity-carrier'),
+                                duration:
+                                    MediaQuery.disableAnimationsOf(context)
+                                    ? Duration.zero
+                                    : const Duration(milliseconds: 180),
+                                curve: Curves.easeOut,
+                                width: _expanded
+                                    ? math.min(
+                                        260,
+                                        MediaQuery.sizeOf(context).width - 48,
+                                      )
+                                    : 44,
+                                height: 44,
+                                clipBehavior: Clip.hardEdge,
+                                decoration: BoxDecoration(
+                                  color: scheme.surfaceContainerHigh,
+                                  borderRadius: BorderRadius.circular(22),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Positioned(
+                                      left: 14,
+                                      width: math.min(
+                                        196,
+                                        MediaQuery.sizeOf(context).width - 112,
+                                      ),
+                                      top: 4,
+                                      bottom: 4,
+                                      child: AnimatedOpacity(
+                                        opacity: _expanded ? 1 : 0,
+                                        duration:
+                                            MediaQuery.disableAnimationsOf(
+                                              context,
+                                            )
+                                            ? Duration.zero
+                                            : const Duration(milliseconds: 80),
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            Text(
+                                              subtitle,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: scheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: 8,
+                                      top: 8,
+                                      width: 28,
+                                      height: 28,
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          CircularProgressIndicator(
+                                            value: progress,
+                                            strokeWidth: 2,
+                                            color: done
+                                                ? Colors.green
+                                                : scheme.primary,
+                                            backgroundColor:
+                                                scheme.outlineVariant,
+                                          ),
+                                          if (done)
+                                            const Icon(
+                                              Icons.check_rounded,
+                                              size: 16,
+                                              color: Colors.green,
+                                            )
+                                          else if (active.length > 1)
+                                            Text(
+                                              '${active.length}',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            )
+                                          else if (hasActive)
+                                            Icon(
+                                              Icons.stop_rounded,
+                                              size: 14,
+                                              color: scheme.primary,
+                                            )
+                                          else
+                                            Icon(
+                                              Icons.more_horiz_rounded,
+                                              size: 16,
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
-              builder: (context, menu, _) => Semantics(
-                button: true,
-                label: 'Show activity, ${active.length} active tasks',
-                child: Tooltip(
-                  message: 'Show activity',
-                  child: GestureDetector(
-                    key: const Key('activity-menu-button'),
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => menu.isOpen ? menu.close() : menu.open(),
-                    child: AnimatedContainer(
-                      key: const Key('activity-carrier'),
-                      duration: MediaQuery.disableAnimationsOf(context)
-                          ? Duration.zero
-                          : const Duration(milliseconds: 180),
-                      curve: Curves.easeOut,
-                      width: _expanded
-                          ? math.min(260, MediaQuery.sizeOf(context).width - 48)
-                          : 44,
-                      height: 44,
-                      clipBehavior: Clip.hardEdge,
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            left: 14,
-                            width: math.min(
-                              196,
-                              MediaQuery.sizeOf(context).width - 112,
-                            ),
-                            top: 4,
-                            bottom: 4,
-                            child: AnimatedOpacity(
-                              opacity: _expanded ? 1 : 0,
-                              duration: MediaQuery.disableAnimationsOf(context)
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 80),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Text(
-                                    subtitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            right: 8,
-                            top: 8,
-                            width: 28,
-                            height: 28,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                CircularProgressIndicator(
-                                  value: progress,
-                                  strokeWidth: 2,
-                                  color: done ? Colors.green : scheme.primary,
-                                  backgroundColor: scheme.outlineVariant,
-                                ),
-                                if (done)
-                                  const Icon(
-                                    Icons.check_rounded,
-                                    size: 16,
-                                    color: Colors.green,
-                                  )
-                                else if (active.length > 1)
-                                  Text(
-                                    '${active.length}',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  )
-                                else if (hasActive)
-                                  Icon(
-                                    Icons.stop_rounded,
-                                    size: 14,
-                                    color: scheme.primary,
-                                  )
-                                else
-                                  Icon(
-                                    Icons.more_horiz_rounded,
-                                    size: 16,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ),
         );
       },
@@ -254,6 +325,9 @@ class _AppDownloadIndicatorState extends State<AppDownloadIndicator> {
 
 class _ActivityAnnouncement {
   bool wasActive = false;
+  String resultKey = '';
+  DateTime? hideAt;
+  bool hidden = false;
 }
 
 class _Activity {

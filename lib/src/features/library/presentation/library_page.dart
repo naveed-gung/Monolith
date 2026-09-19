@@ -853,7 +853,11 @@ class _RecentShelf extends StatelessWidget {
                 width: 132,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(8),
-                  onTap: () => controller.selectTrack(track, openPlayer: true),
+                  onTap: () => controller.selectTrack(
+                    track,
+                    openPlayer: true,
+                    queue: recent,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

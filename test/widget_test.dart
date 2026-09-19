@@ -76,6 +76,28 @@ void main() {
     await work;
     await tester.pumpWidget(const SizedBox());
   });
+  testWidgets('Songs sorted Z to A passes its visible order into playback', (
+    tester,
+  ) async {
+    final controller = await _buildTestController(tester);
+    controller.selectTab(AppTab.songs);
+    await tester.pumpWidget(MonolithApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Sort songs'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Z → A'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Weightless Dreams').first);
+    await tester.pumpAndSettle();
+    expect(controller.currentTrack?.id, 'track-aether');
+    expect(controller.upNextTracks.map((t) => t.id), ['track-luna']);
+    controller.nextTrack();
+    await tester.pumpAndSettle();
+    expect(controller.currentTrack?.id, 'track-luna');
+    await tester.pumpWidget(const SizedBox());
+    controller.dispose();
+  });
+
   testWidgets('Monolith opens on the library page', (tester) async {
     final controller = await _buildTestController(tester);
 

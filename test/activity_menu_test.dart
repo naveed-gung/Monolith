@@ -122,6 +122,55 @@ void main() {
     },
   );
 
+  testWidgets(
+    'finished activity fades after five seconds and stays hidden across tabs',
+    (tester) async {
+      final controller = _Controller()..isImportingAudio = false;
+      final updates = AppUpdateService(ios: true);
+      Widget screen(String name) => AppScope(
+        controller: controller,
+        child: MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                const SizedBox(height: 100),
+                AppDownloadIndicator(
+                  key: ValueKey(name),
+                  updateService: updates,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      final carrier = find.byKey(const Key('activity-carrier'));
+      await tester.pumpWidget(screen('downloads'));
+      expect(tester.getTopLeft(carrier).dy, 116);
+      controller.downloadTasks = controller.downloadTasks
+          .map(
+            (t) =>
+                t.copyWith(status: DownloadTaskStatus.completed, progress: 1),
+          )
+          .toList();
+      controller.notifyListeners();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
+      expect(carrier, findsOneWidget);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(carrier, findsNothing);
+      await tester.pumpWidget(screen('library'));
+      expect(carrier, findsNothing);
+      controller.isImportingAudio = true;
+      controller.notifyListeners();
+      await tester.pump();
+      expect(carrier, findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+      updates.dispose();
+    },
+  );
+
   testWidgets('switching screens does not replay the activity announcement', (
     tester,
   ) async {

@@ -575,7 +575,7 @@ class _QueueTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return InkWell(
-      onTap: () => controller.selectTrack(track, openPlayer: true),
+      onTap: () => controller.selectQueuedTrack(track),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
         child: Row(

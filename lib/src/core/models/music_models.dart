@@ -34,6 +34,7 @@ class Track {
     this.artworkQueryId,
     this.artworkFilePath,
     this.artworkUrl,
+    this.sourceUrl,
     this.playCount = 0,
     this.lastPlayed,
     this.addedAt,
@@ -52,6 +53,7 @@ class Track {
   final int? artworkQueryId;
   final String? artworkFilePath;
   final String? artworkUrl;
+  final String? sourceUrl;
 
   // Smart-playlist metadata (persisted in the manifest; nullable so the const
   // constructor and older manifests both stay valid).
@@ -75,6 +77,7 @@ class Track {
     int? artworkQueryId,
     String? artworkFilePath,
     String? artworkUrl,
+    String? sourceUrl,
     int? playCount,
     DateTime? lastPlayed,
     DateTime? addedAt,
@@ -93,6 +96,7 @@ class Track {
       artworkQueryId: artworkQueryId ?? this.artworkQueryId,
       artworkFilePath: artworkFilePath ?? this.artworkFilePath,
       artworkUrl: artworkUrl ?? this.artworkUrl,
+      sourceUrl: sourceUrl ?? this.sourceUrl,
       playCount: playCount ?? this.playCount,
       lastPlayed: lastPlayed ?? this.lastPlayed,
       addedAt: addedAt ?? this.addedAt,
@@ -114,6 +118,7 @@ class Track {
       'artworkQueryId': artworkQueryId,
       'artworkFilePath': artworkFilePath,
       'artworkUrl': artworkUrl,
+      'sourceUrl': sourceUrl,
       'playCount': playCount,
       'lastPlayedMs': lastPlayed?.millisecondsSinceEpoch,
       'addedAtMs': addedAt?.millisecondsSinceEpoch,
@@ -142,6 +147,7 @@ class Track {
       artworkFilePath:
           (json['artworkFilePath'] ?? json['artworkPath']) as String?,
       artworkUrl: json['artworkUrl'] as String?,
+      sourceUrl: json['sourceUrl'] as String?,
       playCount: json['playCount'] as int? ?? 0,
       lastPlayed: json['lastPlayedMs'] == null
           ? DateTime.tryParse(json['lastPlayedAt'] as String? ?? '')
@@ -312,4 +318,31 @@ class DownloadTaskInfo {
       detailLog: detailLog ?? this.detailLog,
     );
   }
+}
+
+/// One remembered link, most recent attempt first. Kept separately from audio.
+class DownloadHistoryEntry {
+  const DownloadHistoryEntry({required this.title, required this.url});
+  final String title;
+  final String url;
+  Map<String, String> toJson() => {'title': title, 'url': url};
+}
+
+String downloadSourceKey(String url) {
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null) return url.trim();
+  String? id;
+  if (uri.host == 'youtu.be') {
+    id = uri.pathSegments.firstOrNull;
+  } else if (uri.host == 'youtube.com' || uri.host.endsWith('.youtube.com')) {
+    id = uri.queryParameters['v'];
+    if (id == null &&
+        uri.pathSegments.length > 1 &&
+        const ['shorts', 'embed', 'live'].contains(uri.pathSegments.first)) {
+      id = uri.pathSegments[1];
+    }
+  }
+  return id != null && RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(id)
+      ? 'https://www.youtube.com/watch?v=$id'
+      : uri.replace(fragment: '').toString();
 }

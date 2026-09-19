@@ -1,4 +1,5 @@
 import 'update_panel.dart';
+import 'download_history_page.dart';
 import '../../../core/services/app_update_service.dart';
 
 import 'package:flutter/material.dart';
@@ -328,6 +329,17 @@ class SettingsPage extends StatelessWidget {
                         Navigator.of(context).pop();
                         controller.openPlayer();
                       },
+                    ),
+                    _Divider(),
+                    _ActionRow(
+                      icon: AppIcons.refresh,
+                      title: 'Download history',
+                      subtitle: 'Saved links · download again or clear history',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const DownloadHistoryPage(),
+                        ),
+                      ),
                     ),
                     _Divider(),
                     _ActionRow(

@@ -105,25 +105,20 @@ class _SearchPageState extends State<SearchPage> {
                     fillColor: scheme.surfaceContainerLow,
                     border: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color:
-                            scheme.outlineVariant.withValues(alpha: 0.5),
+                        color: scheme.outlineVariant.withValues(alpha: 0.5),
                         width: 0.5,
                       ),
                       borderRadius: AppRadii.all(AppRadii.md),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(
-                        color:
-                            scheme.outlineVariant.withValues(alpha: 0.5),
+                        color: scheme.outlineVariant.withValues(alpha: 0.5),
                         width: 0.5,
                       ),
                       borderRadius: AppRadii.all(AppRadii.md),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: scheme.primary,
-                        width: 1.5,
-                      ),
+                      borderSide: BorderSide(color: scheme.primary, width: 1.5),
                       borderRadius: AppRadii.all(AppRadii.md),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
@@ -192,40 +187,41 @@ class _RecentSliver extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Text(
-                'Recent',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: AppType.title,
-                  letterSpacing: AppType.trackSnug,
-                ),
+      delegate: SliverChildBuilderDelegate((context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: Text(
+              'Recent',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: AppType.title,
+                letterSpacing: AppType.trackSnug,
               ),
-            );
-          }
-          final track = tracks[index - 1];
-          final isLast = index == tracks.length;
-          final controller = AppScope.read(context);
-          return Column(
-            children: [
-              _SearchTile(
-                track: track,
-                onTap: () => controller.selectTrack(track, openPlayer: true),
-              ),
-              if (!isLast)
-                Divider(
-                  height: 1,
-                  indent: 72,
-                  color: scheme.outlineVariant.withValues(alpha: 0.35),
-                ),
-            ],
+            ),
           );
-        },
-        childCount: tracks.length + 1,
-      ),
+        }
+        final track = tracks[index - 1];
+        final isLast = index == tracks.length;
+        final controller = AppScope.read(context);
+        return Column(
+          children: [
+            _SearchTile(
+              track: track,
+              onTap: () => controller.selectTrack(
+                track,
+                openPlayer: true,
+                queue: tracks,
+              ),
+            ),
+            if (!isLast)
+              Divider(
+                height: 1,
+                indent: 72,
+                color: scheme.outlineVariant.withValues(alpha: 0.35),
+              ),
+          ],
+        );
+      }, childCount: tracks.length + 1),
     );
   }
 }
@@ -240,40 +236,41 @@ class _ResultsSliver extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Text(
-                '${tracks.length} result${tracks.length == 1 ? '' : 's'}',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: AppType.title,
-                  letterSpacing: AppType.trackSnug,
-                ),
+      delegate: SliverChildBuilderDelegate((context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: Text(
+              '${tracks.length} result${tracks.length == 1 ? '' : 's'}',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: AppType.title,
+                letterSpacing: AppType.trackSnug,
               ),
-            );
-          }
-          final track = tracks[index - 1];
-          final isLast = index == tracks.length;
-          final controller = AppScope.read(context);
-          return Column(
-            children: [
-              _SearchTile(
-                track: track,
-                onTap: () => controller.selectTrack(track, openPlayer: true),
-              ),
-              if (!isLast)
-                Divider(
-                  height: 1,
-                  indent: 72,
-                  color: scheme.outlineVariant.withValues(alpha: 0.35),
-                ),
-            ],
+            ),
           );
-        },
-        childCount: tracks.length + 1,
-      ),
+        }
+        final track = tracks[index - 1];
+        final isLast = index == tracks.length;
+        final controller = AppScope.read(context);
+        return Column(
+          children: [
+            _SearchTile(
+              track: track,
+              onTap: () => controller.selectTrack(
+                track,
+                openPlayer: true,
+                queue: tracks,
+              ),
+            ),
+            if (!isLast)
+              Divider(
+                height: 1,
+                indent: 72,
+                color: scheme.outlineVariant.withValues(alpha: 0.35),
+              ),
+          ],
+        );
+      }, childCount: tracks.length + 1),
     );
   }
 }
@@ -285,7 +282,6 @@ class _SearchTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = AppScope.read(context);
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -315,7 +311,9 @@ class _SearchTile extends StatelessWidget {
                     track.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyLarge?.copyWith(fontWeight: AppType.body),
+                    style: textTheme.bodyLarge?.copyWith(
+                      fontWeight: AppType.body,
+                    ),
                   ),
                   Text(
                     '${track.artist} • ${track.album}',
@@ -329,8 +327,7 @@ class _SearchTile extends StatelessWidget {
               ),
             ),
             IconButton(
-              onPressed: () =>
-                  controller.selectTrack(track, openPlayer: true),
+              onPressed: onTap,
               icon: PhosphorIcon(
                 AppIcons.playCircle,
                 size: 26,

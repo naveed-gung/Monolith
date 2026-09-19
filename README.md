@@ -18,6 +18,9 @@ Six actual Pixel 10a emulator captures with the current coral accent, alternatin
 
 ## Your collection
 
+- Settings → **Download history** remembers song names and links. Clear history without deleting music, or use **Get anyway** to safely replace a saved copy.
+- Playback follows the displayed song order. Completed activity fades after five seconds.
+
 - Import readable songs from the iOS Music picker, import the accessible local Music library in one batch, or choose audio files from Files. Failed items retain their individual reasons.
 - Browse songs, artists, albums, playlists, and recent additions.
 - Open the activity dropdown below the header to inspect concurrent transfers and stop individual jobs.

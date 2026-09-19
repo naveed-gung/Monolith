@@ -388,8 +388,11 @@ class _DownloadsPageState extends State<DownloadsPage>
                   children: [
                     _OfflineTrackRow(
                       track: track,
-                      onTap: () =>
-                          controller.selectTrack(track, openPlayer: true),
+                      onTap: () => controller.selectTrack(
+                        track,
+                        openPlayer: true,
+                        queue: filtered,
+                      ),
                     ),
                     if (!isLast)
                       Divider(

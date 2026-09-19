@@ -458,6 +458,7 @@ class _SongsPageState extends State<SongsPage> {
                             if (shuffled.isNotEmpty) {
                               controller.selectTrack(
                                 shuffled.first,
+                                queue: shuffled,
                                 autoplay: true,
                                 openPlayer: true,
                               );
@@ -532,111 +533,109 @@ class _SongsPageState extends State<SongsPage> {
                 180,
               ),
               sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final track = tracks[index];
-                    final isCurrent = controller.currentTrack?.id == track.id;
-                    final isPlaying = isCurrent && controller.isPlaying;
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final track = tracks[index];
+                  final isCurrent = controller.currentTrack?.id == track.id;
+                  final isPlaying = isCurrent && controller.isPlaying;
 
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: InkWell(
-                        onTap: () {
-                          controller.hapticLight();
-                          controller.selectTrack(
-                            track,
-                            autoplay: true,
-                            openPlayer: false,
-                          );
-                        },
-                        borderRadius: AppRadii.all(AppRadii.md),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: AppSpacing.sm,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isCurrent
-                                ? scheme.primary.withValues(alpha: 0.12)
-                                : Colors.transparent,
-                            borderRadius: AppRadii.all(AppRadii.md),
-                          ),
-                          child: Row(
-                            children: [
-                              Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  SizedBox(
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: InkWell(
+                      onTap: () {
+                        controller.hapticLight();
+                        controller.selectTrack(
+                          track,
+                          queue: tracks,
+                          autoplay: true,
+                          openPlayer: false,
+                        );
+                      },
+                      borderRadius: AppRadii.all(AppRadii.md),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: AppSpacing.sm,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isCurrent
+                              ? scheme.primary.withValues(alpha: 0.12)
+                              : Colors.transparent,
+                          borderRadius: AppRadii.all(AppRadii.md),
+                        ),
+                        child: Row(
+                          children: [
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 48,
+                                  height: 48,
+                                  child: TrackArtwork(
+                                    track: track,
+                                    borderRadius: AppRadii.all(AppRadii.sm),
+                                  ),
+                                ),
+                                if (isPlaying)
+                                  Container(
                                     width: 48,
                                     height: 48,
-                                    child: TrackArtwork(
-                                      track: track,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black45,
                                       borderRadius: AppRadii.all(AppRadii.sm),
                                     ),
-                                  ),
-                                  if (isPlaying)
-                                    Container(
-                                      width: 48,
-                                      height: 48,
-                                      decoration: BoxDecoration(
-                                        color: Colors.black45,
-                                        borderRadius: AppRadii.all(AppRadii.sm),
-                                      ),
-                                      child: Center(
-                                        child: PhosphorIcon(
-                                          PhosphorIcons.speakerHigh(
-                                            PhosphorIconsStyle.fill,
-                                          ),
-                                          size: 20,
-                                          color: Colors.white,
+                                    child: Center(
+                                      child: PhosphorIcon(
+                                        PhosphorIcons.speakerHigh(
+                                          PhosphorIconsStyle.fill,
                                         ),
+                                        size: 20,
+                                        color: Colors.white,
                                       ),
                                     ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    track.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: textTheme.bodyLarge?.copyWith(
+                                      fontWeight: isCurrent
+                                          ? FontWeight.bold
+                                          : AppType.body,
+                                      color: isCurrent
+                                          ? scheme.primary
+                                          : scheme.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${track.artist} · ${_formatDuration(track.duration)}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(width: AppSpacing.md),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      track.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: textTheme.bodyLarge?.copyWith(
-                                        fontWeight: isCurrent
-                                            ? FontWeight.bold
-                                            : AppType.body,
-                                        color: isCurrent
-                                            ? scheme.primary
-                                            : scheme.onSurface,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${track.artist} · ${_formatDuration(track.duration)}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: scheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                icon: PhosphorIcon(AppIcons.more, size: 20),
-                                color: scheme.onSurfaceVariant,
-                                onPressed: () => _openMenu(track, controller),
-                              ),
-                            ],
-                          ),
+                            ),
+                            IconButton(
+                              icon: PhosphorIcon(AppIcons.more, size: 20),
+                              color: scheme.onSurfaceVariant,
+                              onPressed: () => _openMenu(track, controller),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  },
-                  childCount: tracks.length,
-                ),
+                    ),
+                  );
+                }, childCount: tracks.length),
               ),
             ),
         ],

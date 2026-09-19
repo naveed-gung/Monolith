@@ -2,6 +2,17 @@
 
 All notable changes to Monolith are documented here.
 
+## Unreleased — 2026-09-19
+
+| Before | After |
+| --- | --- |
+| Activity touched the Add button and stayed visible after completion | 16px separation; settled activity fades out after five seconds and stays hidden when changing tabs |
+| Download links were lost after removing a song | Clearable Settings → Download history remembers names and links; existing songs require Cancel / Get anyway confirmation |
+| Getting a fresh copy needed manual deletion | Get anyway keeps the old audio until a valid new copy is saved, then removes the old file |
+| Sorted Songs taps, search results, and other lists used the default queue | Playback follows the displayed collection; Up Next selections preserve that queue |
+
+The standard iOS Lock Screen controls belong to iOS. Monolith cannot add custom shuffle/repeat buttons to that card using its supported media APIs; in-app controls remain available.
+
 ## [1.4.4] — 2026-09-10
 
 ### Fixed & Reliability

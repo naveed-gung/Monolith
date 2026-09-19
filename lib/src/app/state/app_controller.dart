@@ -37,6 +37,7 @@ class MonolithController extends ChangeNotifier {
   static const _kSeenImportPrompt = 'pref_seen_import_prompt';
   static const _kRepeat = 'pref_repeat';
   static const _kPlaylists = 'pref_playlists_v1';
+  static const _kDownloadHistory = 'download_history_v1';
 
   MonolithController({
     LocalMediaService? localMediaService,
@@ -90,6 +91,100 @@ class MonolithController extends ChangeNotifier {
   List<ImportedItemResult> get importFailures =>
       List.unmodifiable(_importFailures);
   SharedPreferences? _prefs;
+  List<DownloadHistoryEntry> _downloadHistory = [];
+  List<DownloadHistoryEntry> get downloadHistory =>
+      List.unmodifiable(_downloadHistory);
+  final Map<String, String> _replacementTrackIds = {};
+  final Set<String> _historyRequests = {};
+
+  String? _trackSourceUrl(Track track) {
+    if (track.source != TrackSource.downloaded) return null;
+    if (track.sourceUrl != null) return track.sourceUrl;
+    // Older manifests kept the source's YouTube artwork URL, but not its link.
+    final artwork = Uri.tryParse(track.artworkUrl ?? '');
+    if (artwork?.host == 'i.ytimg.com' &&
+        artwork!.pathSegments.length >= 2 &&
+        const ['vi', 'vi_webp'].contains(artwork.pathSegments.first) &&
+        RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(artwork.pathSegments[1])) {
+      return 'https://www.youtube.com/watch?v=${artwork.pathSegments[1]}';
+    }
+    return null;
+  }
+
+  Future<Track?> downloadedTrackForUrl(String url) async {
+    final key = downloadSourceKey(url);
+    for (final track in _downloadedTracks) {
+      final source = _trackSourceUrl(track);
+      if (source == null || downloadSourceKey(source) != key) continue;
+      final path = await _downloadStore.resolveTrackPath(track.filePath);
+      if (path != null && await File(path).exists()) return track;
+    }
+    return null;
+  }
+
+  Future<void> _historyWrite = Future<void>.value();
+  Future<void> _saveDownloadHistory(List<DownloadHistoryEntry> entries) async {
+    final previous = _downloadHistory;
+    _downloadHistory = entries;
+    final write = _historyWrite.catchError((Object _) {}).then((_) async {
+      final prefs = _prefs ??= await SharedPreferences.getInstance();
+      if (!await prefs.setString(
+        _kDownloadHistory,
+        jsonEncode(entries.map((e) => e.toJson()).toList()),
+      )) {
+        throw StateError('Could not save download history.');
+      }
+    });
+    _historyWrite = write;
+    try {
+      await write;
+    } catch (_) {
+      if (identical(_downloadHistory, entries)) _downloadHistory = previous;
+      rethrow;
+    } finally {
+      if (!_isDisposed) notifyListeners();
+    }
+  }
+
+  Future<void> clearDownloadHistory() => _saveDownloadHistory([]);
+
+  Future<void> redownloadHistoryEntry(
+    DownloadHistoryEntry entry, {
+    bool replaceExisting = false,
+  }) async {
+    final key = downloadSourceKey(entry.url);
+    if (!_historyRequests.add(key)) {
+      throw StateError('This song is already being prepared.');
+    }
+    try {
+      if (_downloadTasks.any(
+        (t) =>
+            downloadSourceKey(t.url) == key &&
+            (t.isActive || t.status == DownloadTaskStatus.paused),
+      )) {
+        throw StateError('This song already has a download in progress.');
+      }
+      final existing = await downloadedTrackForUrl(entry.url);
+      if (existing != null && !replaceExisting) {
+        throw StateError('You already have this song.');
+      }
+      final knownTrack =
+          existing ??
+          _downloadedTracks.where((track) {
+            final source = _trackSourceUrl(track);
+            return source != null && downloadSourceKey(source) == key;
+          }).firstOrNull;
+      await _checkConnectivity();
+      final preview = await inspectDownload(entry.url);
+      await startAudioDownload(
+        preview: preview,
+        fileName: preview.suggestedFileName,
+        replaceTrackId: knownTrack?.id,
+      );
+    } finally {
+      _historyRequests.remove(key);
+    }
+  }
 
   late final StreamSubscription<PlayerState> _playerStateSubscription;
   late final StreamSubscription<Duration> _playerPositionSubscription;
@@ -469,6 +564,13 @@ class MonolithController extends ChangeNotifier {
     unawaited(
       _activateTrackIndex(index, openPlayer: openPlayer, autoplay: autoplay),
     );
+  }
+
+  void selectQueuedTrack(Track track) {
+    final index = tracks.indexWhere((t) => t.id == track.id);
+    if (index >= 0) {
+      unawaited(_activateTrackIndex(index, openPlayer: true, autoplay: true));
+    }
   }
 
   void openPlayer() {
@@ -1104,6 +1206,7 @@ class MonolithController extends ChangeNotifier {
   Future<void> startAudioDownload({
     required DownloadPreview preview,
     required String fileName,
+    String? replaceTrackId,
   }) async {
     await _checkConnectivity();
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
@@ -1113,22 +1216,23 @@ class MonolithController extends ChangeNotifier {
       fileName.trim().isEmpty ? preview.suggestedFileName : fileName.trim(),
     );
     final processId = 'audio_${DateTime.now().microsecondsSinceEpoch}';
+    if (replaceTrackId != null) {
+      _replacementTrackIds[processId] = replaceTrackId;
+    }
 
-    unawaited(
-      _runQueuedDownload(
-        DownloadTaskInfo(
-          processId: processId,
-          url: preview.url,
-          title: preview.title,
-          fileName: sanitizedName,
-          uploader: preview.uploader,
-          thumbnailUrl: preview.thumbnailUrl,
-          status: DownloadTaskStatus.ready,
-          mediaDuration: preview.duration,
-          totalBytes: preview.estimatedSizeBytes,
-        ),
-      ),
+    final task = DownloadTaskInfo(
+      processId: processId,
+      url: preview.url,
+      title: preview.title,
+      fileName: sanitizedName,
+      uploader: preview.uploader,
+      thumbnailUrl: preview.thumbnailUrl,
+      status: DownloadTaskStatus.ready,
+      mediaDuration: preview.duration,
+      totalBytes: preview.estimatedSizeBytes,
     );
+    _upsertDownloadTask(task);
+    unawaited(_runQueuedDownload(task));
   }
 
   Future<void> _runQueuedDownload(DownloadTaskInfo task) async {
@@ -1248,6 +1352,16 @@ class MonolithController extends ChangeNotifier {
     _fatalDownloadErrors.remove(task.processId);
     _upsertDownloadTask(task);
 
+    try {
+      final key = downloadSourceKey(task.url);
+      await _saveDownloadHistory([
+        DownloadHistoryEntry(title: task.title, url: task.url),
+        ..._downloadHistory.where((e) => downloadSourceKey(e.url) != key),
+      ]);
+    } catch (_) {
+      _libraryError =
+          'Download history could not be saved. Check available storage.';
+    }
     await _ensureDownloaderReady();
     if (_cancelledDownloadIds.contains(task.processId)) return;
     final outputDirectory = await _downloadStore.getDownloadDirectory();
@@ -1316,8 +1430,17 @@ class MonolithController extends ChangeNotifier {
     final artworkFilePath = await _downloadStore.findArtworkForAudio(
       result.outputPath!,
     );
+    final replacementId = _replacementTrackIds[task.processId];
+    final oldTrack = _downloadedTracks
+        .where(
+          (t) => t.id == replacementId && t.source == TrackSource.downloaded,
+        )
+        .firstOrNull;
     final track = Track(
-      id: 'download-${task.processId}',
+      id: oldTrack?.id ?? 'download-${task.processId}',
+      sourceUrl: task.url,
+      playCount: oldTrack?.playCount ?? 0,
+      lastPlayed: oldTrack?.lastPlayed,
       title: preview.title,
       artist: preview.uploader ?? 'Unknown source',
       album: 'Downloads',
@@ -1333,16 +1456,22 @@ class MonolithController extends ChangeNotifier {
       addedAt: DateTime.now(),
     );
 
-    _downloadedTracks = [
+    final nextTracks = [
       track,
       ..._downloadedTracks.where(
-        (existing) => existing.filePath != track.filePath,
+        (existing) =>
+            existing.filePath != track.filePath && existing.id != oldTrack?.id,
       ),
     ];
     _fatalDownloadErrors.remove(task.processId);
-    await _downloadStore.saveTracks(_downloadedTracks);
+    await _downloadStore.saveTracks(nextTracks);
+    _downloadedTracks = nextTracks;
     await _localMediaService.scanMedia(result.outputPath!);
 
+    final replacingCurrent =
+        oldTrack != null && currentTrack?.id == oldTrack.id;
+    final wasPlaying = _audioPlayer.playing;
+    final resumePosition = _currentPosition;
     _rebuildTracks(preferredTrackId: currentTrack?.id ?? track.id);
 
     // INVARIANT: the download path has ZERO lyric dependency. Lyrics (.lrc
@@ -1353,8 +1482,23 @@ class MonolithController extends ChangeNotifier {
     // fail or delay the audio. See test/lyrics_download_independence_test.dart
     // and TASK C in MONOLITH_1.0.4.
 
-    // Initialize an empty player; keep an existing source and listening position.
-    await _syncSelectedTrack(autoplay: false);
+    // Replace only after the new audio and manifest are safe; retain queue IDs.
+    if (replacingCurrent) _loadedTrackId = null;
+    await _syncSelectedTrack(autoplay: replacingCurrent && wasPlaying);
+    if (replacingCurrent && currentTrack?.id == track.id) {
+      await _audioPlayer.seek(
+        resumePosition > currentTrackDuration ? Duration.zero : resumePosition,
+      );
+    }
+    if (oldTrack != null && oldTrack.filePath != track.filePath) {
+      try {
+        await _downloadStore.deleteArtifactsForTrack(oldTrack);
+      } catch (_) {
+        _libraryError =
+            'The new copy is saved, but the old file could not be removed.';
+      }
+    }
+    _replacementTrackIds.remove(task.processId);
 
     _upsertDownloadTask(
       _downloadTaskById(task.processId).copyWith(
@@ -1475,12 +1619,51 @@ class MonolithController extends ChangeNotifier {
     await _loadPrefs();
     await _configureAudioSession();
     await refreshLibrary();
+    if (!_prefs!.containsKey(_kDownloadHistory)) {
+      final recovered = <String, DownloadHistoryEntry>{};
+      for (final track in _downloadedTracks) {
+        final url = _trackSourceUrl(track);
+        if (url != null) {
+          recovered.putIfAbsent(
+            downloadSourceKey(url),
+            () => DownloadHistoryEntry(title: track.title, url: url),
+          );
+        }
+      }
+      try {
+        await _saveDownloadHistory(recovered.values.toList());
+      } catch (_) {
+        _libraryError = 'Download history could not be saved.';
+      }
+    }
     await _initializeDownloader();
   }
 
   Future<void> _loadPrefs() async {
     _prefs = await SharedPreferences.getInstance();
     final p = _prefs!;
+    try {
+      final decoded = jsonDecode(p.getString(_kDownloadHistory) ?? '[]');
+      if (decoded is List) {
+        _downloadHistory = [
+          for (final entry in decoded)
+            if (entry is Map &&
+                entry['title'] is String &&
+                entry['url'] is String &&
+                const [
+                  'https',
+                  'http',
+                ].contains(Uri.tryParse(entry['url'] as String)?.scheme))
+              DownloadHistoryEntry(
+                title: entry['title'] as String,
+                url: entry['url'] as String,
+              ),
+        ];
+      }
+    } on FormatException {
+      /* A damaged history must not block the library. */
+    }
+
     final savedPlaylists = p.getString(_kPlaylists);
     if (savedPlaylists != null) {
       try {

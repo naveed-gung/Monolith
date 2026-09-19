@@ -1,5 +1,6 @@
 import 'package:monolith/data/platform_channels/media_import_channel.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -94,6 +95,8 @@ class _Store extends DownloadStore {
   @override
   Future<Directory> getDownloadDirectory() async => root;
   @override
+  Future<String?> resolveTrackPath(String? saved) async => saved;
+  @override
   Future<Map<Object?, Object?>> readAudioMetadata(String path) async => {};
 }
 
@@ -129,6 +132,10 @@ class _Downloader implements MediaDownloader {
   }
 
   @override
+  Future<VideoInfo> getVideoInfo(String url) async =>
+      VideoInfo(title: 'Fresh song', duration: 84);
+
+  @override
   Future<bool> cancelDownload(String processId) async => false; // Provider still resolving metadata.
   @override
   void dispose() {
@@ -143,6 +150,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory root;
   late _Player player;
+  late _Store store;
   late _Downloader downloader;
   late MonolithController controller;
   setUp(() async {
@@ -175,7 +183,7 @@ void main() {
     downloader = _Downloader();
     controller = MonolithController(
       audioPlayer: player,
-      downloadStore: _Store(root, [
+      downloadStore: store = _Store(root, [
         track,
         track.copyWith(
           id: 'second',
@@ -197,6 +205,155 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     await root.delete(recursive: true);
   });
+  test(
+    'displayed queue BCAD plays C then A then D; Up Next keeps that queue',
+    () async {
+      final seed = controller.tracks.first;
+      store.tracks = [
+        for (final id in ['a', 'b', 'c', 'd']) seed.copyWith(id: id, title: id),
+      ];
+      await controller.refreshLibrary();
+      final order = [
+        for (final id in ['b', 'c', 'a', 'd'])
+          controller.tracks.firstWhere((t) => t.id == id),
+      ];
+      controller.selectTrack(order[1], queue: order, autoplay: false);
+      expect(controller.upNextTracks.map((t) => t.id), ['a', 'd']);
+      controller.selectQueuedTrack(order[2]);
+      expect(controller.upNextTracks.map((t) => t.id), ['d']);
+      controller.previousTrack();
+      expect(controller.currentTrack?.id, 'c');
+      controller.nextTrack();
+      expect(controller.currentTrack?.id, 'a');
+      controller.nextTrack();
+      expect(controller.currentTrack?.id, 'd');
+      expect(controller.upNextTracks, isEmpty);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+    },
+  );
+
+  test(
+    'history persists links, normalizes duplicates, and clearing does not delete audio',
+    () async {
+      const url = 'https://youtu.be/jNQXAC9IVRw';
+      await controller.startAudioDownload(
+        preview: const DownloadPreview(
+          url: url,
+          title: 'Remember me',
+          suggestedFileName: 'song',
+        ),
+        fileName: 'song',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(controller.downloadHistory.single.title, 'Remember me');
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        (jsonDecode(prefs.getString('download_history_v1')!) as List)
+            .single['url'],
+        url,
+      );
+      final restarted = MonolithController(
+        audioPlayer: _Player(),
+        downloadStore: store,
+        localMediaService: _Media(),
+        mediaDownloader: _Downloader(),
+      );
+      await restarted.whenReady;
+      expect(restarted.downloadHistory.single.url, url);
+      await restarted.clearDownloadHistory();
+      restarted.dispose();
+      expect(prefs.getString('download_history_v1'), '[]');
+      expect(await File(controller.tracks.first.filePath!).exists(), isTrue);
+      expect(
+        downloadSourceKey(url),
+        downloadSourceKey(
+          'https://www.youtube.com/watch?v=jNQXAC9IVRw&list=ignored',
+        ),
+      );
+    },
+  );
+
+  test(
+    'history repairs a missing audio file without duplicating its library entry',
+    () async {
+      const url = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
+      final original = controller.tracks.first.copyWith(
+        id: 'missing',
+        source: TrackSource.downloaded,
+        sourceUrl: url,
+      );
+      store.tracks = [original];
+      await controller.refreshLibrary();
+      await File(original.filePath!).delete();
+      expect(await controller.downloadedTrackForUrl(url), isNull);
+      await controller.redownloadHistoryEntry(
+        const DownloadHistoryEntry(title: 'Missing', url: url),
+      );
+      final fresh = File('${root.path}/repaired.m4a')
+        ..writeAsBytesSync([1, 2, 3]);
+      downloader.result.complete(
+        DownloadResult(status: OperationStatus.success, outputPath: fresh.path),
+      );
+      for (
+        var i = 0;
+        i < 100 && controller.downloadTasks.any((t) => t.isActive);
+        i++
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(controller.downloadedTracks.single.id, original.id);
+      expect(controller.downloadedTracks.single.filePath, fresh.path);
+    },
+  );
+
+  for (final succeeds in [false, true]) {
+    test(
+      'history replacement preserves old audio until valid success ($succeeds)',
+      () async {
+        const url = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
+        final original = controller.tracks.first.copyWith(
+          id: 'saved',
+          source: TrackSource.downloaded,
+          sourceUrl: url,
+        );
+        store.tracks = [original];
+        await controller.refreshLibrary();
+        const entry = DownloadHistoryEntry(title: 'Saved', url: url);
+        await expectLater(
+          controller.redownloadHistoryEntry(entry),
+          throwsStateError,
+        );
+        expect(downloader.processId, isNull);
+        await controller.redownloadHistoryEntry(entry, replaceExisting: true);
+        expect(await File(original.filePath!).exists(), isTrue);
+        final fresh = File('${root.path}/fresh.m4a')
+          ..writeAsBytesSync([1, 2, 3]);
+        downloader.result.complete(
+          DownloadResult(
+            status: succeeds ? OperationStatus.success : OperationStatus.error,
+            outputPath: succeeds ? fresh.path : null,
+            errorMessage: succeeds ? null : 'Source unavailable',
+          ),
+        );
+        for (
+          var i = 0;
+          i < 100 && controller.downloadTasks.any((t) => t.isActive);
+          i++
+        ) {
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+        expect(await File(original.filePath!).exists(), !succeeds);
+        expect(controller.downloadedTracks.single.id, original.id);
+        expect(
+          controller.downloadedTracks.single.filePath,
+          succeeds ? fresh.path : original.filePath,
+        );
+        expect(controller.downloadedTracks.single.sourceUrl, url);
+        expect(controller.downloadHistory.single.url, url);
+      },
+    );
+  }
+
   test(
     'repeat defaults off and remembers each explicit choice on restart',
     () async {

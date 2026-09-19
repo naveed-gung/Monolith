@@ -11,4 +11,4 @@ verified-by: claude-code
 
 | Date | Agent | Work | Commit |
 |------|-------|------|--------|
-| 2026-09-19 | claude-code | Reviewed and shipped the download-history / playback-order batch (16 changes); analyze clean for lib+test, 27 targeted tests green; scaffolded this KB and seeded TASK-01..05 | uncommitted |
+| 2026-09-19 | claude-code | Reviewed and shipped the download-history / playback-order batch (16 changes); analyze clean for lib+test, 27 targeted tests green; scaffolded this KB and seeded TASK-01..05 | bd83488 |

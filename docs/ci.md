@@ -39,11 +39,21 @@ the icon tree-shaker rejects). The Android job passes the same flag, plus
 **debug keystore** (`android/app/build.gradle.kts` →
 `release { signingConfig = signingConfigs.getByName("debug") }`) — fine for a
 sideloaded build, and we never commit a real release key (see `SECURITY.md`).
-The Linux runner has no debug keystore, so the workflow generates one with
-`keytool` before building; that means **every CI build is signed with a
-different throwaway key** and Android will refuse an in-place upgrade over a
-previously installed APK. Uninstall first, or move to a real, secret-stored
-release key if seamless updates ever matter.
+That signing key is **not a key this project owns**. `android.yml` runs
+`keytool -genkey` when the runner has no `~/.android/debug.keystore`, and nothing
+caches that file between runs, so the certificate is whatever the ephemeral
+runner happened to hold — it can change when GitHub rebuilds its runner image,
+and it differs from the debug keystore on the Windows dev machine. Android
+refuses to install an APK over an installed app signed by a different
+certificate, so a sideloaded upgrade can fail with "App not installed" and force
+an uninstall (losing app data). Check before assuming an upgrade will work:
+
+```sh
+keytool -printcert -jarfile monolith.apk   # compare the SHA-256 between releases
+```
+
+Tracked as TASK-07 in `docs/agent/01-roadmap.md` — the fix is a real release key
+held in repository secrets.
 
 ## Dependabot — disabled on purpose
 

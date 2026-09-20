@@ -135,14 +135,21 @@ instead of silently clobbering. Revert = restore the previous two steps.
 ### TASK-07 Android CI signs every build with a throwaway key
 Priority: P1 · Effort: M · Depends: — · Files: `.github/workflows/android.yml`, `android/app/build.gradle.kts`
 
-**Why**: `release { signingConfig = signingConfigs.getByName("debug") }` and the Linux
-runner has no debug keystore, so `android.yml` runs `keytool -genkey` to create one on
-every run. `keytool` generates fresh key material each time, and nothing caches
-`~/.android`, so **each release APK is signed by a different certificate**. Android
-refuses to install an APK over an installed app with a different signer, so sideloaded
-upgrades fail with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` / "App not installed" and the
-in-app updater (`AppUpdateService`, which downloads the release APK) cannot complete an
-update — the user must uninstall first, losing app data.
+**Why**: `android/app/build.gradle.kts` has
+`release { signingConfig = signingConfigs.getByName("debug") }`, and `android.yml`
+creates that debug keystore on the runner with `keytool -genkey` whenever
+`~/.android/debug.keystore` is absent. Nothing caches `~/.android` between runs, so the
+release APK is signed by **whatever certificate that ephemeral runner held** — freshly
+generated when the image has none, and free to change whenever GitHub rebuilds the runner
+image. It is also not the Windows dev machine's debug key. Android refuses to install
+over an app signed by a different certificate, so a sideloaded upgrade can fail with
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE` / "App not installed" and the in-app updater
+(`AppUpdateService`, which downloads the release APK) cannot complete — the user has to
+uninstall first and loses app data.
+
+**Not yet measured**: the signer SHA-256 of the published `v1.4.3` and `v1.4.4` APKs was
+not compared — the release downloads stalled on 2026-09-20. Do that first; it decides
+whether this is already breaking users or only a latent risk.
 
 **Acceptance criteria**:
 - [ ] every future release APK is signed by one stable certificate

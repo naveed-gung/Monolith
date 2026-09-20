@@ -3,7 +3,7 @@ touched anything related, bump last-verified, and append to SESSIONS.md.
 Rules: docs/agent/PROTOCOL.md -->
 ---
 doc: 01-roadmap
-last-verified: 2026-09-19
+last-verified: 2026-09-20
 verified-by: claude-code
 ---
 
@@ -16,10 +16,14 @@ task below came from reading the code or running the tooling — no filler.
 
 | ID | Title | Priority | Effort | Status | Last touched |
 |----|-------|----------|--------|--------|--------------|
+| TASK-07 | Android CI signs every build with a throwaway key | P1 | M | TODO | 2026-09-20 |
 | TASK-01 | Exclude probe directories from `flutter analyze` | P2 | S | TODO | 2026-09-19 |
 | TASK-02 | Cap the persisted download history | P2 | S | TODO | 2026-09-19 |
+| TASK-08 | `v1.4.4` release assets no longer match the `v1.4.4` tag | P2 | S | BLOCKED | 2026-09-20 |
 | TASK-03 | Recover source links for pre-`sourceUrl` downloads | P3 | M | TODO | 2026-09-19 |
-| TASK-04 | Add `android.yml` CI | P3 | M | DROPPED | 2026-09-19 |
+| TASK-09 | Version string is duplicated across four files | P3 | S | TODO | 2026-09-20 |
+| TASK-04 | `android.yml` CI | P3 | M | DONE | 2026-09-20 |
+| TASK-06 | Publish releases only from a `v*` tag | P1 | S | DONE | 2026-09-20 |
 | TASK-05 | Custom shuffle/repeat on the iOS Lock Screen | P3 | M | DROPPED | 2026-09-19 |
 
 ## Tasks
@@ -91,15 +95,116 @@ history.
 **Verification**: targeted unit tests around `_trackSourceUrl`; manual check on device.
 **Risks/rollback**: a bad heuristic maps a track to someone else's video. Keep the strict 11-character id check.
 
-### TASK-04 Add `android.yml` CI
-Priority: P3 · Effort: M · Depends: — · Files: `.github/workflows/`
+### TASK-04 `android.yml` CI
+Priority: P3 · Effort: M · Depends: — · Files: `.github/workflows/android.yml`
 
-**Why**: an Android workflow was added during the 1.0.4 batch and removed again by the
-owner — CI is iOS-only, APKs are built locally on Windows and uploaded with
-`gh release upload`.
+**CORRECTION (2026-09-20)**: this task was seeded DROPPED on a stale fact. The removal
+(`0c06f8b revert: remove Android CI`) was reverted by the owner in
+`39a2654 ci: enable auto-build on push for iOS and Android workflows`. `android.yml` has
+been tracked and green ever since — `gh run list` shows Android runs succeeding for every
+release from 1.4.0 to the 2026-09-19 main push (run `35466858492`, 8m54s, success).
+Nothing to build; the task is DONE and kept only so the wrong note is not re-derived.
 
-**Dropped**: do not re-add an Android workflow. Raise it with the owner first if the
-build story changes.
+**Current shape**: `ubuntu-latest`, JDK 17 temurin, `flutter build apk --release
+--no-tree-shake-icons --android-skip-build-dependency-validation`, ABI `arm64-v8a`,
+artifact + release asset `monolith.apk`. Signing weakness tracked as TASK-07.
+
+### TASK-06 Publish releases only from a `v*` tag
+Priority: P1 · Effort: S · Depends: — · Files: `.github/workflows/ios.yml`, `.github/workflows/android.yml`
+
+**Why**: both workflows trigger on pushes to `main` as well as on `v*` tags, and the
+`Extract app version` step derived the release tag from `pubspec.yaml` whenever the ref
+was not a tag. A push to `main` without a version bump therefore resolved to the
+*already published* tag and `softprops/action-gh-release` replaced that release's assets
+in place. This happened on 2026-09-19: the `v1.4.4` release (published 2026-09-10) had
+its `monolith.ipa` and `monolith.apk` overwritten at 20:20 and 20:24 UTC with binaries
+built from unreleased `main`.
+
+**Done 2026-09-20**: `Extract app version` replaced with `Resolve release tag`, which
+publishes only for `refs/tags/v*` or an explicit `workflow_dispatch` tag input, rejects a
+tag that does not match `pubspec.yaml`, and passes the dispatch input through an `env:`
+var rather than interpolating it into the shell. Main pushes still build and upload the
+7-day workflow artifact.
+
+**Verification**: both files parse (`yaml.safe_load`); `publish` gate is
+`steps.app_version.outputs.publish == 'true'` in both. Confirmed end-to-end by the
+`v1.4.5` tag run.
+**Risks/rollback**: a tag whose `pubspec.yaml` was not bumped now fails the job loudly
+instead of silently clobbering. Revert = restore the previous two steps.
+
+### TASK-07 Android CI signs every build with a throwaway key
+Priority: P1 · Effort: M · Depends: — · Files: `.github/workflows/android.yml`, `android/app/build.gradle.kts`
+
+**Why**: `release { signingConfig = signingConfigs.getByName("debug") }` and the Linux
+runner has no debug keystore, so `android.yml` runs `keytool -genkey` to create one on
+every run. `keytool` generates fresh key material each time, and nothing caches
+`~/.android`, so **each release APK is signed by a different certificate**. Android
+refuses to install an APK over an installed app with a different signer, so sideloaded
+upgrades fail with `INSTALL_FAILED_UPDATE_INCOMPATIBLE` / "App not installed" and the
+in-app updater (`AppUpdateService`, which downloads the release APK) cannot complete an
+update — the user must uninstall first, losing app data.
+
+**Acceptance criteria**:
+- [ ] every future release APK is signed by one stable certificate
+- [ ] the signing key is never committed — secret-stored and decoded at build time
+- [ ] `docs/SIDELOADING.md` states plainly that upgrading across the key change needs an uninstall
+- [ ] the signer is verifiable: `keytool -printcert -jarfile monolith.apk` SHA-256 matches between two consecutive releases
+
+**Agent instructions**:
+1. Generate a release keystore locally, once, and keep it out of the repo.
+2. HUMAN-GATE: creating the `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`,
+   `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD` repository secrets.
+3. Add a `release` signing config in `build.gradle.kts` reading from
+   `key.properties`, written by the workflow from the secrets; keep the debug
+   fallback for local builds so a clone without secrets still builds.
+4. Drop the `keytool -genkey` step once the real key is wired.
+
+**Verification**: build two APKs from two runs; compare `keytool -printcert -jarfile`
+SHA-256; install one over the other on a device.
+**Risks/rollback**: the key becomes unrecoverable if lost — every future update breaks.
+Back it up offline before switching. Existing installs still need one uninstall to cross
+from throwaway keys to the stable key; say so in the release notes.
+
+### TASK-08 `v1.4.4` release assets no longer match the `v1.4.4` tag
+Priority: P2 · Effort: S · Depends: TASK-06 · Files: — (GitHub release, not code)
+
+**Why**: fallout of TASK-06. `gh release view v1.4.4` shows the release published
+2026-09-10 but `monolith.apk` updated 2026-09-19T20:24:32Z and `monolith.ipa`
+2026-09-19T20:20:01Z — both built from `main` at `878420d`, which is 1.4.5 code. Anyone
+who downloaded `v1.4.4` after that date got binaries that do not correspond to the tag.
+
+**Blocked**: waiting on an owner decision — this is a published-artifact change.
+
+**Agent instructions**:
+1. HUMAN-GATE: decide between (a) rebuilding 1.4.4 from tag `v1.4.4` and re-uploading, or
+   (b) leaving the binaries and adding a note to the `v1.4.4` release body.
+2. Option (b) is cheaper and honest; option (a) requires a `workflow_dispatch` run against
+   the `v1.4.4` ref, which the new pubspec/tag match check will accept because that tree
+   still says `1.4.4+13`.
+**Verification**: asset `updatedAt` and the release body agree about what the binaries are.
+**Risks/rollback**: re-uploading changes checksums users may have recorded.
+
+### TASK-09 Version string is duplicated across four files
+Priority: P3 · Effort: S · Depends: — · Files: `pubspec.yaml`, `lib/src/core/services/app_update_service.dart`, `README.md`, `test/songs_tab_and_gestures_test.dart`
+
+**Why**: a release needs `version:` in `pubspec.yaml`, `AppUpdateService.currentVersion`,
+the README banner and the assertion in `songs_tab_and_gestures_test.dart` all moved by
+hand. Miss `currentVersion` and the in-app updater offers the running version as an
+update; miss `pubspec.yaml` and the new tag-match check fails the release build.
+
+**Acceptance criteria**:
+- [ ] one source of truth for the version at runtime
+- [ ] the test asserts agreement rather than a hardcoded literal
+
+**Agent instructions**:
+1. Prefer `package_info_plus` (already an indirect dependency via the Flutter
+   ecosystem — confirm before adding) or a generated constant over a second literal.
+2. If a literal must stay, make the test read `pubspec.yaml` and compare, so drift fails
+   CI instead of shipping.
+**Verification**: `flutter test test/songs_tab_and_gestures_test.dart` fails when
+`pubspec.yaml` and `currentVersion` disagree.
+**Risks/rollback**: reading `pubspec.yaml` at test time depends on the working directory;
+use `Directory.current` explicitly.
 
 ### TASK-05 Custom shuffle/repeat on the iOS Lock Screen
 Priority: P3 · Effort: M · Depends: — · Files: `lib/src/core/services/`

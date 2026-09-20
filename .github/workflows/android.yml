@@ -91,17 +91,46 @@ jobs:
           compression-level: 0
           retention-days: 7
 
-      - name: Extract app version
+      # A release is cut ONLY for a v* tag, or for a workflow_dispatch that names
+      # one. A plain push to main still builds and uploads the workflow artifact,
+      # but must never touch an already published release: before this gate, a
+      # main push with an unbumped pubspec resolved to the CURRENT version's tag
+      # and overwrote that release's assets in place (v1.4.4, 2026-09-19).
+      - name: Resolve release tag
         id: app_version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          VERSION=$(grep '^version: ' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1 | tr -d '[:space:]')
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          set -eo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="$GITHUB_REF_NAME"
+          else
+            TAG="$INPUT_TAG"
+          fi
+          if [[ -z "$TAG" ]]; then
+            echo "No release tag — build only, nothing will be published."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          re='^v[0-9]+\.[0-9]+\.[0-9]+$'
+          if [[ ! "$TAG" =~ $re ]]; then
+            echo "Refusing to publish to malformed tag: $TAG"
+            exit 1
+          fi
+          PUBSPEC="v$(grep '^version: ' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1 | tr -d '[:space:]')"
+          if [[ "$TAG" != "$PUBSPEC" ]]; then
+            echo "Tag $TAG does not match pubspec version $PUBSPEC — bump pubspec.yaml first."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Publish to GitHub Releases
+        if: steps.app_version.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || steps.app_version.outputs.tag }}
-          name: "Monolith ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || steps.app_version.outputs.tag }}"
+          tag_name: ${{ steps.app_version.outputs.tag }}
+          name: "Monolith ${{ steps.app_version.outputs.tag }}"
           files: monolith.apk
           fail_on_unmatched_files: true
           append_body: true

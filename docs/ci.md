@@ -6,19 +6,44 @@ This repo's automation, and why the bot runs you sometimes see are normal.
 
 | File | Trigger | What it does |
 | --- | --- | --- |
-| `.github/workflows/ios.yml` | push of a `v*` tag (or manual) | Builds the **unsigned IPA**, uploads `monolith.ipa` to the tag's GitHub Release. macOS runner. |
+| `.github/workflows/ios.yml` | push to `main`, push of a `v*` tag, or manual | Builds the **unsigned IPA** on `macos-15`. Always uploads `monolith.ipa` as a 7-day workflow artifact; publishes it to the GitHub Release **only for a tag**. |
+| `.github/workflows/android.yml` | push to `main`, push of a `v*` tag, or manual | Builds the **release APK** on `ubuntu-latest`. Always uploads `monolith.apk` as a 7-day workflow artifact; publishes it to the GitHub Release **only for a tag**. |
 
-**iOS is the ONLY thing CI builds.** There is deliberately **no Android
-workflow** — the **APK is built locally on the Windows dev machine**
-(`flutter build apk --release --no-tree-shake-icons`) and uploaded to the
-release by hand (`gh release upload v<x.y.z> monolith.apk`). This avoids
-duplicate/competing runs and keeps Android off CI entirely.
+**Both platforms build on CI.** A push to `main` is a build check — you get
+downloadable artifacts, nothing is released. A `v*` tag is the release: both
+workflows attach their binary to the same release and `append_body: true` means
+each one appends its own install notes.
+
+### Releasing
+
+1. Bump `version:` in `pubspec.yaml` **and** `AppUpdateService.currentVersion`
+   (`lib/src/core/services/app_update_service.dart`) — the in-app updater
+   compares against the latter.
+2. Move the CHANGELOG's top section from `Unreleased` to `## [x.y.z] — <date>`.
+3. Commit, push `main`, then `git tag vx.y.z && git push origin vx.y.z`.
+
+The **Resolve release tag** step refuses to publish when the tag does not match
+`pubspec.yaml`, and skips publishing entirely when there is no tag. This exists
+because it used to resolve the tag from `pubspec.yaml` on *every* push to
+`main`: on 2026-09-19 a main push with an unbumped `1.4.4+13` re-published into
+the existing `v1.4.4` release and **overwrote its `monolith.apk` and
+`monolith.ipa` in place**, so the tag no longer matched the binaries behind it.
+
+`workflow_dispatch` takes an optional `tag` input — supply `vx.y.z` to
+re-publish that release, leave it blank for a build-only run.
 
 The iOS build needs `--no-tree-shake-icons` because of the vendored
 `phosphor_flutter` 3.44 patch (icon constructors become `static final`, which
-the icon tree-shaker rejects). The local Android release APK is signed with the
-**debug keystore** — fine for a sideloaded build, and we never commit a real
-release key (see `SECURITY.md`).
+the icon tree-shaker rejects). The Android job passes the same flag, plus
+`--android-skip-build-dependency-validation`. The release APK is signed with the
+**debug keystore** (`android/app/build.gradle.kts` →
+`release { signingConfig = signingConfigs.getByName("debug") }`) — fine for a
+sideloaded build, and we never commit a real release key (see `SECURITY.md`).
+The Linux runner has no debug keystore, so the workflow generates one with
+`keytool` before building; that means **every CI build is signed with a
+different throwaway key** and Android will refuse an in-place upgrade over a
+previously installed APK. Uninstall first, or move to a real, secret-stored
+release key if seamless updates ever matter.
 
 ## Dependabot — disabled on purpose
 

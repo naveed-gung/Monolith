@@ -2,7 +2,7 @@
 
 All notable changes to Monolith are documented here.
 
-## Unreleased — 2026-09-19
+## [1.4.5] — 2026-09-20
 
 | Before | After |
 | --- | --- |

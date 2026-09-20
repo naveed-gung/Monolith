@@ -2,7 +2,7 @@
 
 A personal music player for iOS and Android. Bring your own music, keep a local collection, and listen with the screen locked.
 
-**v1.4.4 · Build 13:** this reliability release addresses audit findings across storage recovery, playlist persistence, Android back navigation, queue management, and responsive UI scaling. The iOS changes still require an iPhone test; downloads are not confirmed fixed on the user's device.
+**v1.4.5 · Build 14:** downloads you remove are remembered — Settings → Download history keeps the names and links so you can fetch a song again, and getting a fresh copy keeps the old audio until the new one is saved. Playback now follows the order you see on screen, and the activity indicator clears itself five seconds after the last job finishes.
 
 ## Screenshots
 

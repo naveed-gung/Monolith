@@ -105,29 +105,18 @@ _activateTrackIndex(index)
   │
   └── _syncSelectedTrack(autoplay: true)
         │
-        ├── _fadeVolume(to: 0, ms: 220)    ← smooth out if already playing
-        │
-        ├── AudioPlayer.setAudioSource(
-        │     AudioSource.uri(
-        │       Uri.file(track.filePath!),
-        │       tag: MediaItem(               ← the OS reads this
-        │         id:       track.id,
-        │         title:    track.title,
-        │         artist:   track.artist,
-        │         album:    track.album,
-        │         genre:    track.genre,
-        │         duration: track.duration,
-        │         artUri:   Uri.file(artworkPath) | Uri.parse(artworkUrl),
-        │       )
-        │     )
-        │   )
+        ├── Resolve playable tracks in the selected collection order
+        ├── AudioPlayer.setAudioSources([...], initialIndex: selected)
+        │     Each AudioSource.uri carries its own MediaItem tag
+        │     (title, artist, album, duration, artwork)
+        ├── currentIndexStream updates Monolith after a system skip
         │
         ├── AudioPlayer.play()
         │
-        └── _fadeVolume(to: targetVolume, ms: 220)   ← smooth in
+        └── Optional short volume ramp
 ```
 
-The `MediaItem` tag is the payload the OS surfaces read. Getting it right is the entire job.
+The `MediaItem` tags give the system each song's metadata. Publishing the full queue enables Previous/Next on the lock screen and in Android notifications. The controller keeps its selected song in sync with system skips.
 
 ---
 

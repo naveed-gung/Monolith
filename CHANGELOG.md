@@ -2,6 +2,12 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.4.6] — 2026-09-29
+
+- Publish the visible listening queue to the system media player so lock-screen and notification Previous/Next controls work beyond a single track.
+- Keep Monolith's current song and Up Next in sync when a system control skips, including sorted and shuffled collections.
+- Keep the current position and play state when the library queue refreshes; apply Repeat mode to background playback.
+
 ## [1.4.5] — 2026-09-20
 
 | Before | After |

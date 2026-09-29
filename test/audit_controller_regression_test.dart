@@ -16,6 +16,8 @@ class _Player implements AudioPlayer {
   int loads = 0;
   int rewinds = 0;
   @override
+  Stream<int?> get currentIndexStream => const Stream.empty();
+  @override
   Future<void> seek(Duration? position, {int? index}) async {
     if (position == Duration.zero) rewinds++;
   }
@@ -38,15 +40,19 @@ class _Player implements AudioPlayer {
     Duration maxPeriod = const Duration(milliseconds: 200),
   }) => const Stream.empty();
   @override
-  Future<Duration?> setAudioSource(
-    AudioSource source, {
+  Future<Duration?> setAudioSources(
+    List<AudioSource> sources, {
     bool preload = true,
     int? initialIndex,
     Duration? initialPosition,
+    ShuffleOrder? shuffleOrder,
   }) async {
     loads++;
     return duration;
   }
+
+  @override
+  Future<void> setLoopMode(LoopMode mode) async {}
 
   @override
   Future<void> setVolume(double value) async {

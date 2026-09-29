@@ -187,6 +187,7 @@ class MonolithController extends ChangeNotifier {
   }
 
   late final StreamSubscription<PlayerState> _playerStateSubscription;
+  late final StreamSubscription<int?> _playerIndexSubscription;
   late final StreamSubscription<Duration> _playerPositionSubscription;
   late final StreamSubscription<Duration?> _playerDurationSubscription;
   late final StreamSubscription<DownloadProgress> _downloadProgressSubscription;
@@ -205,6 +206,9 @@ class MonolithController extends ChangeNotifier {
   bool _isDisposed = false;
   String? _loadedTrackId;
   int _sourceGeneration = 0;
+  int _queueRevision = 0;
+  int _loadedQueueRevision = -1;
+  List<String> _audioQueueIds = const [];
   final Set<String> _dismissedDownloadIds = {};
   final Set<String> _cancelledDownloadIds = {};
   int _refreshGeneration = 0;
@@ -555,12 +559,15 @@ class MonolithController extends ChangeNotifier {
     if (index == -1) {
       return;
     }
-    _collectionQueue = queue?.map((t) => t.id).toSet().toList();
-    if (_collectionQueue != null && !_collectionQueue!.contains(track.id)) {
-      _collectionQueue!.insert(0, track.id);
+    final nextQueue = queue?.map((t) => t.id).toSet().toList();
+    if (nextQueue != null && !nextQueue.contains(track.id)) {
+      nextQueue.insert(0, track.id);
     }
+    final queueChanged = !listEquals(_collectionQueue, nextQueue);
+    _collectionQueue = nextQueue;
     _shuffledQueue.clear();
     if (_shuffleEnabled) _resetShuffle(track.id);
+    if (queueChanged || _shuffleEnabled) _queueRevision++;
     unawaited(
       _activateTrackIndex(index, openPlayer: openPlayer, autoplay: autoplay),
     );
@@ -620,6 +627,10 @@ class MonolithController extends ChangeNotifier {
     _shuffleEnabled = !_shuffleEnabled;
     _shuffledQueue.clear();
     if (_shuffleEnabled) _resetShuffle(currentTrack?.id);
+    _queueRevision++;
+    if (_loadedTrackId != null) {
+      unawaited(_syncSelectedTrack(autoplay: _audioPlayer.playing));
+    }
     notifyListeners();
   }
 
@@ -633,8 +644,15 @@ class MonolithController extends ChangeNotifier {
         _repeatMode = RepeatMode.off;
     }
     _prefs?.setString(_kRepeat, _repeatMode.name);
+    unawaited(_audioPlayer.setLoopMode(_nativeLoopMode));
     notifyListeners();
   }
+
+  LoopMode get _nativeLoopMode => switch (_repeatMode) {
+    RepeatMode.off => LoopMode.off,
+    RepeatMode.one => LoopMode.one,
+    RepeatMode.all => LoopMode.all,
+  };
 
   Future<void> setPlaybackProgress(double value) async {
     final totalDuration = currentTrackDuration;
@@ -1618,6 +1636,7 @@ class MonolithController extends ChangeNotifier {
   Future<void> _bootstrap() async {
     await _loadPrefs();
     await _configureAudioSession();
+    await _audioPlayer.setLoopMode(_nativeLoopMode);
     await refreshLibrary();
     if (!_prefs!.containsKey(_kDownloadHistory)) {
       final recovered = <String, DownloadHistoryEntry>{};
@@ -1737,6 +1756,29 @@ class MonolithController extends ChangeNotifier {
   }
 
   void _bindAudioPlayer() {
+    _playerIndexSubscription = _audioPlayer.currentIndexStream.listen((index) {
+      if (_isDisposed || index == null || index >= _audioQueueIds.length) {
+        return;
+      }
+      final trackId = _audioQueueIds[index];
+      final trackIndex = _tracks.indexWhere((track) => track.id == trackId);
+      if (trackIndex < 0 ||
+          (_selectedTrackIndex == trackIndex && _loadedTrackId == trackId)) {
+        return;
+      }
+      _selectedTrackIndex = trackIndex;
+      _loadedTrackId = trackId;
+      _currentPosition = Duration.zero;
+      positionListenable.value = Duration.zero;
+      progress.value = 0;
+      _currentTrackDuration = _tracks[trackIndex].duration;
+      _completionHandled = false;
+      if (_audioPlayer.playing && _lastRegisteredPlayId != trackId) {
+        _lastRegisteredPlayId = trackId;
+        _registerPlay(_tracks[trackIndex]);
+      }
+      notifyListeners();
+    });
     _playerStateSubscription = _audioPlayer.playerStateStream.listen((state) {
       _isPlaying = state.playing;
 
@@ -2058,37 +2100,72 @@ class MonolithController extends ChangeNotifier {
 
   Future<void> _syncSelectedTrack({required bool autoplay}) async {
     final track = currentTrack;
-    if (track != null && _loadedTrackId == track.id) {
+    if (track != null &&
+        _loadedTrackId == track.id &&
+        _loadedQueueRevision == _queueRevision) {
       if (autoplay) _playLoadedTrack();
       return;
     }
     final generation = ++_sourceGeneration;
+    final wasLoaded = _loadedTrackId == track?.id;
+    final keepPlaying = wasLoaded && _audioPlayer.playing;
+    final initialPosition = wasLoaded ? _currentPosition : Duration.zero;
     _loadedTrackId = null;
-    _currentPosition = Duration.zero;
     _currentTrackDuration = track?.duration ?? Duration.zero;
     if (track == null || !track.canPlay) {
       await _audioPlayer.stop();
       return;
     }
     try {
-      final path = await _downloadStore.resolveTrackPath(track.filePath);
-      if (generation != _sourceGeneration) return;
-      final uri = path == null ? null : Uri.tryParse(path);
-      final isMediaUri =
-          uri?.scheme == 'content' || uri?.scheme == 'ipod-library';
-      if (path == null || (!isMediaUri && !await File(path).exists())) {
-        throw StateError(
-          'The original audio file is missing. Import it again from Music or Files.',
+      if (_loadedQueueRevision == _queueRevision &&
+          _audioQueueIds.contains(track.id)) {
+        await _audioPlayer.seek(
+          Duration.zero,
+          index: _audioQueueIds.indexOf(track.id),
+        );
+      } else {
+        final sources = <AudioSource>[];
+        final ids = <String>[];
+        for (final trackIndex in _queueIndicesForNavigation()) {
+          final candidate = tracks[trackIndex];
+          if (!candidate.canPlay) continue;
+          final path = await _downloadStore.resolveTrackPath(
+            candidate.filePath,
+          );
+          if (generation != _sourceGeneration) return;
+          final uri = path == null ? null : Uri.tryParse(path);
+          final isMediaUri =
+              uri?.scheme == 'content' || uri?.scheme == 'ipod-library';
+          if (path == null || (!isMediaUri && !await File(path).exists())) {
+            if (candidate.id == track.id) {
+              throw StateError('The original audio file is missing.');
+            }
+            continue;
+          }
+          if (candidate.id == track.id && !isMediaUri) {
+            await _downloadStore.readAudioMetadata(path);
+          }
+          ids.add(candidate.id);
+          sources.add(
+            AudioSource.uri(
+              isMediaUri ? uri! : Uri.file(path),
+              tag: _mediaItemForTrack(candidate.copyWith(filePath: path)),
+            ),
+          );
+        }
+        final selectedIndex = ids.indexOf(track.id);
+        if (selectedIndex < 0) {
+          throw StateError('The selected song is unavailable.');
+        }
+        if (generation != _sourceGeneration) return;
+        _audioQueueIds = ids;
+        _loadedQueueRevision = _queueRevision;
+        await _audioPlayer.setAudioSources(
+          sources,
+          initialIndex: selectedIndex,
+          initialPosition: initialPosition,
         );
       }
-      if (!isMediaUri) await _downloadStore.readAudioMetadata(path);
-      if (generation != _sourceGeneration) return;
-      await _audioPlayer.setAudioSource(
-        AudioSource.uri(
-          isMediaUri ? uri! : Uri.file(path),
-          tag: _mediaItemForTrack(track.copyWith(filePath: path)),
-        ),
-      );
       if (generation != _sourceGeneration) return;
       _loadedTrackId = track.id;
       _libraryError = null;
@@ -2098,16 +2175,20 @@ class MonolithController extends ChangeNotifier {
       }
       final targetVolume = _normalizeAudio ? 0.84 : 1.0;
       await _audioPlayer.setVolume(
-        autoplay && _smoothTransitions ? targetVolume * 0.6 : targetVolume,
+        (autoplay || keepPlaying) && _smoothTransitions
+            ? targetVolume * 0.6
+            : targetVolume,
       );
-      if (autoplay) {
-        _playLoadedTrack();
+      if (autoplay || keepPlaying) {
+        if (!_audioPlayer.playing) _playLoadedTrack();
         if (_smoothTransitions) {
           unawaited(_finishVolumeTransition(generation, targetVolume));
         }
       }
     } catch (error) {
       if (generation != _sourceGeneration) return;
+      _loadedQueueRevision = -1;
+      _audioQueueIds = const [];
       _isPlaying = false;
       _libraryError =
           'This audio could not be opened. Try importing it again from Music or Files.';
@@ -2232,6 +2313,13 @@ class MonolithController extends ChangeNotifier {
             ? _tracks[_selectedTrackIndex.clamp(0, _tracks.length - 1)].id
             : null);
 
+    var queueChanged = _tracks.length != nextTracks.length;
+    for (var i = 0; !queueChanged && i < _tracks.length; i++) {
+      queueChanged =
+          _tracks[i].id != nextTracks[i].id ||
+          _tracks[i].filePath != nextTracks[i].filePath;
+    }
+    if (queueChanged) _queueRevision++;
     _tracks = nextTracks;
     final preferredIndex = oldTrackId == null
         ? -1
@@ -2452,6 +2540,7 @@ class MonolithController extends ChangeNotifier {
     progress.dispose();
     unawaited(_audioPlayer.dispose());
     _playerStateSubscription.cancel();
+    _playerIndexSubscription.cancel();
     _playerPositionSubscription.cancel();
     _playerDurationSubscription.cancel();
     _downloadProgressSubscription.cancel();

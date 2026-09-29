@@ -15,11 +15,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class _Player implements AudioPlayer {
   final ended = Completer<void>();
+  final indexEvents = StreamController<int?>.broadcast(sync: true);
+  List<AudioSource> sources = const [];
+  int? selectedIndex;
+  LoopMode selectedLoopMode = LoopMode.off;
   int loads = 0;
   int rewinds = 0;
   @override
   Future<void> seek(Duration? position, {int? index}) async {
     if (position == Duration.zero) rewinds++;
+    if (index != null) {
+      selectedIndex = index;
+      indexEvents.add(index);
+    }
   }
 
   double volumeAtPlay = -1;
@@ -32,6 +40,8 @@ class _Player implements AudioPlayer {
   @override
   Stream<PlayerState> get playerStateStream => const Stream.empty();
   @override
+  Stream<int?> get currentIndexStream => indexEvents.stream;
+  @override
   Stream<Duration?> get durationStream => const Stream.empty();
   @override
   Stream<Duration> createPositionStream({
@@ -40,14 +50,26 @@ class _Player implements AudioPlayer {
     Duration maxPeriod = const Duration(milliseconds: 200),
   }) => const Stream.empty();
   @override
-  Future<Duration?> setAudioSource(
-    AudioSource source, {
+  Future<Duration?> setAudioSources(
+    List<AudioSource> audioSources, {
     bool preload = true,
     int? initialIndex,
     Duration? initialPosition,
+    ShuffleOrder? shuffleOrder,
   }) async {
     loads++;
+    sources = audioSources;
+    selectedIndex = initialIndex;
+    indexEvents.add(initialIndex);
     return duration;
+  }
+
+  @override
+  Future<void> setLoopMode(LoopMode mode) async => selectedLoopMode = mode;
+
+  void skipFromSystem(int index) {
+    selectedIndex = index;
+    indexEvents.add(index);
   }
 
   @override
@@ -75,6 +97,7 @@ class _Player implements AudioPlayer {
   @override
   Future<void> dispose() async {
     if (!ended.isCompleted) ended.complete();
+    await indexEvents.close();
   }
 
   @override
@@ -229,6 +252,61 @@ void main() {
       expect(controller.currentTrack?.id, 'd');
       expect(controller.upNextTracks, isEmpty);
       await Future<void>.delayed(const Duration(milliseconds: 30));
+    },
+  );
+
+  test(
+    'lock-screen skip follows displayed queue and updates in-app selection',
+    () async {
+      final seed = controller.tracks.first;
+      store.tracks = [
+        for (final id in ['a', 'b', 'c', 'd'])
+          seed.copyWith(
+            id: id,
+            title: id,
+            filePath: File(
+              '${root.path}/song.m4a',
+            ).copySync('${root.path}/$id.m4a').path,
+          ),
+      ];
+      await controller.refreshLibrary();
+      final displayed = [
+        for (final id in ['b', 'c', 'a', 'd'])
+          controller.tracks.firstWhere((track) => track.id == id),
+      ];
+      controller.selectTrack(displayed[1], queue: displayed);
+      for (
+        var i = 0;
+        i < 50 &&
+            (player.sources.length != 4 ||
+                (player.sources.first as IndexedAudioSource).tag.id != 'b');
+        i++
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(
+        player.sources.map((source) => (source as IndexedAudioSource).tag.id),
+        ['b', 'c', 'a', 'd'],
+      );
+      expect(player.selectedIndex, 1);
+      player.skipFromSystem(2);
+      expect(controller.currentTrack?.id, 'a');
+      expect(controller.upNextTracks.map((track) => track.id), ['d']);
+      player.skipFromSystem(1);
+      expect(controller.currentTrack?.id, 'c');
+      controller.cycleRepeatMode();
+      expect(player.selectedLoopMode, LoopMode.all);
+      controller.toggleShuffle();
+      for (var i = 0;
+          i < 50 &&
+              (player.sources.first as IndexedAudioSource).tag.id != 'c';
+          i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      final shuffledNext = controller.upNextTracks.first.id;
+      expect((player.sources[1] as IndexedAudioSource).tag.id, shuffledNext);
+      player.skipFromSystem(1);
+      expect(controller.currentTrack?.id, shuffledNext);
     },
   );
 
@@ -492,10 +570,14 @@ void main() {
       for (var i = 0; i < 30 && controller.downloadedTracks.isEmpty; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
+      for (var i = 0; i < 100 && player.sources.length != 3; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
       expect(controller.downloadedTracks.single.title, 'Downloaded');
       expect(controller.downloadedTracks.single.duration.inSeconds, 19);
       expect(controller.currentTrack!.id, playingId);
-      expect(player.loads, loads);
+      expect(player.loads, greaterThan(loads));
+      expect(player.sources.length, 3);
       expect(player.playing, isTrue);
       await controller.refreshLibrary();
       expect(controller.downloadedTracks.length, 1);

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:monolith/src/app/state/app_controller.dart';
@@ -32,7 +34,9 @@ void main() {
       ]);
     });
 
-    testWidgets('dismissDownloadTask and clearLibraryError work correctly', (tester) async {
+    testWidgets('dismissDownloadTask and clearLibraryError work correctly', (
+      tester,
+    ) async {
       final controller = await tester.runAsync(() async {
         final c = MonolithController(
           localMediaService: _FakeLocalMediaService([]),
@@ -53,7 +57,12 @@ void main() {
     });
 
     test('AppUpdateService version matches the shipped pubspec version', () {
-      expect(AppUpdateService.currentVersion, '1.4.5');
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      final version = RegExp(
+        r'^version:\s+(\d+\.\d+\.\d+)\+\d+',
+        multiLine: true,
+      ).firstMatch(pubspec)?.group(1);
+      expect(AppUpdateService.currentVersion, version);
     });
 
     test('clearStaleAppCache runs without errors', () async {

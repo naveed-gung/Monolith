@@ -2,6 +2,8 @@
 
 A personal music player for iOS and Android. Bring your own music, keep a local collection, and listen with the screen locked.
 
+**On a computer?** [Monolith Desktop](https://github.com/naveed-gung/Monolith-DE) is the companion Rust + Slint project. Windows is verified; Linux builds and Debian packaging remain pending. The apps share a visual identity, with separate libraries and no automatic cross-device sync.
+
 **v1.4.6 · Build 15:** iOS lock-screen and Android media controls can skip between songs in the current listening order. The app stays in sync when a system control changes the song.
 
 ## Screenshots
@@ -118,7 +120,7 @@ APK/IPA files are available on [GitHub Releases](https://github.com/naveed-gung/
 
 - Android: install a compatible APK over the existing app, with the same application ID and signing key.
 - iOS: this project targets the user's TrollStore installation. Build/package the IPA on macOS with Xcode; no Apple Developer signing flow was added here. Use TrollStore on a supported device and replace the installed app rather than deleting it first.
-- Desktop: deferred. Windows/Linux feature parity and the requested under-150 MB memory budget have not been demonstrated.
+- Desktop: maintained separately in [Monolith Desktop](https://github.com/naveed-gung/Monolith-DE). See that repository for Windows setup, local folder imports and Linux build status; mobile build commands below do not build it.
 
 ```sh
 flutter pub get

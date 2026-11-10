@@ -3,7 +3,8 @@
 ## Owned files
 
 - **iOS:** the app Documents directory, then `Monolith/Music`. Imports use `Monolith/Music/Imports`.
-- **Android:** the app external files directory, then `Monolith/Music`; imported copies use its `Imports` subfolder.
+- **Android (1.5.1+):** the public `Music/Monolith` folder, keeping the `Music/` and `Music/Imports` layout under it — audio survives uninstall/reinstall. The manifest, artwork sidecars (`Art/`), and `.part` files stay in the app external files directory. Deleting a file a previous install saved may show Android's delete-confirmation dialog.
+- **Android (≤1.5.0):** the app external files directory, then `Monolith/Music`; imported copies use its `Imports` subfolder. This location is wiped on uninstall.
 - `Monolith/manifest.json` stores track metadata. Artwork is kept beside audio when available.
 - Temporary downloads end in `.part` and are excluded from library scans.
 
@@ -31,9 +32,9 @@ No installation flow can promise recovery after the user deletes the app or its 
 
 ## Deleting Monolith
 
-Treat Monolith's app storage as removable with the app. Do not rely on app-private Documents or Android app external files surviving uninstall.
+On Android 1.5.1+ downloads live in public `Music/Monolith` and outlive the app; on iOS and older Android builds, treat Monolith's app storage as removable with the app. Do not rely on app-private Documents or Android app external files surviving uninstall.
 
-Use the export action to make copies outside the app first. The repository has native Files/SAF export and a public-Music writing bridge, but the active download path still defaults to the app's own music folder. Automatic iCloud backup/sync is not implemented.
+Use the export action to make copies outside the app first. The repository has native Files/SAF export and a public-Music writing bridge. Automatic iCloud backup/sync is not implemented.
 
 ## Recovery behavior
 

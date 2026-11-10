@@ -145,7 +145,7 @@ class AppUpdateService extends ChangeNotifier {
   }
 
   static final instance = AppUpdateService();
-  static const currentVersion = '1.5.0';
+  static const currentVersion = '1.5.1';
   bool autoDownload = true;
   bool busy = false;
   double? progress;

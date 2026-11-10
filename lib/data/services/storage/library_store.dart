@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../domain/models/track.dart';
@@ -28,10 +29,12 @@ typedef RootDirFactory = Future<Directory> Function();
 /// - **v1 migration** — a bare JSON array (the v1 [DownloadStore] shape) is
 ///   parsed into v2 models and re-saved in the v2 envelope on first load.
 class LibraryStore {
-  LibraryStore({RootDirFactory? rootDirFactory})
-    : _rootDirFactory = rootDirFactory ?? defaultRootDirectory;
+  LibraryStore({RootDirFactory? rootDirFactory, RootDirFactory? audioDirFactory})
+    : _rootDirFactory = rootDirFactory ?? defaultRootDirectory,
+      _audioDirFactory = audioDirFactory;
 
   final RootDirFactory _rootDirFactory;
+  final RootDirFactory? _audioDirFactory;
 
   /// Current manifest schema version.
   static const int schemaVersion = 2;
@@ -69,13 +72,48 @@ class LibraryStore {
     return ensureDir('${documents.path}/Monolith');
   }
 
-  /// Monolith's own top-level data folder.
+  /// Default audio-root resolver — mirrors the v1
+  /// `DownloadStore._audioRootDirectory` logic: Android → public
+  /// `Music/Monolith` (survives uninstall), else the private root.
+  static Future<Directory> defaultAudioRootDirectory() async {
+    if (Platform.isAndroid) {
+      try {
+        final path = await const MethodChannel(
+          'monolith/media_import',
+        ).invokeMethod<String>('getPublicMusicDir');
+        if (path != null && path.isNotEmpty) {
+          return ensureDir(path);
+        }
+      } catch (_) {
+        // Fall through to the private root.
+      }
+    }
+    return defaultRootDirectory();
+  }
+
+  /// Monolith's own private top-level data folder (manifest, artwork
+  /// sidecars, pre-1.5.1 audio).
   Future<Directory> rootDirectory() => _rootDirFactory();
+
+  /// The audio storage root — public `Music/Monolith` on Android when
+  /// available, the private root otherwise.
+  Future<Directory> audioRootDirectory() async {
+    final factory = _audioDirFactory;
+    if (factory == null) return rootDirectory();
+    return factory();
+  }
 
   /// The `Music` subfolder where audio lives; created on demand.
   Future<Directory> musicDirectory() async {
-    final root = await rootDirectory();
+    final root = await audioRootDirectory();
     return ensureDir('${root.path}/$_musicFolderName');
+  }
+
+  /// Artwork sidecars for public audio live in the private `Art` folder:
+  /// scoped storage (API 30+) can refuse non-media files in Music/.
+  Future<Directory> _artDirectory() async {
+    final root = await rootDirectory();
+    return ensureDir('${root.path}/Art');
   }
 
   /// Loads the manifest, migrating from v1 if needed and pruning entries
@@ -116,7 +154,17 @@ class LibraryStore {
     final tracks = <Track>[];
     for (final item in rawTracks) {
       if (item is! Map<String, dynamic>) continue;
-      final track = Track.fromJson(item);
+      var track = Track.fromJson(item);
+      // Pre-1.5.1 manifest paths point at the private root; audio moved to
+      // public Music/Monolith — repoint before the existence check prunes.
+      final relocated = await _relocatedPath(track.filePath);
+      if (relocated != track.filePath) {
+        track = track.copyWith(
+          filePath: relocated,
+          artworkPath: await findArtworkForAudio(relocated),
+        );
+        needsRewrite = true;
+      }
       if (await _audioFileExists(track.filePath)) {
         tracks.add(track);
       }
@@ -192,7 +240,24 @@ class LibraryStore {
     return merged;
   }
 
-  /// Looks for sidecar artwork next to an audio file (`<stem>.jpg|jpeg|png|webp`).
+  /// Maps a stored path at the private root onto the audio root when the
+  /// file exists there instead (audio migrated to public storage).
+  Future<String> _relocatedPath(String path) async {
+    if (await _audioFileExists(path)) return path;
+    final root = await rootDirectory();
+    final audioRoot = await audioRootDirectory();
+    final rootPath = canonical(root.path);
+    final audioPath = canonical(audioRoot.path);
+    if (audioPath == rootPath) return path;
+    final normalized = canonical(path);
+    if (!normalized.startsWith('$rootPath/')) return path;
+    final candidate = '$audioPath${normalized.substring(rootPath.length)}';
+    return File(candidate).existsSync() ? candidate : path;
+  }
+
+  /// Looks for sidecar artwork next to an audio file
+  /// (`<stem>.jpg|jpeg|png|webp`), then in the private `Art` folder keyed by
+  /// the audio file's stem (artwork can't reliably sit beside public audio).
   Future<String?> findArtworkForAudio(String audioFilePath) async {
     final dot = audioFilePath.lastIndexOf('.');
     final stem = dot == -1 ? audioFilePath : audioFilePath.substring(0, dot);
@@ -203,6 +268,17 @@ class LibraryStore {
         return candidate.path;
       }
     }
+
+    try {
+      final artDir = await _artDirectory();
+      final fileStem = _stem(audioFilePath);
+      for (final extension in _artworkExtensions) {
+        final candidate = File('${artDir.path}/$fileStem.$extension');
+        if (await candidate.exists()) {
+          return candidate.path;
+        }
+      }
+    } catch (_) {}
     return null;
   }
 
@@ -220,8 +296,54 @@ class LibraryStore {
       if (entity is! File) continue;
       if (_stem(entity.uri.pathSegments.last) != stem) continue;
       if (await entity.exists()) {
-        await entity.delete();
+        if (isAudioFile(entity.path)) {
+          await deleteAudioFile(entity.path);
+        } else {
+          try {
+            await entity.delete();
+          } on FileSystemException {
+            // Sidecars that survive are harmless; leave them behind.
+          }
+        }
       }
+    }
+  }
+
+  /// Deletes an audio file; on Android a file a previous install left in
+  /// public Music needs the system consent dialog (MediaStore
+  /// .createDeleteRequest), invoked via the native channel. Throws a precise
+  /// error when the file survives.
+  Future<void> deleteAudioFile(String path) async {
+    final file = File(path);
+    if (!await file.exists()) return;
+    try {
+      await file.delete();
+    } on FileSystemException {
+      // Fall through to the consent path below.
+    }
+    if (!await file.exists()) return;
+    if (!Platform.isAndroid) {
+      throw FileSystemException('Could not delete $path', path);
+    }
+    var granted = false;
+    try {
+      granted =
+          await const MethodChannel(
+            'monolith/media_import',
+          ).invokeMethod<bool>('requestAudioDelete', {'path': path}) ??
+          false;
+    } on MissingPluginException {
+      granted = false;
+    } on PlatformException {
+      granted = false;
+    }
+    if (!granted && await file.exists()) {
+      throw FileSystemException(
+        'Android requires your confirmation to delete songs an older '
+        'install saved to public Music. Grant it in the system dialog, or '
+        'remove the file in the Files app: $path',
+        path,
+      );
     }
   }
 

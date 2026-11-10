@@ -42,9 +42,18 @@ final rootDirProvider = Provider<RootDirFactory>(
   (ref) => LibraryStore.defaultRootDirectory,
 );
 
+/// Resolves the audio root (public Music/Monolith on Android when
+/// available). Override in tests to point at a temporary directory.
+final audioDirProvider = Provider<RootDirFactory>(
+  (ref) => LibraryStore.defaultAudioRootDirectory,
+);
+
 /// Versioned library persistence (atomic writes, pruning, disk merge).
 final libraryStoreProvider = Provider<LibraryStore>(
-  (ref) => LibraryStore(rootDirFactory: ref.watch(rootDirProvider)),
+  (ref) => LibraryStore(
+    rootDirFactory: ref.watch(rootDirProvider),
+    audioDirFactory: ref.watch(audioDirProvider),
+  ),
 );
 
 /// Initialized [SharedPreferences]; see the bootstrap contract above.

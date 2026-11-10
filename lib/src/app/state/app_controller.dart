@@ -848,13 +848,16 @@ class MonolithController extends ChangeNotifier {
     try {
       final shouldLoadDeviceLibrary = !supportsAppleMusicImportPrompt;
 
-      // Merge in any audio files found on disk that aren't in the manifest, so
-      // the library repopulates from surviving files after a reinstall (Task D).
-      final storedTracks = await _downloadStore.loadTracksMergingDisk();
+      // Audio permission first: after a reinstall, songs in public
+      // Music/Monolith belong to the old install and are only listable once
+      // it is granted.
       final mediaSnapshot = await _localMediaService.loadTracks(
         retryRequest: retryPermissionRequest,
         requestPermission: shouldLoadDeviceLibrary,
       );
+      // Merge in any audio files found on disk that aren't in the manifest, so
+      // the library repopulates from surviving files after a reinstall (Task D).
+      final storedTracks = await _downloadStore.loadTracksMergingDisk();
 
       if (refreshGeneration != _refreshGeneration) return;
       _downloadedTracks = storedTracks;
@@ -1445,6 +1448,8 @@ class MonolithController extends ChangeNotifier {
       return;
     }
 
+    // Public audio can't carry image sidecars reliably; move them private.
+    await _downloadStore.moveArtworkBeside(result.outputPath!);
     final artworkFilePath = await _downloadStore.findArtworkForAudio(
       result.outputPath!,
     );

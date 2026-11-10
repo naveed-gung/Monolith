@@ -18,7 +18,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
-    <application android:label="Monolith" android:name="${applicationName}" android:extractNativeLibs="true" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher">
+    <application android:label="Monolith" android:name="${applicationName}" android:extractNativeLibs="true" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:requestLegacyExternalStorage="true">
         <!-- Points at our own MainActivity (which extends
              com.ryanheise.audioservice.AudioServiceActivity). Launching the
              audioservice activity class directly used to bypass

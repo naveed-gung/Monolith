@@ -1,9 +1,26 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// One stable release key so every APK installs over the previous one. CI sets
+// MONOLITH_KEYSTORE* from repository secrets; locally android/key.properties
+// (gitignored) may point at the same keystore. Without either, release builds
+// fall back to the debug key and cannot update a released install.
+val releaseSigning = Properties().apply {
+    val file = rootProject.file("key.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+    System.getenv("MONOLITH_KEYSTORE")?.let { setProperty("storeFile", it) }
+    System.getenv("MONOLITH_KEYSTORE_PASSWORD")?.let {
+        setProperty("storePassword", it)
+        setProperty("keyPassword", it)
+    }
+    System.getenv("MONOLITH_KEY_ALIAS")?.let { setProperty("keyAlias", it) }
+}.takeIf { it.getProperty("storeFile")?.let { path -> file(path).exists() } == true }
 
 android {
     namespace = "dev.naveed_gung.monolith"
@@ -34,6 +51,17 @@ android {
         }
     }
 
+    signingConfigs {
+        if (releaseSigning != null) {
+            create("release") {
+                storeFile = file(releaseSigning.getProperty("storeFile"))
+                storePassword = releaseSigning.getProperty("storePassword")
+                keyAlias = releaseSigning.getProperty("keyAlias")
+                keyPassword = releaseSigning.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             ndk {
@@ -43,9 +71,7 @@ android {
         }
 
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
 

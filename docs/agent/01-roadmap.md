@@ -19,6 +19,7 @@ task below came from reading the code or running the tooling — no filler.
 | TASK-13 | Monolith app Wi-Fi sharing (send + receive, desktop-compatible) | P1 | L | DONE | 2026-11-10 |
 | TASK-14 | Premium player open/close shared-element transition | P1 | M | DONE | 2026-11-10 |
 | TASK-15 | Bluetooth RFCOMM sharing (Android-only, after LAN) | P2 | L | TODO | 2026-11-10 |
+| TASK-16 | Stable release signing + public Music storage (survives uninstall) | P1 | L | DONE | 2026-11-10 |
 | TASK-07 | Android CI signs every build with a throwaway key | P1 | M | TODO | 2026-09-20 |
 | TASK-10 | Edit Up Next and keep system controls in sync | P2 | L | TODO | 2026-09-29 |
 | TASK-11 | Stop playback with a sleep timer | P2 | M | TODO | 2026-09-29 |

@@ -47,6 +47,7 @@ class MediaImportHandler(private val activity: Activity) {
     companion object {
         const val CHANNEL_NAME = "monolith/media_import"
         private const val SAF_REQUEST_CODE = 4711
+        private const val DELETE_REQUEST_CODE = 4712
 
         private val EXT_TO_MIME = mapOf(
             "mp3" to "audio/mpeg",
@@ -107,6 +108,7 @@ class MediaImportHandler(private val activity: Activity) {
                     "exportToSaf" -> exportToSaf(call, result)
                     "writeToPublicMusic" -> writeToPublicMusic(call, result)
                     "getPublicMusicDir" -> getPublicMusicDir(result)
+                    "requestAudioDelete" -> requestAudioDelete(call, result)
                     else -> result.notImplemented()
                 }
             }
@@ -232,6 +234,17 @@ class MediaImportHandler(private val activity: Activity) {
      * must then skip forwarding to super.onActivityResult).
      */
     fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode == DELETE_REQUEST_CODE) {
+            val reply = deletePendingReply
+            deletePendingReply = null
+            val path = deletePendingPath
+            deletePendingPath = null
+            mainHandler.post {
+                val gone = path == null || !File(path).exists()
+                reply?.success(resultCode == Activity.RESULT_OK && gone)
+            }
+            return true
+        }
         if (requestCode != SAF_REQUEST_CODE) return false
         val reply = safPendingReply ?: return true
 
@@ -349,6 +362,88 @@ class MediaImportHandler(private val activity: Activity) {
             counter++
         }
         return candidate
+    }
+
+    // ------------------------------------------------------------------
+    // Public audio delete (files owned by a previous install need consent)
+    // ------------------------------------------------------------------
+
+    private var deletePendingReply: MethodChannel.Result? = null
+    private var deletePendingPath: String? = null
+
+    /**
+     * Deletes [path] under public Music. Own files delete directly; files a
+     * previous install created need the system consent dialog
+     * (MediaStore.createDeleteRequest, API 30+). Replies `true` when the file
+     * is gone, `false` on denial/failure.
+     */
+    private fun requestAudioDelete(call: MethodCall, result: MethodChannel.Result) {
+        val path = call.argument<String>("path")
+        if (path.isNullOrBlank()) {
+            result.error("bad_args", "path is required", null)
+            return
+        }
+        val file = File(path)
+        if (!file.exists()) {
+            result.success(true)
+            return
+        }
+        if (file.delete() || !file.exists()) {
+            result.success(true)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            // Scoped-storage consent prompts only exist on API 30+.
+            result.success(false)
+            return
+        }
+        if (deletePendingReply != null) {
+            result.error("delete_busy", "A delete confirmation is already open.", null)
+            return
+        }
+        executor.execute {
+            val uri = queryAudioUri(path)
+            mainHandler.post {
+                if (uri == null) {
+                    result.success(false)
+                    return@post
+                }
+                try {
+                    val request = MediaStore.createDeleteRequest(
+                        activity.contentResolver,
+                        listOf(uri),
+                    )
+                    deletePendingReply = result
+                    deletePendingPath = path
+                    activity.startIntentSenderForResult(
+                        request.intentSender, DELETE_REQUEST_CODE, null, 0, 0, 0,
+                    )
+                } catch (e: Exception) {
+                    deletePendingReply = null
+                    deletePendingPath = null
+                    result.success(false)
+                }
+            }
+        }
+    }
+
+    /** MediaStore Uri for an absolute path under public storage, or null. */
+    private fun queryAudioUri(path: String): Uri? {
+        val resolver = activity.contentResolver
+        val projection = arrayOf(MediaStore.Audio.Media._ID)
+        val selection = "${MediaStore.Audio.Media.DATA} = ?"
+        resolver.query(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            projection, selection, arrayOf(path), null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                return Uri.withAppendedPath(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    cursor.getString(0),
+                )
+            }
+        }
+        return null
     }
 
     // ------------------------------------------------------------------

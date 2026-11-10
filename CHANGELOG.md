@@ -2,6 +2,12 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.5.1] — 2026-11-10
+
+- Release builds are now signed with Monolith's stable release key, so later versions install over this one — upgrading from 1.5.0 or older (debug-signed) needs one uninstall/reinstall.
+- Songs now live in the public `Music/Monolith` folder and survive uninstall/reinstall; existing libraries migrate automatically on first launch, manifest and artwork stay private.
+- Deleting a song saved to public Music by a previous install asks Android's permission instead of failing silently.
+
 ## [1.5.0] — Unreleased
 
 - Share songs between Monolith devices over local Wi-Fi: a song's Share sheet gains "Monolith app" (send to a discovered device) and "Receive" (a five-minute foreground session). Discovery and the framed wire protocol match Monolith Desktop — TLS 1.3 with the discovery-provided certificate fingerprint pinned; every song needs explicit recipient consent and lands in the library through the existing importer.

@@ -59,17 +59,30 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Ensure debug keystore exists
+      # SIGNING: every release must use the one stable key in repository
+      # secrets. A per-run generated debug key (used up to v1.5.0) gave each
+      # APK a different signature, so Android refused to update installs.
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          mkdir -p ~/.android
-          if [ ! -f ~/.android/debug.keystore ]; then
-            keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            if [[ "$GITHUB_REF" == refs/tags/v* || -n "$INPUT_TAG" ]]; then
+              echo "ANDROID_KEYSTORE_BASE64 secret missing — refusing to publish an APK that cannot update installs."
+              exit 1
+            fi
+            echo "No release keystore — build-only run falls back to the debug key."
+            exit 0
           fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/monolith-release.jks"
+          echo "MONOLITH_KEYSTORE=$RUNNER_TEMP/monolith-release.jks" >> "$GITHUB_ENV"
 
-      # NOTE ON SIGNING: this release APK is signed with the debug keystore
-      # (android/app/build.gradle.kts -> release { signingConfig = signingConfigs.getByName("debug") }).
-      # Deliberate choice for sideloaded builds.
       - name: Build release APK
+        env:
+          MONOLITH_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MONOLITH_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: flutter build apk --release --no-tree-shake-icons --android-skip-build-dependency-validation
 
       - name: Rename APK
@@ -146,6 +159,7 @@ jobs:
             enable **Install unknown apps** for your browser/file manager when
             prompted. No Play Store account needed.
 
-            > **Note:** this build is signed with a debug key (fine for
-            > sideloading). Android may warn it's from an unknown developer —
-            > that's expected for a non–Play Store APK.
+            > **Note:** signed with Monolith's stable release key, so later
+            > versions install over this one. Upgrading from v1.5.0 or older
+            > (debug-signed) needs one uninstall/reinstall. Android may warn
+            > it's from an unknown developer — expected for a non–Play Store APK.

@@ -184,6 +184,20 @@ class MediaImportChannel {
       return null;
     }
   }
+
+  /// Deletes a public-Music audio file, showing the system consent dialog
+  /// (MediaStore.createDeleteRequest) when a previous install owns it.
+  /// `true` when the file is gone.
+  Future<bool> requestAudioDelete(String path) async {
+    try {
+      return await channel.invokeMethod<bool>('requestAudioDelete', {
+            'path': path,
+          }) ??
+          false;
+    } on PlatformException {
+      return false;
+    }
+  }
 }
 
 /// Outcome of one item handed back by the native music-library picker.

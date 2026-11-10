@@ -1,0 +1,10 @@
+{
+  "serviceUuid": "e8793c34-7c2e-49ad-88c2-16c9a0762c91",
+  "maximumControlBytes": 16384,
+  "maximumSongBytes": 100000000,
+  "hello": {"type": "hello", "app": "monolith-music", "version": 1},
+  "offer": {"type": "offer", "name": "song.wav", "title": "Example song", "size": 16044, "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  "accept": {"type": "accept"},
+  "decline": {"type": "decline"},
+  "saved": {"type": "saved", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+}

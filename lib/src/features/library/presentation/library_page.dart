@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../app/state/app_controller.dart';
 import '../../../app/state/app_scope.dart';
@@ -10,6 +9,7 @@ import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
 import '../../../shared/widgets/app_download_indicator.dart';
+import '../../nearby/presentation/nearby_share_sheet.dart';
 
 enum _SortOrder { aToZ, zToA, newest, oldest }
 
@@ -255,14 +255,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Future<void> _shareTrack(Track track) async {
     try {
-      final fp = track.filePath;
-      if (fp != null && fp.trim().isNotEmpty) {
-        await Share.shareXFiles([
-          XFile(fp),
-        ], text: '${track.title} • ${track.artist}');
-      } else {
-        await Share.share('${track.title} • ${track.artist}');
-      }
+      await showTrackShareSheet(context, track);
     } catch (e) {
       _showMsg('Sharing failed: $e');
     }

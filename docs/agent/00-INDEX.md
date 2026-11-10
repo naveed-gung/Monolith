@@ -3,8 +3,8 @@ touched, bump last-verified, and append a line to SESSIONS.md.
 Rules: docs/agent/PROTOCOL.md -->
 ---
 doc: 00-INDEX
-last-verified: 2026-09-20
-verified-by: claude-code
+last-verified: 2026-11-10
+verified-by: devin
 ---
 
 # Monolith — agent docs index
@@ -12,8 +12,7 @@ verified-by: claude-code
 Agent-maintained knowledge base. Read this file first, every session.
 
 Monolith is an offline-first Flutter music player (Android + iOS) with built-in
-downloads. Current version: `1.4.5+14` (`pubspec.yaml`), released 2026-09-20. The
-CHANGELOG has no `Unreleased` section — open it when the next change lands.
+downloads. Current source version: `1.5.0+16` (`pubspec.yaml`, verified 2026-11-10).
 
 ## Doc map
 
@@ -61,9 +60,9 @@ needs HUMAN-GATE or dependency · `DONE` verified complete · `DROPPED` won't do
    upgrades and the in-app updater cannot install over an existing install.
 2. TASK-08 — decide what to do about the `v1.4.4` release whose assets were overwritten
    with 1.4.5 binaries (HUMAN-GATE).
-3. TASK-02 — cap the download-history list before it grows without bound.
-4. TASK-01 — keep `flutter analyze` signal clean by excluding probe directories.
-5. TASK-03 — recover source links for pre-`sourceUrl` downloads beyond the artwork heuristic.
+3. TASK-15 — Bluetooth RFCOMM sharing (Android-only); LAN sharing TASK-13 shipped.
+4. TASK-02 — cap the download-history list before it grows without bound.
+5. TASK-01 — keep `flutter analyze` signal clean by excluding probe directories.
 
 ## Cross-doc dependencies
 

@@ -4,7 +4,7 @@ A personal music player for iOS and Android. Bring your own music, keep a local 
 
 **On a computer?** [Monolith Desktop](https://github.com/naveed-gung/Monolith-DE) is the companion Rust + Slint project. Windows is verified; Linux builds and Debian packaging remain pending. The apps share a visual identity, with separate libraries and no automatic cross-device sync.
 
-**v1.4.6 · Build 15:** iOS lock-screen and Android media controls can skip between songs in the current listening order. The app stays in sync when a system control changes the song.
+**v1.5.0 · Build 16:** Send and receive songs between Monolith devices over local Wi-Fi (Share → Monolith app), with explicit consent and TLS-pinned devices — the same protocol as Monolith Desktop. The mini player now expands into the full player with a shared-artwork morph.
 
 ## Screenshots
 

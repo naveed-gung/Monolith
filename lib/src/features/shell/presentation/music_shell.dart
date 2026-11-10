@@ -39,6 +39,9 @@ class _MusicShellState extends State<MusicShell>
   MonolithController? _controller;
   bool _isMiniPlayerDismissed = false;
   String? _lastTrackId;
+  // The full player is a real route so its artwork shares a Hero flight with
+  // the mini player (container-transform open/close).
+  Route<void>? _playerRoute;
 
   @override
   void initState() {
@@ -90,6 +93,81 @@ class _MusicShellState extends State<MusicShell>
     // when reduced effects is disabled, instead of spending frames on a glow.
     _visualizerController.stop();
     _artworkController.stop();
+    _syncPlayerRoute();
+  }
+
+  /// Keeps the player route in lockstep with `controller.isPlayerOpen`.
+  /// Open → push (Hero flies the artwork up, page fades/scales in); any pop
+  /// cause clears the flag via the route's PopScope. Programmatic close →
+  /// pop the route so the shared-element transition reverses — no instant pop.
+  void _syncPlayerRoute() {
+    final controller = _controller;
+    if (controller == null) return;
+    if (controller.isPlayerOpen) {
+      if (_playerRoute != null) return;
+      final duration = MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : AppMotion.durSlow;
+      _playerRoute = PageRouteBuilder<void>(
+        // Transparent: the shell (and mini player, the Hero destination)
+        // stays painted beneath during open/close — no black flash.
+        opaque: false,
+        transitionDuration: duration,
+        reverseTransitionDuration: duration,
+        pageBuilder: (_, _, _) => PopScope(
+          canPop: true,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) {
+              _playerRoute = null;
+              _controller?.closePlayer();
+            }
+          },
+          child: _PlayerOverlay(
+            controller: controller,
+            animation: _visualizerController,
+            artworkAnimation: _artworkController,
+          ),
+        ),
+        transitionsBuilder: (_, animation, _, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: AppMotion.emphasized,
+            reverseCurve: AppMotion.exit,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.94, end: 1.0).animate(curved),
+              child: child,
+            ),
+          );
+        },
+      );
+      final route = _playerRoute!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(
+          Navigator.of(context).push(route).then((_) {
+            if (!mounted) return;
+            _playerRoute = null;
+            final c = _controller;
+            if (c != null && c.isPlayerOpen) c.closePlayer();
+          }),
+        );
+      });
+      return;
+    }
+    final route = _playerRoute;
+    if (route == null) return;
+    _playerRoute = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !route.isActive) return;
+      final navigator = Navigator.of(context);
+      // Dismiss anything stacked above the player (e.g. the lyrics sheet),
+      // then pop the player itself so the transition reverses.
+      navigator.popUntil((candidate) => candidate == route);
+      navigator.pop();
+    });
   }
 
   @override
@@ -134,11 +212,11 @@ class _MusicShellState extends State<MusicShell>
               children: [
                 const Positioned.fill(child: Atmosphere()),
                 currentPage,
-                // Mini player — above page content, below player overlay.
+                // Mini player — above page content, below the player route.
+                // Stays mounted while the player is open: it is the Hero
+                // flight endpoint for the artwork morph in both directions.
                 // Gesture down hides it; gesture up opens full player.
-                if (!controller.isPlayerOpen &&
-                    miniTrack != null &&
-                    !_isMiniPlayerDismissed)
+                if (miniTrack != null && !_isMiniPlayerDismissed)
                   Positioned(
                     left: AppSpacing.lg,
                     right: AppSpacing.lg,
@@ -235,48 +313,6 @@ class _MusicShellState extends State<MusicShell>
                       ),
                     ),
                   ),
-                // Player overlay
-                Positioned.fill(
-                  child: IgnorePointer(
-                    ignoring: !controller.isPlayerOpen,
-                    child: AnimatedSwitcher(
-                      duration: AppMotion.durSlow,
-                      switchInCurve: AppMotion.emphasized,
-                      switchOutCurve: AppMotion.exit,
-                      transitionBuilder: (child, anim) {
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: anim,
-                            curve: AppMotion.standard,
-                          ),
-                          child: SlideTransition(
-                            position:
-                                Tween<Offset>(
-                                  begin: const Offset(0, 1),
-                                  end: Offset.zero,
-                                ).animate(
-                                  CurvedAnimation(
-                                    parent: anim,
-                                    curve: AppMotion.emphasized,
-                                  ),
-                                ),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: controller.isPlayerOpen
-                          ? _PlayerOverlay(
-                              key: const ValueKey('player-overlay'),
-                              controller: controller,
-                              animation: _visualizerController,
-                              artworkAnimation: _artworkController,
-                            )
-                          : const SizedBox.shrink(
-                              key: ValueKey('player-overlay-hidden'),
-                            ),
-                    ),
-                  ),
-                ),
               ],
             ),
             bottomNavigationBar: controller.isPlayerOpen
@@ -699,7 +735,6 @@ class _MiniButton extends StatelessWidget {
 
 class _PlayerOverlay extends StatefulWidget {
   const _PlayerOverlay({
-    super.key,
     required this.controller,
     required this.animation,
     required this.artworkAnimation,
@@ -749,11 +784,15 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
   void _handleDragEnd(DragEndDetails details) {
     final velocity = details.primaryVelocity ?? 0;
     final shouldClose = velocity > 650 || _dragOffset > 120;
+    final instant = MediaQuery.disableAnimationsOf(context);
 
     if (shouldClose) {
-      // Slide the sheet off screen along the drag direction, then close.
+      // Slide the sheet off screen along the drag direction, then pop the
+      // route — the reverse transition runs while the sheet is off-screen.
       final screenH = MediaQuery.sizeOf(context).height;
-      _settleController.duration = const Duration(milliseconds: 220);
+      _settleController.duration = instant
+          ? Duration.zero
+          : const Duration(milliseconds: 220);
       _settleAnimation = Tween<double>(begin: _dragOffset, end: screenH)
           .animate(
             CurvedAnimation(parent: _settleController, curve: Curves.easeIn),
@@ -762,13 +801,15 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
         ..reset()
         ..forward().whenComplete(() {
           _settleController.duration = AppMotion.durMedium;
-          if (mounted) widget.controller.closePlayer();
+          if (mounted) Navigator.of(context).maybePop();
         });
       return;
     }
 
     // Spring back to resting position.
-    _settleController.duration = AppMotion.durMedium;
+    _settleController.duration = instant
+        ? Duration.zero
+        : AppMotion.durMedium;
     _settleAnimation = Tween<double>(begin: _dragOffset, end: 0).animate(
       CurvedAnimation(parent: _settleController, curve: AppMotion.emphasized),
     );
@@ -781,10 +822,11 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Transform.translate(
-      offset: Offset(0, _dragOffset),
-      child: Container(
-        key: const Key('player-overlay-sheet'),
+    return RepaintBoundary(
+      child: Transform.translate(
+        offset: Offset(0, _dragOffset),
+        child: Material(
+          key: const Key('player-overlay-sheet'),
         color:
             widget.controller.immersiveCanvas &&
                 widget.controller.currentTrack != null
@@ -804,7 +846,7 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
                 label: 'Close player',
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
-                  onTap: widget.controller.closePlayer,
+                  onTap: () => Navigator.of(context).maybePop(),
                   onVerticalDragUpdate: _handleDragUpdate,
                   onVerticalDragEnd: _handleDragEnd,
                   child: Padding(
@@ -844,7 +886,8 @@ class _PlayerOverlayState extends State<_PlayerOverlay>
             ],
           ),
         ),
-      ),
+          ),
+        ),
     );
   }
 }

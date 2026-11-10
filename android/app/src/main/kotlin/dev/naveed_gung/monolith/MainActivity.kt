@@ -1,6 +1,8 @@
 package dev.naveed_gung.monolith
 
+import android.content.Context
 import android.content.Intent
+import android.net.wifi.WifiManager
 import androidx.core.content.FileProvider
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -15,11 +17,37 @@ class MainActivity : AudioServiceActivity() {
 
     private var mediaImportHandler: MediaImportHandler? = null
     private var sharedAudioHandler: SharedAudioHandler? = null
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         mediaImportHandler = MediaImportHandler(this).also { it.attach(flutterEngine) }
         sharedAudioHandler = SharedAudioHandler(this, flutterEngine).also { it.accept(intent) }
+        // Nearby sharing (Monolith app over Wi-Fi): hold a MulticastLock while
+        // the Share picker or Receive session is open so UDP broadcast
+        // discovery replies are delivered to the app.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "monolith/nearby").setMethodCallHandler { call, result ->
+            val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            when (call.method) {
+                "acquireMulticastLock" -> try {
+                    if (multicastLock?.isHeld != true) {
+                        multicastLock = wifi?.createMulticastLock("monolith-nearby")
+                            ?.also { it.setReferenceCounted(false); it.acquire() }
+                    }
+                    result.success(null)
+                } catch (error: Exception) {
+                    result.error("multicast_lock", error.message, null)
+                }
+                "releaseMulticastLock" -> try {
+                    multicastLock?.let { if (it.isHeld) it.release() }
+                    multicastLock = null
+                    result.success(null)
+                } catch (error: Exception) {
+                    result.error("multicast_lock", error.message, null)
+                }
+                else -> result.notImplemented()
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "monolith/updates").setMethodCallHandler { call, result ->
             if (call.method != "install") {
                 result.notImplemented()
@@ -44,6 +72,8 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        multicastLock?.let { if (it.isHeld) it.release() }
+        multicastLock = null
         sharedAudioHandler?.dispose()
         sharedAudioHandler = null
         mediaImportHandler?.detach()

@@ -2,6 +2,11 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.5.0] — Unreleased
+
+- Share songs between Monolith devices over local Wi-Fi: a song's Share sheet gains "Monolith app" (send to a discovered device) and "Receive" (a five-minute foreground session). Discovery and the framed wire protocol match Monolith Desktop — TLS 1.3 with the discovery-provided certificate fingerprint pinned; every song needs explicit recipient consent and lands in the library through the existing importer.
+- Premium player open/close: the mini player's artwork now morphs into the full player (shared-element flight plus fade/scale), drag-to-dismiss keeps tracking the finger with velocity settle, and closing replays the transition in reverse. Honors the system's reduce-animations setting.
+
 ## [1.4.6] — 2026-09-29
 
 - Publish the visible listening queue to the system media player so lock-screen and notification Previous/Next controls work beyond a single track.

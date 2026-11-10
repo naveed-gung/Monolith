@@ -25,7 +25,7 @@
 	<key>NSAppleMusicUsageDescription</key>
 	<string>Monolith needs access to your media library to import songs from your device.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Monolith uses local network access for audio session management.</string>
+	<string>Monolith uses local network access for audio session management and to send or receive songs with nearby Monolith devices you approve.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

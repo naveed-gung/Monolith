@@ -142,6 +142,7 @@ class DownloadRequest {
     this.writeAutoSubtitles,
     this.customOptions,
     this.processId,
+    this.artworkDirectory,
   });
 
   final String url;
@@ -160,6 +161,11 @@ class DownloadRequest {
   final bool? writeAutoSubtitles;
   final Map<String?, String?>? customOptions;
   final String? processId;
+
+  /// Private directory for artwork sidecars. When set (Android public-Music
+  /// layout), thumbnails land here instead of beside the audio file, since
+  /// scoped storage refuses non-media files in public Music.
+  final String? artworkDirectory;
 }
 
 class DownloadResult {

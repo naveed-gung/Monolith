@@ -112,6 +112,10 @@ class DownloadStore {
   /// scoped storage (API 30+) only allows media files matching a public
   /// directory's type, so images next to audio in Music/ are unreliable.
   /// Lookup falls back to sidecars sitting beside the audio file.
+  /// Private directory holding artwork sidecars; exposed so download
+  /// pipelines can place non-audio files outside the public Music folder.
+  Future<Directory> artworkDirectory() => _artDirectory();
+
   Future<Directory> _artDirectory() async {
     final root = await _rootDirectory();
     return _ensureDir('${root.path}${_sep}Art');

@@ -6,7 +6,7 @@
 - **Android (1.5.1+):** the public `Music/Monolith` folder, keeping the `Music/` and `Music/Imports` layout under it — audio survives uninstall/reinstall. The manifest, artwork sidecars (`Art/`), and `.part` files stay in the app external files directory. Deleting a file a previous install saved may show Android's delete-confirmation dialog.
 - **Android (≤1.5.0):** the app external files directory, then `Monolith/Music`; imported copies use its `Imports` subfolder. This location is wiped on uninstall.
 - `Monolith/manifest.json` stores track metadata. Artwork is kept beside audio when available.
-- Temporary downloads end in `.part` and are excluded from library scans.
+- Temporary downloads end in `.part` and are excluded from library scans. Since 1.5.2 all in-progress files (`.part`, source video, extracted audio) stage in the app's private temp folder — scoped storage on Android 11+ only permits audio files inside public `Music`. The finished audio file is the only thing ever written there.
 
 On iOS, browse Files → On My iPhone → Monolith → Monolith → Music. The first Monolith is the app's Documents entry; the second is the folder created by the store.
 

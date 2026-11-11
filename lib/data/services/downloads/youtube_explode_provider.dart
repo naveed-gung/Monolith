@@ -25,15 +25,21 @@ import 'source_provider.dart';
 class YoutubeExplodeProvider implements SourceProvider {
   YoutubeExplodeProvider({
     required Future<Directory> Function() destinationDirectory,
+    Future<Directory> Function()? artworkDirectory,
     yt.YoutubeExplode? youtube,
     http.Client? httpClient,
   }) : _destinationDirectory = destinationDirectory,
+       _artworkDirectory = artworkDirectory,
        _youtube = youtube ?? yt.YoutubeExplode(),
        _httpClient = httpClient ?? http.Client();
 
   /// Where completed audio is written. Wired to [LibraryStore.musicDirectory]
   /// by the DI layer so downloads land in the library folder.
   final Future<Directory> Function() _destinationDirectory;
+
+  /// Private artwork folder — scoped storage on Android 11+ refuses image
+  /// files inside public Music/, so sidecars live in the app Art dir.
+  final Future<Directory> Function()? _artworkDirectory;
   final yt.YoutubeExplode _youtube;
   final http.Client _httpClient;
 
@@ -110,12 +116,20 @@ class YoutubeExplodeProvider implements SourceProvider {
       await sink.close();
       sink = null;
 
-      // Sidecar artwork next to the audio file — LibraryStore picks it up as
-      // artworkPath on registration (best-effort, never fails the download).
-      await _tryWriteArtwork(
-        video,
-        '${directory.path}${Platform.pathSeparator}$stem.jpg',
-      );
+      // Sidecar artwork — LibraryStore picks it up as artworkPath on
+      // registration (best-effort, never fails the download). On Android the
+      // sidecar lands in the private Art dir: scoped storage refuses image
+      // files beside public Music audio.
+      String artworkPath;
+      final artDir = _artworkDirectory;
+      if (artDir != null) {
+        final dir = await artDir();
+        await dir.create(recursive: true);
+        artworkPath = '${dir.path}${Platform.pathSeparator}$stem.jpg';
+      } else {
+        artworkPath = '${directory.path}${Platform.pathSeparator}$stem.jpg';
+      }
+      await _tryWriteArtwork(video, artworkPath);
 
       finished = true;
       yield DownloadCompleted(filePath: outputFile.path);

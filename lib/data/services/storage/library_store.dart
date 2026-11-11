@@ -109,6 +109,10 @@ class LibraryStore {
     return ensureDir('${root.path}/$_musicFolderName');
   }
 
+  /// Private folder holding artwork sidecars for public audio; exposed so
+  /// download pipelines can place non-audio files outside public Music.
+  Future<Directory> artworkDirectory() => _artDirectory();
+
   /// Artwork sidecars for public audio live in the private `Art` folder:
   /// scoped storage (API 30+) can refuse non-media files in Music/.
   Future<Directory> _artDirectory() async {

@@ -20,6 +20,7 @@ task below came from reading the code or running the tooling — no filler.
 | TASK-14 | Premium player open/close shared-element transition | P1 | M | DONE | 2026-11-10 |
 | TASK-15 | Bluetooth RFCOMM sharing (Android-only, after LAN) | P2 | L | TODO | 2026-11-10 |
 | TASK-16 | Stable release signing + public Music storage (survives uninstall) | P1 | L | DONE | 2026-11-10 |
+| TASK-17 | Scoped-storage download failure at 100% (non-audio files in public Music) | P1 | M | DONE | 2026-11-10 |
 | TASK-07 | Android CI signs every build with a throwaway key | P1 | M | TODO | 2026-09-20 |
 | TASK-10 | Edit Up Next and keep system controls in sync | P2 | L | TODO | 2026-09-29 |
 | TASK-11 | Stop playback with a sleep timer | P2 | M | TODO | 2026-09-29 |
@@ -68,6 +69,13 @@ Priority: P2 · Effort: L · Depends: TASK-13 · Files: `lib/src/core/services/n
 **Why**: Spec allows Android-only RFCOMM (`listenUsingRfcommWithServiceRecord`/`createRfcommSocketToServiceRecord`, UUID `e8793c34-...`, secure RFCOMM only) but only if time remains after LAN works; omitted cleanly this session. Deferred, not dropped — the wire protocol layer (`nearby_channel`/`nearby_transfer`) is transport-agnostic and can sit on an RFCOMM socket via a Kotlin EventChannel/MethodChannel bridge.
 
 **Acceptance criteria**: paired-device picker → send; receive session; secure RFCOMM only; runtime BLUETOOTH_CONNECT (SDK 31+); all socket/hash/import work off the UI thread.
+
+### TASK-17 Scoped-storage download failure at 100%
+Priority: P1 · Effort: M · Depends: TASK-16 · Files: `lib/src/core/services/media_downloader.dart`, `media_output.dart`, `lib/data/services/downloads/youtube_explode_provider.dart`
+
+**Done 2026-11-10**: YouTube downloads failed at 100% on Android 11+ because non-audio files were created in public `Music` — direct-path downloads wrote `<final>.part` there, extraction path copied `audio.m4a` to `<final>.part`, and thumbnails wrote `<stem>.jpg` beside the audio. Now every in-progress artifact lives in private staging (`Directory.systemTemp`); only the finished audio is published via `commitStagedAudio` (rename → copy+length-verify fallback → no truncated target survives an error). Thumbnails land in the private `Art` dir via `DownloadRequest.artworkDirectory` (v1) and `artworkDirectory` DI param on `YoutubeExplodeProvider` (v2); `findArtworkForAudio` already resolves `Art` by stem. `artworkPathForAudio`/`commitStagedAudio` are shared helpers in `media_output.dart` (testable without network/youtube).
+
+**Verification**: `test/media_output_test.dart` (4 cases: only final audio in public dir, no partial target on failure, art-dir path, sidecar fallback); flutter analyze clean; full suite green. Device verification skipped — no device attached.
 
 ### TASK-10 Edit Up Next and keep system controls in sync
 Priority: P2 · Effort: L · Depends: — · Files: `lib/src/app/state/app_controller.dart`, player/queue UI, media controls

@@ -135,6 +135,8 @@ final sourceProvidersProvider = Provider<List<SourceProvider>>((ref) {
     YoutubeExplodeProvider(
       destinationDirectory: () =>
           ref.watch(libraryStoreProvider).musicDirectory(),
+      artworkDirectory: () =>
+          ref.watch(libraryStoreProvider).artworkDirectory(),
     ),
   ];
 });

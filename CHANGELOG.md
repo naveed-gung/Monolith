@@ -2,6 +2,10 @@
 
 All notable changes to Monolith are documented here.
 
+## [1.5.2] — Unreleased
+
+- Fix YouTube downloads failing at 100% on Android 11+: in-progress files (`.part`, source video, extracted audio) and artwork are no longer written into public `Music` — scoped storage only permits audio files there. Downloads now stage privately and publish the finished audio file; thumbnails land in the private `Art` folder.
+
 ## [1.5.1] — 2026-11-10
 
 - Release builds are now signed with Monolith's stable release key, so later versions install over this one — upgrading from 1.5.0 or older (debug-signed) needs one uninstall/reinstall.

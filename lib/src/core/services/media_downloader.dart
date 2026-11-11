@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 
 import 'media_downloader_models.dart';
+import 'media_output.dart';
 import 'audio_stream_transfer.dart';
 import 'native_audio_extractor.dart';
 
@@ -191,18 +192,22 @@ class _StreamMediaDownloader implements MediaDownloader {
                 video: video,
                 stream: selectedStream,
               );
+              // Every in-progress artifact lives in private staging: scoped
+              // storage (Android 11+) refuses non-audio filenames like
+              // `.part` inside public Music, so only the finished audio file
+              // may ever touch the output directory.
+              activeDownload.staging ??= await Directory.systemTemp
+                  .createTemp('monolith_audio_');
+              final stagingDir = activeDownload.staging!;
               File outputFile;
               if (needsExtraction) {
-                activeDownload.staging = await Directory.systemTemp.createTemp(
-                  'monolith_audio_',
-                );
-                outputFile = File('${activeDownload.staging!.path}/source.mp4');
+                outputFile = File('${stagingDir.path}/source.mp4');
                 _log(
                   processId,
                   'Trying a compatible source; keeping only its audio.',
                 );
               } else {
-                outputFile = File('${finalFile.path}.part');
+                outputFile = File('${stagingDir.path}/audio.part');
               }
               activeDownload.outputFile = outputFile;
               activeDownload.checkCancelled();
@@ -265,9 +270,7 @@ class _StreamMediaDownloader implements MediaDownloader {
                     await audioFile.length() == 0) {
                   throw StateError('Audio extraction produced no audio.');
                 }
-                final stagedAudio = File('${finalFile.path}.part');
-                activeDownload.outputFile = stagedAudio;
-                await audioFile.copy(stagedAudio.path);
+                activeDownload.outputFile = audioFile;
               }
               completedFile = finalFile;
               break;
@@ -293,9 +296,18 @@ class _StreamMediaDownloader implements MediaDownloader {
         throw transferError ?? StateError('No audio source available.');
       }
       if (request.embedThumbnail == true) {
+        // Artwork is not an audio file: it lands in the private Art
+        // directory when one is provided, never beside public audio.
+        final artDir = request.artworkDirectory;
         activeDownload.artworkFile = File(
-          '${_fileStem(completedFile.path)}.jpg',
+          artworkPathForAudio(
+            completedFile.path,
+            artworkDirectory: artDir,
+          ),
         );
+        if (artDir != null) {
+          await Directory(artDir).create(recursive: true);
+        }
         await _downloadThumbnail(
           video: video,
           destination: activeDownload.artworkFile,
@@ -303,7 +315,10 @@ class _StreamMediaDownloader implements MediaDownloader {
         );
       }
       activeDownload.checkCancelled();
-      await activeDownload.outputFile!.rename(completedFile.path);
+      await commitStagedAudio(
+        staged: activeDownload.outputFile!,
+        target: completedFile,
+      );
       activeDownload.outputFile = completedFile;
       _emitState(processId, DownloadStateType.completed);
       return DownloadResult(
@@ -610,13 +625,6 @@ class _StreamMediaDownloader implements MediaDownloader {
   String _channelUrl(yt.Video video) =>
       'https://www.youtube.com/channel/${video.channelId}';
 
-  String _fileStem(String path) {
-    final dotIndex = path.lastIndexOf('.');
-    if (dotIndex <= 0) {
-      return path;
-    }
-    return path.substring(0, dotIndex);
-  }
 }
 
 class _UnsupportedMediaDownloader implements MediaDownloader {

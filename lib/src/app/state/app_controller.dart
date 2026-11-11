@@ -1387,11 +1387,19 @@ class MonolithController extends ChangeNotifier {
     if (_cancelledDownloadIds.contains(task.processId)) return;
     final outputDirectory = await _downloadStore.getDownloadDirectory();
     if (_cancelledDownloadIds.contains(task.processId)) return;
+    Directory? artworkDirectory;
+    try {
+      artworkDirectory = await _downloadStore.artworkDirectory();
+    } catch (_) {
+      // Artwork is decorative; the downloader falls back to a sidecar.
+    }
+    if (_cancelledDownloadIds.contains(task.processId)) return;
     final request = _buildAudioDownloadRequest(
       processId: task.processId,
       url: task.url,
       fileName: task.fileName,
       outputDirectoryPath: outputDirectory.path,
+      artworkDirectoryPath: artworkDirectory?.path,
     );
     final preview = DownloadPreview(
       url: task.url,
@@ -1988,6 +1996,7 @@ class MonolithController extends ChangeNotifier {
     required String url,
     required String fileName,
     required String outputDirectoryPath,
+    String? artworkDirectoryPath,
   }) {
     return DownloadRequest(
       url: url,
@@ -2007,6 +2016,7 @@ class MonolithController extends ChangeNotifier {
         '--extractor-retries': '3',
       },
       processId: processId,
+      artworkDirectory: artworkDirectoryPath,
     );
   }
 

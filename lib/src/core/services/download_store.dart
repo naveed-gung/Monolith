@@ -497,6 +497,28 @@ class DownloadStore {
     return null;
   }
 
+  /// Stores cover art received over Monolith sharing for [audioFilePath] in
+  /// the private Art folder (keyed by the audio's stem, where
+  /// [findArtworkForAudio] looks). [extension] is the sniffed image type.
+  /// Stale covers left under the same stem by a deleted song are replaced so
+  /// the lookup order cannot pick the old picture.
+  Future<File> saveSharedArtwork(
+    String audioFilePath,
+    Uint8List bytes,
+    String extension,
+  ) async {
+    final artDir = await _artDirectory();
+    final stem = _stem(audioFilePath);
+    for (final stale in ['jpg', 'jpeg', 'png', 'webp']) {
+      final file = File('${artDir.path}$_sep$stem.$stale');
+      if (await file.exists()) await file.delete();
+    }
+    final target = File('${artDir.path}$_sep$stem.$extension');
+    final temporary = File('${target.path}.part');
+    await temporary.writeAsBytes(bytes, flush: true);
+    return temporary.rename(target.path);
+  }
+
   /// Moves an artwork sidecar sitting beside a public audio file into the
   /// private Art folder, since scoped storage can refuse images in Music/.
   /// No-op when the audio lives under the private root already.

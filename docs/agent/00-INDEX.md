@@ -3,8 +3,8 @@ touched, bump last-verified, and append a line to SESSIONS.md.
 Rules: docs/agent/PROTOCOL.md -->
 ---
 doc: 00-INDEX
-last-verified: 2026-11-10
-verified-by: devin
+last-verified: 2026-11-22
+verified-by: claude-code
 ---
 
 # Monolith — agent docs index
@@ -56,13 +56,14 @@ needs HUMAN-GATE or dependency · `DONE` verified complete · `DROPPED` won't do
 
 ## Current top priorities (max 5 — keep current)
 
-1. TASK-07 — Android CI signs each build with a fresh throwaway key, so sideloaded
+1. TASK-18 — Share hub + cover art + reliable discovery (mobile code written, untested;
+   desktop side pending).
+2. TASK-07 — Android CI signs each build with a fresh throwaway key, so sideloaded
    upgrades and the in-app updater cannot install over an existing install.
-2. TASK-08 — decide what to do about the `v1.4.4` release whose assets were overwritten
+3. TASK-08 — decide what to do about the `v1.4.4` release whose assets were overwritten
    with 1.4.5 binaries (HUMAN-GATE).
-3. TASK-15 — Bluetooth RFCOMM sharing (Android-only); LAN sharing TASK-13 shipped.
-4. TASK-02 — cap the download-history list before it grows without bound.
-5. TASK-01 — keep `flutter analyze` signal clean by excluding probe directories.
+4. TASK-15 — Bluetooth RFCOMM sharing (Android-only); LAN sharing TASK-13 shipped.
+5. TASK-02 — cap the download-history list before it grows without bound.
 
 ## Cross-doc dependencies
 

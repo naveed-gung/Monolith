@@ -11,6 +11,12 @@ const nearbyMaxControlBytes = 16 * 1024;
 const nearbyDiscoveryPort = 45881;
 const nearbyMaxPeers = 32;
 
+/// Optional cover-art sidecar that may follow the audio bytes (protocol v1
+/// artwork extension, docs/nearby-music.md). Same cap as the desktop cover
+/// decoder; older peers ignore the extra offer fields and never ask for it.
+const nearbyMaxArtworkBytes = 8 * 1024 * 1024;
+const nearbyArtworkExtensions = <String>{'jpg', 'png', 'webp'};
+
 /// Extensions the desktop receiver publishes (nearby-music.md "Supported
 /// extensions match the existing importer"). Kept as the wire set for both
 /// directions so mobile stays byte-for-byte compatible with desktop.
@@ -76,14 +82,7 @@ bool nearbyValidName(String name) {
 
 bool _isAsciiDigit(int unit) => unit >= 0x30 && unit <= 0x39;
 
-bool nearbyValidFingerprint(String value) =>
-    value.length == 64 &&
-    value.codeUnits.every(
-      (c) =>
-          (c >= 0x30 && c <= 0x39) ||
-          (c >= 0x61 && c <= 0x66) ||
-          (c >= 0x41 && c <= 0x46),
-    );
+bool nearbyValidFingerprint(String value) => _isHex64(value);
 
 /// IPv4 link-local/loopback/private check, matching `local()` in lan.rs. The
 /// sender derives the IP from the datagram source and rejects anything else.
@@ -110,35 +109,78 @@ String _lowerHex(List<int> bytes) {
 
 String nearbyHex(List<int> bytes) => _lowerHex(bytes);
 
-/// A validated one-song offer, identical to the desktop `Offer`.
+bool _isHex64(String value) =>
+    value.length == 64 &&
+    value.codeUnits.every(
+      (c) =>
+          (c >= 0x30 && c <= 0x39) ||
+          (c >= 0x61 && c <= 0x66) ||
+          (c >= 0x41 && c <= 0x46),
+    );
+
+/// Sniffs JPEG / PNG / WebP magic bytes and returns the sidecar extension, or
+/// null when [bytes] is not a supported image. The receiver never trusts the
+/// advertised extension alone.
+String? nearbyArtworkKind(List<int> bytes) {
+  if (bytes.length >= 3 &&
+      bytes[0] == 0xff &&
+      bytes[1] == 0xd8 &&
+      bytes[2] == 0xff) {
+    return 'jpg';
+  }
+  if (bytes.length >= 8 &&
+      bytes[0] == 0x89 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x4e &&
+      bytes[3] == 0x47) {
+    return 'png';
+  }
+  if (bytes.length >= 12 &&
+      String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+      String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP') {
+    return 'webp';
+  }
+  return null;
+}
+
+/// A validated one-song offer, identical to the desktop `Offer`, plus the
+/// optional artwork sidecar description (`artworkSize == 0` means none).
 class NearbyOffer {
   const NearbyOffer({
     required this.name,
     required this.title,
     required this.size,
     required this.sha256,
+    this.artworkSize = 0,
+    this.artworkSha256 = '',
+    this.artworkExt = '',
   });
 
   final String name;
   final String title;
   final int size;
   final String sha256;
+  final int artworkSize;
+  final String artworkSha256;
+  final String artworkExt;
+
+  bool get hasArtwork => artworkSize > 0;
 
   void validate() {
     if (!nearbyValidName(name) ||
         !_cleanText(title, 480) ||
         size <= 0 ||
         size > nearbyMaxSongBytes ||
-        sha256.length != 64 ||
-        !sha256.codeUnits.every(
-          (c) =>
-              (c >= 0x30 && c <= 0x39) ||
-              (c >= 0x61 && c <= 0x66) ||
-              (c >= 0x41 && c <= 0x46),
-        )) {
+        !_isHex64(sha256)) {
       throw const FormatException(
         'Invalid song offer. Only audio files up to 100 MB are accepted.',
       );
+    }
+    if (hasArtwork &&
+        (artworkSize > nearbyMaxArtworkBytes ||
+            !_isHex64(artworkSha256) ||
+            !nearbyArtworkExtensions.contains(artworkExt))) {
+      throw const FormatException('Invalid artwork in song offer.');
     }
   }
 
@@ -148,6 +190,11 @@ class NearbyOffer {
     'title': title,
     'size': size,
     'sha256': sha256,
+    if (hasArtwork) ...{
+      'artwork_size': artworkSize,
+      'artwork_sha256': artworkSha256,
+      'artwork_ext': artworkExt,
+    },
   };
 
   static NearbyOffer parse(Object? value) {
@@ -164,6 +211,28 @@ class NearbyOffer {
       sha256: (value['sha256'] as String? ?? '').toLowerCase(),
     );
     offer.validate();
+    // Artwork is optional: a malformed description is dropped (the receiver
+    // then simply never asks for it) instead of refusing the song.
+    final rawArtSize = value['artwork_size'];
+    final artSha = value['artwork_sha256'];
+    final artExt = value['artwork_ext'];
+    if (rawArtSize is int &&
+        rawArtSize > 0 &&
+        rawArtSize <= nearbyMaxArtworkBytes &&
+        artSha is String &&
+        _isHex64(artSha) &&
+        artExt is String &&
+        nearbyArtworkExtensions.contains(artExt.toLowerCase())) {
+      return NearbyOffer(
+        name: offer.name,
+        title: offer.title,
+        size: offer.size,
+        sha256: offer.sha256,
+        artworkSize: rawArtSize,
+        artworkSha256: artSha.toLowerCase(),
+        artworkExt: artExt.toLowerCase(),
+      );
+    }
     return offer;
   }
 }

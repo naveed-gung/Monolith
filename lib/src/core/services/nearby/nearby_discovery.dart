@@ -68,14 +68,53 @@ NearbyPeer? nearbyParsePeer(
   );
 }
 
-/// One 2-second broadcast scan (lan.rs `discover`). Cancellation is polled on
-/// every datagram and timer tick.
+/// Where a scan sends its query: the limited broadcast, each private IPv4
+/// interface's /24 directed broadcast, and a unicast sweep of that /24.
+/// Directed broadcast survives Windows/VPN adapters that swallow
+/// 255.255.255.255; the unicast sweep reaches iOS devices (no multicast
+/// entitlement) and routers that filter broadcast entirely.
+Future<List<InternetAddress>> nearbyDiscoveryTargets() async {
+  final broadcast = <InternetAddress>[InternetAddress('255.255.255.255')];
+  final sweep = <InternetAddress>[];
+  final seenPrefixes = <String>{};
+  try {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+    );
+    for (final interface in interfaces) {
+      for (final address in interface.addresses) {
+        final b = address.rawAddress;
+        if (b[0] == 127 || !nearbyLocalAddress(address)) continue;
+        final prefix = '${b[0]}.${b[1]}.${b[2]}';
+        // Bound the sweep: a phone/desktop rarely has more than a couple of
+        // real LAN interfaces, and every /24 costs 254 datagrams.
+        if (seenPrefixes.length >= 3 || !seenPrefixes.add(prefix)) continue;
+        broadcast.add(InternetAddress('$prefix.255'));
+        for (var host = 1; host < 255; host++) {
+          if (host != b[3]) sweep.add(InternetAddress('$prefix.$host'));
+        }
+      }
+    }
+  } on SocketException {
+    // Interface enumeration unavailable: fall back to limited broadcast.
+  }
+  return [...broadcast, ...sweep];
+}
+
+/// One 2-second scan (lan.rs `discover`). The query burst is repeated three
+/// times inside the window because UDP is lossy on Wi-Fi. Cancellation is
+/// polled on every datagram and timer tick. [ignoreFingerprint] drops this
+/// device's own responder from the results.
 Future<List<NearbyPeer>> nearbyDiscover({
   required NearbyCancel cancel,
   InternetAddress? broadcastAddress,
   Duration window = const Duration(seconds: 2),
   int maxPeers = nearbyMaxPeers,
+  String? ignoreFingerprint,
 }) async {
+  final targets = broadcastAddress != null
+      ? [broadcastAddress]
+      : await nearbyDiscoveryTargets();
   final socket = await RawDatagramSocket.bind(
     InternetAddress.anyIPv4,
     0,
@@ -93,11 +132,22 @@ Future<List<NearbyPeer>> nearbyDiscover({
         'nonce': nonce,
       }),
     );
-    socket.send(
-      query,
-      broadcastAddress ?? InternetAddress('255.255.255.255'),
-      nearbyDiscoveryPort,
-    );
+    void burst() {
+      for (final target in targets) {
+        try {
+          socket.send(query, target, nearbyDiscoveryPort);
+        } on SocketException {
+          // Unreachable subnet/adapter: keep trying the remaining targets.
+        }
+      }
+    }
+
+    burst();
+    final repeats = [
+      Timer(window * 0.3, burst),
+      Timer(window * 0.6, burst),
+    ];
+    final ignored = ignoreFingerprint?.toLowerCase();
     final peers = <NearbyPeer>[];
     final seen = <String>{};
     final done = Completer<void>();
@@ -118,7 +168,9 @@ Future<List<NearbyPeer>> nearbyDiscover({
           continue;
         }
         final peer = nearbyParsePeer(decoded, source, nonce);
-        if (peer != null && seen.add(peer.id)) {
+        if (peer != null &&
+            peer.fingerprint != ignored &&
+            seen.add(peer.id)) {
           peers.add(peer);
           if (peers.length >= maxPeers && !done.isCompleted) {
             done.complete();
@@ -134,6 +186,9 @@ Future<List<NearbyPeer>> nearbyDiscover({
         cancel.onCancel,
       ]);
     } finally {
+      for (final timer in repeats) {
+        timer.cancel();
+      }
       await subscription.cancel();
     }
     return peers;
@@ -143,7 +198,7 @@ Future<List<NearbyPeer>> nearbyDiscover({
 }
 
 /// Answers `discover` datagrams with the listening session's `available`
-/// reply. Lives only while a Receive session is open (lan.rs `Listener`).
+/// reply. Lives only while the Share screen is open (lan.rs `Listener`).
 class NearbyDiscoveryResponder {
   NearbyDiscoveryResponder._(this._socket, this._subscription);
 

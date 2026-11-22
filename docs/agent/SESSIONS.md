@@ -3,14 +3,15 @@ delete the oldest beyond 30. Format: date | agent | tasks touched | commit-sha-o
 Rules: docs/agent/PROTOCOL.md -->
 ---
 doc: SESSIONS
-last-verified: 2026-11-10
-verified-by: devin
+last-verified: 2026-11-22
+verified-by: claude-code
 ---
 
 # Session journal (newest first, max 30)
 
 | Date | Agent | Work | Commit |
 |------|-------|------|--------|
+| 2026-11-22 | claude-code | TASK-18 opened: share hub page, artwork wire extension, discovery sweep/repeat/self-filter, Library share entry, tests (not run, no-build constraint); desktop side pending | uncommitted |
 | 2026-11-10 | devin | TASK-17 scoped-storage fix: stage all in-progress downloads privately, artwork to private Art dir (both downloader pipelines); 1.5.2+18 | uncommitted |
 | 2026-11-10 | devin | TASK-13 LAN song sharing (UDP discovery + TLS 1.3 pinned framed protocol, send+receive, desktop-compatible wire v1) and TASK-14 player shared-element open/close; v1.5.0+16; opened TASK-15 Bluetooth RFCOMM | uncommitted |
 | 2026-09-29 | codex | Planned TASK-10 editable Up Next and TASK-11 sleep timer; recorded TASK-12 listening sessions as an unapproved proposal; corrected current source version in index | uncommitted |

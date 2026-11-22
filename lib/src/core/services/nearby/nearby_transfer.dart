@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
@@ -10,10 +11,16 @@ import 'nearby_wire.dart';
 /// hello ↔ hello, offer → consent → accept/decline → exact-size raw audio →
 /// SHA-256 + content probe → publish → `saved` receipt only after import
 /// succeeds. EOF/timeout/errors/cancel never mean success.
+///
+/// When [offer] advertises artwork and the recipient answers
+/// `{"type":"accept","artwork":true}`, exactly `artworkSize` bytes of
+/// [artwork] follow the audio. Older recipients never ask, so nothing extra
+/// is written and the stream stays v1-compatible.
 Future<void> nearbySend(
   NearbyChannel channel,
   File source,
   NearbyOffer offer, {
+  File? artwork,
   void Function(int sent, int total)? onProgress,
 }) async {
   offer.validate();
@@ -37,6 +44,12 @@ Future<void> nearbySend(
     offer.size,
     onProgress: onProgress,
   );
+  if (answer['artwork'] == true && offer.hasArtwork && artwork != null) {
+    await channel.sendBytes(
+      artwork.openRead(0, offer.artworkSize),
+      offer.artworkSize,
+    );
+  }
   final receipt = await channel.readControl();
   if (receipt['type'] != 'saved' || receipt['sha256'] != offer.sha256) {
     throw const SocketException('No verified library receipt was received.');
@@ -50,12 +63,19 @@ Future<void> nearbySend(
 /// [import] runs the existing importer. A `saved` receipt is sent only after
 /// both succeed — if publication succeeded but import failed the verified
 /// audio is retained and no receipt is sent.
+///
+/// [saveArtwork], when given, opts into the artwork extension: the receiver
+/// asks for the sidecar, always drains exactly `artworkSize` bytes (keeping
+/// the stream in sync), and stores it beside the published song only when its
+/// SHA-256 and image magic match. Bad artwork is dropped, never the song.
 Future<File> nearbyReceive(
   NearbyChannel channel,
   Directory stagingDirectory, {
   required Future<bool> Function(NearbyOffer offer, String sender) consent,
   required Future<File> Function(File staged, String name) publish,
   required Future<void> Function(File published) import,
+  Future<void> Function(File published, Uint8List bytes, String ext)?
+  saveArtwork,
   void Function(int received, int total)? onProgress,
 }) async {
   final sender = channel.socket.remoteAddress.address;
@@ -95,11 +115,18 @@ Future<File> nearbyReceive(
   IOSink? sink;
   try {
     sink = staged.openWrite();
-    await channel.writeControl(const {'type': 'accept'});
+    final wantArtwork = offer.hasArtwork && saveArtwork != null;
+    await channel.writeControl({
+      'type': 'accept',
+      if (wantArtwork) 'artwork': true,
+    });
     await channel.receiveBytes(sink, offer.size, onProgress: onProgress);
     await sink.flush();
     await sink.close();
     sink = null;
+    final artwork = wantArtwork
+        ? await channel.readExact(offer.artworkSize)
+        : null;
 
     if (channel.cancel.cancelled) {
       throw const SocketException('Sharing cancelled.');
@@ -118,6 +145,17 @@ Future<File> nearbyReceive(
       throw const SocketException('Sharing cancelled.');
     }
     final published = await publish(staged, offer.name);
+    if (artwork != null) {
+      final kind = nearbyArtworkKind(artwork);
+      if (kind != null &&
+          sha256.convert(artwork).toString() == offer.artworkSha256) {
+        try {
+          await saveArtwork!(published, artwork, kind);
+        } catch (_) {
+          // Cover art is best-effort; the verified song still imports.
+        }
+      }
+    }
     // Keep verified audio on disk if import fails; never claim it reached
     // the library.
     await import(published);
@@ -138,7 +176,14 @@ Future<File> nearbyReceive(
 /// Builds the [NearbyOffer] a sender advertises for [file] — the same checks
 /// the desktop performs before the first byte: real size 1…100 MB and a
 /// SHA-256 of the stable snapshot actually being sent.
-Future<NearbyOffer> nearbyOfferForFile(File file, String title) async {
+///
+/// [artwork] is an optional cover sidecar (JPEG/PNG/WebP up to 8 MB). Anything
+/// unreadable, oversized or not an image is silently left out of the offer.
+Future<NearbyOffer> nearbyOfferForFile(
+  File file,
+  String title, {
+  File? artwork,
+}) async {
   final size = await file.length();
   if (size <= 0 || size > nearbyMaxSongBytes) {
     throw const SocketException('Choose a song under 100 MB.');
@@ -147,11 +192,33 @@ Future<NearbyOffer> nearbyOfferForFile(File file, String title) async {
   final cleaned = title
       .replaceAll(RegExp(r'[\x00-\x1f\x7f-\x9f]'), '')
       .trim();
+  var artworkSize = 0;
+  var artworkSha256 = '';
+  var artworkExt = '';
+  if (artwork != null) {
+    try {
+      final length = await artwork.length();
+      if (length > 0 && length <= nearbyMaxArtworkBytes) {
+        final bytes = await artwork.readAsBytes();
+        final kind = nearbyArtworkKind(bytes);
+        if (kind != null && bytes.length == length) {
+          artworkSize = length;
+          artworkSha256 = sha256.convert(bytes).toString();
+          artworkExt = kind;
+        }
+      }
+    } on FileSystemException {
+      // Missing or unreadable cover: share the song without it.
+    }
+  }
   final offer = NearbyOffer(
     name: name,
     title: cleaned.length > 120 ? cleaned.substring(0, 120) : cleaned,
     size: size,
     sha256: (await sha256.bind(file.openRead()).first).toString(),
+    artworkSize: artworkSize,
+    artworkSha256: artworkSha256,
+    artworkExt: artworkExt,
   );
   offer.validate();
   return offer;

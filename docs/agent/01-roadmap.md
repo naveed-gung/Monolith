@@ -3,8 +3,8 @@ touched anything related, bump last-verified, and append to SESSIONS.md.
 Rules: docs/agent/PROTOCOL.md -->
 ---
 doc: 01-roadmap
-last-verified: 2026-11-10
-verified-by: devin
+last-verified: 2026-11-22
+verified-by: claude-code
 ---
 
 # Monolith — roadmap & open work
@@ -16,6 +16,7 @@ task below came from reading the code or running the tooling — no filler.
 
 | ID | Title | Priority | Effort | Status | Last touched |
 |----|-------|----------|--------|--------|--------------|
+| TASK-18 | Share hub: one screen, always discoverable, cover art, reliable discovery | P1 | L | IN-PROGRESS | 2026-11-22 |
 | TASK-13 | Monolith app Wi-Fi sharing (send + receive, desktop-compatible) | P1 | L | DONE | 2026-11-10 |
 | TASK-14 | Premium player open/close shared-element transition | P1 | M | DONE | 2026-11-10 |
 | TASK-15 | Bluetooth RFCOMM sharing (Android-only, after LAN) | P2 | L | TODO | 2026-11-10 |
@@ -35,6 +36,26 @@ task below came from reading the code or running the tooling — no filler.
 | TASK-05 | Custom shuffle/repeat on the iOS Lock Screen | P3 | M | DROPPED | 2026-09-19 |
 
 ## Tasks
+
+### TASK-18 Share hub: one screen, always discoverable, cover art, reliable discovery
+Priority: P1 · Effort: L · Depends: TASK-13 · Files: `lib/src/features/nearby/presentation/nearby_page.dart`, `nearby_share_sheet.dart`, `lib/src/core/services/nearby/{nearby_wire,nearby_transfer,nearby_discovery}.dart`, `download_store.dart`, `library_page.dart`, `test/nearby_test.dart`; desktop `Monolith-DE` `src/{lan,nearby,nearby_ui}.rs`, `ui/nearby.slint`
+
+**Why** (user report 2026-11-22): devices not visible on share; no dedicated entry point; cover art not shared; desktop sharing UI broken.
+
+**Root causes**: only Receive mode answered discovery (sender + sender never saw each other); single 255.255.255.255 datagram often leaves via a virtual adapter or gets dropped; list flickered per scan; desktop worker could not answer while scanning.
+
+**Done (mobile, uncommitted 2026-11-22)**:
+- Wire extension, backward compatible: offer gains optional `artwork_size` (≤8 MB) / `artwork_sha256` / `artwork_ext` (jpg/png/webp). Receiver opts in with `{"type":"accept","artwork":true}`; only then sender appends exactly `artwork_size` bytes after audio. Receiver drains, verifies sha + magic bytes, saves sidecar after publish and before import; bad art never fails the song. Malformed art fields are dropped at parse.
+- Discovery: limited broadcast + per-interface /24 directed broadcast + unicast sweep (≤3 prefixes), bursts at 0/30/60 % of the 2 s window, own fingerprint ignored.
+- `NearbyPage` hub replaces share/receive pages: receiver auto-starts (visible as alias), scan loop every ~3 s with 15 s peer TTL, multi-select song picker with search + thumbnails, sequential batch send with per-song state, consent dialog shows "with cover art", PopScope confirm while sending, empty-state network tips.
+- Entry points: Library header broadcast icon (`Key('nearby-button')`); track menu Share → "Nearby Monolith" opens hub with song preselected.
+- `DownloadStore.saveSharedArtwork` writes `<Art>/<stem>.<ext>` atomically.
+
+**Verification**: NOT run — user forbade builds (no network). `.dart_tool/package_config.json` missing, so even `flutter analyze --no-pub` impossible. New tests written: own-fingerprint ignore, artwork kind sniff, offer art toJson/parse, malformed art dropped, art roundtrip with/without receiver support. Run `flutter pub get && flutter analyze && flutter test test/nearby_test.dart` when online.
+
+**Remaining**: desktop side (lan.rs respond-during-discover + broadcast sweep, nearby.rs art extension, nearby_ui listener-on-refresh + layout fix, main-window header/white-rect glitch), docs/nearby-music.md, run tests, commit.
+
+**Risks/rollback**: real-device interop unverified; iOS needs Local Network permission granted. Revert = restore deleted `nearby_share_page.dart`/`nearby_receive_page.dart` from `4aa80b2`.
 
 ### TASK-13 Monolith app Wi-Fi sharing (send + receive, desktop-compatible)
 Priority: P1 · Effort: L · Depends: — · Files: `lib/src/core/services/nearby/*`, `lib/src/features/nearby/presentation/*`, `android/app/src/main/AndroidManifest.xml`, `android/app/src/main/kotlin/.../MainActivity.kt`, `ios/Runner/Info.plist`

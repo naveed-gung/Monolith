@@ -9,6 +9,7 @@ import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/track_artwork.dart';
 import '../../../shared/widgets/app_download_indicator.dart';
+import '../../nearby/presentation/nearby_page.dart';
 import '../../nearby/presentation/nearby_share_sheet.dart';
 
 enum _SortOrder { aToZ, zToA, newest, oldest }
@@ -543,6 +544,15 @@ class _LibraryPageState extends State<LibraryPage> {
                         ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    key: const Key('nearby-button'),
+                    onPressed: () {
+                      controller.hapticSelection();
+                      openNearbyPage(context);
+                    },
+                    tooltip: 'Share with nearby Monolith',
+                    icon: PhosphorIcon(PhosphorIcons.broadcast(), size: 22),
                   ),
                   Theme(
                     data: Theme.of(context).copyWith(

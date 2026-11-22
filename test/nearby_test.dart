@@ -58,6 +58,13 @@ Uint8List _audio() {
   return out;
 }
 
+/// Smallest byte string that sniffs as a JPEG cover.
+Uint8List _jpeg() => Uint8List.fromList([
+  0xFF, 0xD8, 0xFF, 0xE0, //
+  ...List<int>.generate(60, (i) => i),
+  0xFF, 0xD9,
+]);
+
 Future<(NearbyChannel, NearbyChannel)> _socketPair({
   NearbyCancel? aCancel,
   NearbyCancel? bCancel,
@@ -286,6 +293,77 @@ void main() {
         cancel.cancel();
       }
     });
+
+    test('scan ignores this device's own responder', () async {
+      final cancel = NearbyCancel();
+      final responder = await NearbyDiscoveryResponder.start(
+        port: 45232,
+        alias: 'Self Device',
+        fingerprint: 'c' * 64,
+      );
+      try {
+        final peers = await nearbyDiscover(
+          cancel: cancel,
+          broadcastAddress: InternetAddress.loopbackIPv4,
+          ignoreFingerprint: 'c' * 64,
+        );
+        expect(peers, isEmpty);
+      } finally {
+        await responder.close();
+        cancel.cancel();
+      }
+    });
+  });
+
+  group('artwork extension', () {
+    test('kind sniffing', () {
+      expect(nearbyArtworkKind(_jpeg()), 'jpg');
+      expect(
+        nearbyArtworkKind([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+        'png',
+      );
+      expect(nearbyArtworkKind([...'RIFF'.codeUnits, 0, 0, 0, 0, ...'WEBP'.codeUnits]), 'webp');
+      expect(nearbyArtworkKind('hello world!'.codeUnits), isNull);
+    });
+
+    test('offer carries artwork fields only when present', () {
+      final plain = NearbyOffer(
+        name: 'a.mp3',
+        title: 'A',
+        size: 10,
+        sha256: 'a' * 64,
+      );
+      expect(plain.toJson().containsKey('artwork_size'), isFalse);
+      final withArt = NearbyOffer(
+        name: 'a.mp3',
+        title: 'A',
+        size: 10,
+        sha256: 'a' * 64,
+        artworkSize: 66,
+        artworkSha256: 'b' * 64,
+        artworkExt: 'jpg',
+      );
+      final parsed = NearbyOffer.parse(withArt.toJson());
+      expect(parsed.hasArtwork, isTrue);
+      expect(parsed.artworkSize, 66);
+      expect(parsed.artworkSha256, 'b' * 64);
+      expect(parsed.artworkExt, 'jpg');
+    });
+
+    test('malformed artwork is dropped, the song offer survives', () {
+      final json = NearbyOffer(
+        name: 'a.mp3',
+        title: 'A',
+        size: 10,
+        sha256: 'a' * 64,
+      ).toJson()
+        ..['artwork_size'] = 9 * 1024 * 1024
+        ..['artwork_sha256'] = 'b' * 64
+        ..['artwork_ext'] = 'gif';
+      final parsed = NearbyOffer.parse(json);
+      expect(parsed.hasArtwork, isFalse);
+      expect(parsed.size, 10);
+    });
   });
 
   group('transfer', () {
@@ -348,6 +426,63 @@ void main() {
         await dir.delete(recursive: true);
       }
     });
+
+    for (final receiverSupportsArtwork in [true, false]) {
+      test(
+        'cover art travels with the song '
+        '(receiver supports artwork: $receiverSupportsArtwork)',
+        () async {
+          final dir = await tempDir();
+          try {
+            final source = File('${dir.path}${Platform.pathSeparator}song.wav')
+              ..writeAsBytesSync(_audio());
+            final cover = File('${dir.path}${Platform.pathSeparator}song.jpg')
+              ..writeAsBytesSync(_jpeg());
+            final offer = await nearbyOfferForFile(
+              source,
+              'Art song',
+              artwork: cover,
+            );
+            expect(offer.hasArtwork, isTrue);
+            expect(offer.artworkExt, 'jpg');
+            final inbox = await Directory(
+              '${dir.path}${Platform.pathSeparator}inbox',
+            ).create();
+            final (client, server) = await _socketPair();
+            Uint8List? savedArt;
+            String? savedExt;
+            final received = nearbyReceive(
+              server,
+              inbox,
+              consent: (_, _) async => true,
+              publish: (staged, name) async => staged.copy(
+                '${inbox.path}${Platform.pathSeparator}$name',
+              ),
+              saveArtwork: receiverSupportsArtwork
+                  ? (_, bytes, ext) async {
+                      savedArt = bytes;
+                      savedExt = ext;
+                    }
+                  : null,
+              import: (_) async {},
+            );
+            await nearbySend(client, source, offer, artwork: cover);
+            final published = await received;
+            expect(await published.readAsBytes(), _audio());
+            if (receiverSupportsArtwork) {
+              expect(savedArt, _jpeg());
+              expect(savedExt, 'jpg');
+            } else {
+              expect(savedArt, isNull);
+            }
+            await client.close();
+            await server.close();
+          } finally {
+            await dir.delete(recursive: true);
+          }
+        },
+      );
+    }
 
     test('TLS rejects a changed certificate', () async {
       final cancel = NearbyCancel();

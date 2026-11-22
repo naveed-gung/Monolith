@@ -5,13 +5,13 @@ import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/design_tokens.dart';
 import '../../../core/models/music_models.dart';
 import '../../../core/widgets/app_icons.dart';
-import 'nearby_receive_page.dart';
-import 'nearby_share_page.dart';
+import 'nearby_page.dart';
 
-/// Song action → Share → chooser. "Monolith app" sends the song directly to a
-/// discovered Monolith device over the local network; "Other apps" keeps the
-/// system share sheet; "Receive" opens the five-minute foreground session.
+/// Song action → Share → chooser. "Nearby Monolith" opens the sharing hub with
+/// the song preselected (the hub also receives while open); "Other apps" keeps
+/// the system share sheet.
 Future<void> showTrackShareSheet(BuildContext context, Track track) async {
+  final canSend = nearbyCanSend(track);
   final action = await showModalBottomSheet<_ShareTarget>(
     context: context,
     showDragHandle: true,
@@ -19,7 +19,7 @@ Future<void> showTrackShareSheet(BuildContext context, Track track) async {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.md,
-          AppSpacing.sm,
+          0,
           AppSpacing.md,
           AppSpacing.xl,
         ),
@@ -27,16 +27,15 @@ Future<void> showTrackShareSheet(BuildContext context, Track track) async {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: PhosphorIcon(PhosphorIcons.wifiHigh()),
-              title: const Text('Monolith app'),
-              subtitle: const Text('Send to a nearby Monolith device'),
+              leading: PhosphorIcon(PhosphorIcons.broadcast()),
+              title: const Text('Nearby Monolith'),
+              subtitle: Text(
+                canSend
+                    ? 'Send with cover art to a phone or computer on this Wi-Fi'
+                    : 'Only songs stored on this device can be sent',
+              ),
+              enabled: canSend,
               onTap: () => Navigator.pop(ctx, _ShareTarget.monolith),
-            ),
-            ListTile(
-              leading: PhosphorIcon(PhosphorIcons.downloadSimple()),
-              title: const Text('Receive'),
-              subtitle: const Text('Let another Monolith device send to you'),
-              onTap: () => Navigator.pop(ctx, _ShareTarget.receive),
             ),
             ListTile(
               leading: PhosphorIcon(AppIcons.share),
@@ -53,26 +52,7 @@ Future<void> showTrackShareSheet(BuildContext context, Track track) async {
   if (!context.mounted) return;
   switch (action) {
     case _ShareTarget.monolith:
-      final fp = track.filePath;
-      if (fp == null || fp.trim().isEmpty) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Only songs stored on this device can be sent to Monolith.',
-            ),
-          ),
-        );
-        return;
-      }
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => NearbySharePage(track: track),
-        ),
-      );
-    case _ShareTarget.receive:
-      await Navigator.of(
-        context,
-      ).push(MaterialPageRoute<void>(builder: (_) => const NearbyReceivePage()));
+      await openNearbyPage(context, tracks: [track]);
     case _ShareTarget.system:
       await shareTrackWithSystem(track);
     case null:
@@ -92,4 +72,4 @@ Future<void> shareTrackWithSystem(Track track) async {
   }
 }
 
-enum _ShareTarget { monolith, receive, system }
+enum _ShareTarget { monolith, system }

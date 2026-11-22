@@ -11,6 +11,7 @@ verified-by: claude-code
 
 | Date | Agent | Work | Commit |
 |------|-------|------|--------|
+| 2026-11-22 | claude-code | release 1.5.3+19 (nearby Share hub, cover art, discovery, CI Flutter pin); tag v1.5.3 pushed with user approval | see git log |
 | 2026-11-22 | claude-code | TASK-19 pin Flutter 3.47.9 in CI (Android Gradle break on 3.50.1); AUDIT.md + 00-INDEX made path-free (no local absolute paths) | see git log |
 | 2026-11-22 | claude-code | TASK-18 opened: share hub page, artwork wire extension, discovery sweep/repeat/self-filter, Library share entry, tests (not run, no-build constraint); desktop side pending | 5fe4331 |
 | 2026-11-10 | devin | TASK-17 scoped-storage fix: stage all in-progress downloads privately, artwork to private Art dir (both downloader pipelines); 1.5.2+18 | uncommitted |

@@ -2,7 +2,14 @@
 
 All notable changes to Monolith are documented here.
 
-## [1.5.2] — Unreleased
+## [1.5.3] — 2026-11-22
+
+- One Share hub, reachable from the Library header and every song's Share sheet: this phone is visible to nearby Monolith devices while the hub is open (no separate Receive step), with a live device list, multi-song sending, per-song progress and an approval prompt for incoming songs.
+- Cover art now travels with shared songs (backward-compatible protocol extension; older Monolith versions still exchange songs).
+- More reliable device discovery on Wi-Fi: directed broadcast plus a local-subnet sweep in repeated bursts, so routers that drop plain broadcast no longer hide devices.
+- CI pins Flutter 3.47.9 so release builds stay reproducible.
+
+## [1.5.2] — 2026-11-11
 
 - Fix YouTube downloads failing at 100% on Android 11+: in-progress files (`.part`, source video, extracted audio) and artwork are no longer written into public `Music` — scoped storage only permits audio files there. Downloads now stage privately and publish the finished audio file; thumbnails land in the private `Art` folder.
 

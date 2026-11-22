@@ -16,6 +16,7 @@ task below came from reading the code or running the tooling — no filler.
 
 | ID | Title | Priority | Effort | Status | Last touched |
 |----|-------|----------|--------|--------|--------------|
+| TASK-19 | CI pins the Flutter version (stable 3.50.1 broke the Android Gradle build) | P1 | S | IN-PROGRESS | 2026-11-22 |
 | TASK-18 | Share hub: one screen, always discoverable, cover art, reliable discovery | P1 | L | IN-PROGRESS | 2026-11-22 |
 | TASK-13 | Monolith app Wi-Fi sharing (send + receive, desktop-compatible) | P1 | L | DONE | 2026-11-10 |
 | TASK-14 | Premium player open/close shared-element transition | P1 | M | DONE | 2026-11-10 |
@@ -36,6 +37,21 @@ task below came from reading the code or running the tooling — no filler.
 | TASK-05 | Custom shuffle/repeat on the iOS Lock Screen | P3 | M | DROPPED | 2026-09-19 |
 
 ## Tasks
+
+### TASK-19 CI pins the Flutter version
+
+**Why**: `subosito/flutter-action@v2` with only `channel: stable` silently moved CI from
+Flutter 3.47.9 (last green, v1.5.2) to 3.50.1. On 3.50.1 the Android build fails at
+`android/build.gradle.kts:108` with a missing
+`ApplicationExtension.getDefaultConfig()` (Android Gradle plugin API mismatch). iOS
+passed on the same commit, so the Dart code was not the cause.
+
+**Fix**: `flutter-version: 3.47.9` in both `android.yml` and `ios.yml`. DONE once the
+next `main` Android run is green.
+
+**Follow-up**: upgrade deliberately later. Bump Flutter, AGP and the Kotlin Gradle plugin
+together in one PR and remove the `evaluationDependsOn(":app")` block if it is no longer
+needed.
 
 ### TASK-18 Share hub: one screen, always discoverable, cover art, reliable discovery
 Priority: P1 · Effort: L · Depends: TASK-13 · Files: `lib/src/features/nearby/presentation/nearby_page.dart`, `nearby_share_sheet.dart`, `lib/src/core/services/nearby/{nearby_wire,nearby_transfer,nearby_discovery}.dart`, `download_store.dart`, `library_page.dart`, `test/nearby_test.dart`; desktop `Monolith-DE` `src/{lan,nearby,nearby_ui}.rs`, `ui/nearby.slint`

@@ -46,8 +46,8 @@ Human-facing docs (authoritative, not agent-maintained): `docs/architecture.md`,
   from throwaway probes under `artifacts/audit/`, `build/`, `scripts/` (TASK-01).
 - The full `flutter test` suite takes ~15 min on Windows — slow, not hung. Per-file runs
   are seconds.
-- Toolchain: Flutter SDK `C:/Users/naveed/develop/flutter`, Android SDK
-  `C:/Users/naveed/AppData/Local/Android/Sdk`, AVD `Pixel_10a`.
+- Toolchain: local Flutter SDK (CI pins Flutter 3.47.9), Android SDK under
+  `%LOCALAPPDATA%/Android/Sdk`, AVD `Pixel_10a`.
 
 ## Status legend
 

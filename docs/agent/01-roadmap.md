@@ -16,7 +16,7 @@ task below came from reading the code or running the tooling — no filler.
 
 | ID | Title | Priority | Effort | Status | Last touched |
 |----|-------|----------|--------|--------|--------------|
-| TASK-19 | CI pins the Flutter version (stable 3.50.1 broke the Android Gradle build) | P1 | S | IN-PROGRESS | 2026-11-22 |
+| TASK-19 | CI pins the Flutter version (stable 3.50.1 broke the Android Gradle build) | P1 | S | DONE | 2026-11-22 |
 | TASK-18 | Share hub: one screen, always discoverable, cover art, reliable discovery | P1 | L | IN-PROGRESS | 2026-11-22 |
 | TASK-13 | Monolith app Wi-Fi sharing (send + receive, desktop-compatible) | P1 | L | DONE | 2026-11-10 |
 | TASK-14 | Premium player open/close shared-element transition | P1 | M | DONE | 2026-11-10 |
